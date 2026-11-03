@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial characters</title>
+<style>
+  :root { --bg: #F6F5FB; --panel: #fff; --ink: #24213F; --ink-2: #6B6789; --line: #E4E1F0; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17151F; --panel: #221F2E; --ink: #EEECF7; --ink-2: #A7A3BD; --line: #36324A; } }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; } p { color: var(--ink-2); margin: 0 0 20px; max-width: 640px; }
+  h2 { font-size: 16px; margin: 24px 0 10px; } h2 small { color: var(--ink-2); font-weight: 400; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  figure { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+  figure img { width: 96px; height: 96px; } figcaption { font-size: 12px; color: var(--ink-2); }
+  code { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; }
+</style>
+</head>
+<body>
+<h1>Tutorial characters</h1>
+<p>Every guide in <code>tutorials/config.js</code>, in every mood, moving as it will in the app. Edit a picture in <code>tutorials/characters/&lt;name&gt;/</code> and reload this page to see it.</p>
+<div id="out"></div>
+<script src="config.js"></script>
+<script>
+  const MOODS = ['idle', 'talk', 'happy', 'cheer', 'wink', 'idea', 'think', 'point', 'surprised', 'sad'];
+  const cfg = window.SB_TUTORIALS || {}, out = document.getElementById('out');
+  for (const [id, c] of Object.entries(cfg.characters || {})) {
+    const h = document.createElement('h2'); h.innerHTML = `${c.name || id} <small>${id === cfg.character ? '(the default guide)' : ''}</small>`; out.appendChild(h);
+    const g = document.createElement('div'); g.className = 'grid'; out.appendChild(g);
+    for (const m of MOODS) { const f = document.createElement('figure'), im = new Image(); im.alt = `${c.name} ${m}`; im.src = '../' + c.folder.replace(/\/$/, '') + '/' + m + '.' + (c.ext || 'svg');
+      im.onerror = () => { f.style.opacity = .4; }; const cap = document.createElement('figcaption'); cap.textContent = m; f.append(im, cap); g.appendChild(f); }
+  }
+</script>
+</body>
+</html>

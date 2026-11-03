@@ -1,0 +1,28 @@
+# Dependencies (the app has none; this is for tooling you may add)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+*.tmp
+.cache/
+
+# Local test output (screenshots, exports)
+/shots/
+/out/
+/scratch/
+
+# Environment files
+.env
+.env.*

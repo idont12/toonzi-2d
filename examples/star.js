@@ -1,0 +1,3 @@
+/* Toonzi 2D example. List it in examples/index.js:
+   SB.examples.add({ name: "Star", kind: 'object', file: "examples/star.js" }); */
+SB.examples.data("examples/star.js", {"name":"Star","link":"q4h1q36w","objects":[{"id":"q4h1q36w","type":"shape","name":"Star","start":0,"dur":2,"hidden":false,"locked":false,"x":640,"y":360,"scale":1,"scx":1,"scy":1,"rot":0,"opacity":1,"ax":0,"ay":0,"tracks":{},"effects":[{"id":"cd5m087y","type":"wobble","on":true,"amt":1,"speed":1}],"frames":[{"strokes":[]}],"fps":8,"play":"loop","frame":0,"phase":0,"shape":"star","w":220,"h":220,"fill":"#FFC83D","fillOn":true,"stroke":"#E08A00","strokeW":8,"link":"q4h1q36w"}],"w":1280,"h":720});

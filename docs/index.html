@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Toonzi 2D documentation</title>
+<meta name="description" content="How to use Toonzi 2D: every tool, the timeline, rigs, physics, effects, interactive mode and every export, explained in short steps.">
+<style>
+  /* Tokens. Light by default, dark when the device is dark. */
+  :root {
+    --bg: #FBFAFF; --panel: #FFFFFF; --panel-2: #F4F1FF; --ink: #24213F; --ink-2: #5E5A7C; --line: #E3DFF5;
+    --brand: #5B3DF5; --brand-ink: #FFFFFF; --brand-soft: #ECE7FF; --pink: #E0357A; --teal: #0F8C7E; --amber: #9A5B00;
+    --note-bg: #ECE7FF; --tip-bg: #E3F6F2; --warn-bg: #FFF1DB;
+    --code-bg: #F0EDFB; --shadow: 0 1px 2px rgba(36,33,63,.06), 0 6px 20px rgba(36,33,63,.06);
+    --radius: 12px; --toc-w: 250px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14121F; --panel: #1C1930; --panel-2: #241F3E; --ink: #ECEAF7; --ink-2: #A9A5C7; --line: #332E52;
+      --brand: #8F7BFF; --brand-ink: #14121F; --brand-soft: #2A2450; --pink: #FF7AA8; --teal: #4FD1C0; --amber: #FFC266;
+      --note-bg: #272150; --tip-bg: #14312E; --warn-bg: #3A2B0F;
+      --code-bg: #2A2548; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.25);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 Lexend, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand); text-underline-offset: 2px; }
+  a:hover { text-decoration-thickness: 2px; }
+  h1, h2, h3, h4 { line-height: 1.25; margin: 0; }
+  p { margin: 0 0 .9em; }
+  ul, ol { margin: 0 0 1em; padding-left: 1.3em; }
+  li { margin: .2em 0; }
+  code, kbd { font: .86em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { background: var(--code-bg); padding: .1em .38em; border-radius: 5px; }
+  kbd { display: inline-block; background: var(--panel); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: .02em .42em; white-space: nowrap; color: var(--ink); }
+  .skip { position: absolute; left: -999px; top: 0; background: var(--brand); color: var(--brand-ink); padding: 8px 14px; border-radius: 0 0 8px 0; z-index: 30; }
+  .skip:focus { left: 0; }
+
+  /* Header */
+  .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px max(16px, env(safe-area-inset-left)); background: var(--bg); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: var(--brand); display: grid; place-items: center; }
+  .brand .logo svg { width: 18px; height: 18px; fill: none; stroke: var(--brand-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .brand small { font-weight: 400; color: var(--ink-2); }
+  .top .sp { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); text-decoration: none; font-weight: 600; font-size: .9rem; border: 0; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn:hover { filter: brightness(1.06); }
+
+  /* Layout */
+  .wrap { display: grid; grid-template-columns: var(--toc-w) minmax(0, 1fr); gap: 36px; max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
+  .toc { position: sticky; top: 64px; align-self: start; max-height: calc(100vh - 80px); overflow: auto; font-size: .92rem; }
+  .toc summary { display: none; }
+  .toc nav { display: flex; flex-direction: column; gap: 1px; }
+  .toc a { display: block; padding: 3px 10px; border-radius: 8px; color: var(--ink-2); text-decoration: none; border-left: 3px solid transparent; }
+  .toc a:hover { background: var(--panel-2); color: var(--ink); }
+  .toc a.on { background: var(--brand-soft); color: var(--ink); border-left-color: var(--brand); font-weight: 600; }
+  .toc .grp { margin: 9px 10px 2px; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  main { min-width: 0; }
+  main > section { margin-bottom: 56px; }
+  main h2 { font-size: 1.7rem; margin: 0 0 .5em; letter-spacing: -.015em; padding-top: 8px; }
+  main h2 .num { color: var(--brand); margin-right: .35em; }
+  main h3 { font-size: 1.15rem; margin: 1.6em 0 .5em; }
+  main h4 { font-size: 1rem; }
+  .lead { font-size: 1.1rem; color: var(--ink-2); }
+  .hash { opacity: 0; margin-left: .3em; text-decoration: none; font-weight: 400; }
+  h2:hover .hash, h3:hover .hash { opacity: .6; }
+
+  /* Hero of the page */
+  .hero { background: linear-gradient(135deg, var(--brand-soft), var(--panel-2)); border: 1px solid var(--line); border-radius: 18px; padding: 28px clamp(18px, 4vw, 40px); margin-bottom: 40px; }
+  .hero h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); letter-spacing: -.02em; margin-bottom: .3em; }
+  .hero p { max-width: 60ch; color: var(--ink-2); font-size: 1.08rem; margin-bottom: 1em; }
+  .hero .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .hero img { display: block; width: 100%; height: auto; border-radius: 12px; margin-top: 22px; background: #24213F; }
+
+  /* Pieces */
+  .callout { border-radius: var(--radius); padding: 12px 16px; margin: 1em 0; background: var(--note-bg); border: 1px solid var(--line); }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout.tip { background: var(--tip-bg); }
+  .callout.warn { background: var(--warn-bg); }
+  .callout b:first-child { margin-right: .3em; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: .6em 0 1em; }
+  .steps li { counter-increment: s; position: relative; padding: 2px 0 2px 38px; margin: .45em 0; min-height: 28px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: .85rem; display: grid; place-items: center; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 1em 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .card.wide { grid-column: 1 / -1; }
+  .card h4 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin-bottom: 6px; font-size: 1.02rem; }
+  .card h4 .id { font-weight: 400; font-size: .76rem; color: var(--ink-2); }
+  .card h4 kbd { font-size: .74rem; }
+  .card p { font-size: .94rem; color: var(--ink-2); margin-bottom: .5em; }
+  .card ul, .card ol { font-size: .92rem; margin-bottom: 0; padding-left: 1.15em; }
+  .card li { margin: .15em 0; }
+  .chip { display: inline-block; font-size: .72rem; padding: 1px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-weight: 600; vertical-align: 1px; }
+  .chip.pink { background: color-mix(in srgb, var(--pink) 16%, transparent); color: var(--pink); }
+  .tablewrap { overflow-x: auto; margin: 1em 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--panel-2); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  table.wide { min-width: 620px; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+  details.more { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 0 16px; margin: .8em 0; }
+  details.more summary { cursor: pointer; padding: 11px 0; font-weight: 600; }
+  details.more[open] summary { border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .menupath { font-weight: 600; }
+  .menupath::after { content: ""; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: .6em 0 1em; }
+  .kv dt { font-weight: 600; } .kv dd { margin: 0; color: var(--ink-2); }
+
+  /* Demos (slots for animations made in Toonzi 2D) */
+  figure.demo { margin: 1.2em 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  figure.demo img, figure.demo iframe, figure.demo object { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; background: var(--panel-2); }
+  figure.demo img { object-fit: contain; height: auto; }
+  figure.demo object { height: auto; }
+  figure.demo.wide { grid-column: 1 / -1; }
+  .demos + p { margin-top: 1.1em; }
+  figure.demo figcaption { padding: 10px 16px; font-size: .9rem; color: var(--ink-2); border-top: 1px solid var(--line); }
+  .demos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+  .demos figure.demo { margin: 0; }
+
+  footer { border-top: 1px solid var(--line); padding: 24px 20px 40px; text-align: center; color: var(--ink-2); font-size: .9rem; }
+
+  /* Phones and tablets: the contents list folds into a button at the top. */
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 14px 16px 64px; }
+    .toc { position: sticky; top: 52px; z-index: 15; max-height: none; margin: 0 -16px 18px; background: var(--bg); border-bottom: 1px solid var(--line); }
+    .toc summary { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; font-weight: 600; cursor: pointer; list-style: none; }
+    .toc summary::-webkit-details-marker { display: none; }
+    .toc summary::after { content: "Show"; font-weight: 400; font-size: .85rem; color: var(--brand); }
+    .toc[open] summary::after { content: "Hide"; }
+    .toc nav { max-height: 60vh; overflow: auto; padding: 0 12px 12px; }
+    html { scroll-padding-top: 118px; }
+    main h2 { font-size: 1.45rem; }
+    .brand small { display: none; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .kv { grid-template-columns: 1fr; gap: 0; } .kv dd { margin-bottom: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  @media print { .top, .toc { display: none; } .wrap { display: block; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the documentation</a>
+
+<header class="top">
+  <a class="brand" href="#top" aria-label="Toonzi 2D documentation, top of the page">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M8 5v14M16 5v14M3 10h5M3 14h5M16 10h5M16 14h5"/></svg></span>
+    <span>Toonzi 2D <small>documentation</small></span>
+  </a>
+  <span class="sp"></span>
+  <a class="btn" href="../index.html">Open the app</a>
+</header>
+
+<div class="wrap" id="top">
+  <details class="toc" id="toc" open>
+    <summary>Contents</summary>
+    <nav aria-label="Contents">
+      <span class="grp">Start</span>
+      <a href="#start">Getting started</a>
+      <a href="#screen">The screen</a>
+      <span class="grp">Make</span>
+      <a href="#tools">Tools</a>
+      <a href="#timeline">Timeline and keyframes</a>
+      <a href="#frames">Frame by frame</a>
+      <a href="#layers">Layers, groups, shots</a>
+      <a href="#masks">Masks</a>
+      <a href="#fx">Effects and transitions</a>
+      <span class="grp">Move</span>
+      <a href="#rigs">Rigs and bones</a>
+      <a href="#controls">Controllers and constraints</a>
+      <a href="#physics">Physics</a>
+      <a href="#interactive">Interactive mode</a>
+      <span class="grp">Organize and share</span>
+      <a href="#screens">Screens and the board</a>
+      <a href="#export">Exporting</a>
+      <span class="grp">Customize</span>
+      <a href="#settings">Settings</a>
+      <a href="#keys">Shortcuts and your actions</a>
+      <a href="#tutorials">Tutorials and the maker</a>
+      <span class="grp">More</span>
+      <a href="#demos">Made in Toonzi 2D</a>
+      <a href="#help">Help</a>
+    </nav>
+  </details>
+
+  <main id="main">
+
+    <div class="hero">
+      <h1>Toonzi 2D documentation</h1>
+      <p>Everything the app can do, in short steps. You do not need to read it in order: pick a topic from the contents, or jump into a <a href="#tutorials">built-in tutorial</a> and learn by doing.</p>
+      <div class="row">
+        <a class="btn" href="../index.html">Open the app</a>
+        <a class="btn ghost" href="#start">Getting started</a>
+        <a class="btn ghost" href="#demos">See animations made in it</a>
+      </div>
+      <!-- TOONZI: hero animation. The same file as the README hero: docs/media/hero.svg (see media/README.txt) -->
+      <img src="media/hero.svg" width="1280" height="640" alt="Toonzi 2D: Draw, Rig, Animate, Export. A ball bounces, a star spins." fetchpriority="low">
+    </div>
+
+    <!-- ===================================================== -->
+    <section id="start">
+      <h2><span class="num">1</span>Getting started</h2>
+      <p class="lead">Toonzi 2D is a 2D animation studio that runs in your browser. Everything stays on your device.</p>
+
+      <h3>Open it</h3>
+      <ul>
+        <li><strong>Open <code>index.html</code></strong> in the project folder (double-click it). Drawing, animating, tutorials and most exports work from the folder.</li>
+        <li><strong>Or serve the folder</strong> with <code>python3 -m http.server</code> or <code>npx serve</code>. You need this for <em>Export as › Interactive › HTML</em>, which packs the app's files into one page.</li>
+        <li>Use Chrome or Edge for the best results (video export uses WebCodecs).</li>
+      </ul>
+
+      <h3>Make something in two minutes</h3>
+      <ol class="steps">
+        <li>Click the <strong>logo</strong> at the top left. This is the main menu. Choose <strong>Tutorials…</strong> and start <strong>Drawing: brush and eraser</strong>. A guide character, Pip, walks you through it.</li>
+        <li>Or draw by yourself: press <kbd>B</kbd> for the Brush and draw on the stage.</li>
+        <li>Press <kbd>K</kbd> to add a keyframe, click the ruler later in time, drag your drawing somewhere else and press <kbd>K</kbd> again.</li>
+        <li>Press <kbd>Home</kbd>, then <kbd>Space</kbd> to play.</li>
+        <li>Logo menu › <strong>Export…</strong> to get a video, an animated SVG and more.</li>
+      </ol>
+
+      <h3>Your work is safe</h3>
+      <p>The app autosaves in your browser. For a file you can keep or send, use logo menu › <strong>Save project</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>). It makes one <code>.json</code> file that includes your pictures and sounds. <strong>Open project…</strong> loads it, and <strong>Recent projects</strong> lists what you opened lately. <strong>Examples</strong> opens ready-made projects.</p>
+
+      <div class="callout tip"><b>Tip</b> <kbd>Ctrl</kbd> means <kbd>⌘</kbd> on a Mac. <kbd>Esc</kbd> steps back one level: closes a menu, then leaves the tool, then clears the selection.</div>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="screen">
+      <h2><span class="num">2</span>The screen</h2>
+      <p>The window has five parts.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Part</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td>Top bar</td><td>The <strong>logo</strong> (main menu), the project name, <strong>undo and redo</strong>, the <strong>snap</strong> magnet, the <strong>Made for</strong> chip (starts as <em>Video</em>), <strong>Settings</strong> (the gear) and <strong>Big stage</strong>.</td></tr>
+          <tr><td>Tool bar</td><td>On the left. The tools you draw and edit with, and the buttons that add a <strong>Drawing</strong>, <strong>Text</strong>, <strong>Shape</strong> or <strong>Import</strong>. Its <strong>⋯</strong> button lets you hide and reorder tools.</td></tr>
+          <tr><td>Stage</td><td>The middle. The picture you are making. The bar above it shows options for the current tool. The zoom box has <strong>−</strong>, <strong>+</strong> and <strong>Fit</strong>.</td></tr>
+          <tr><td>Properties panel</td><td>On the right. Settings for the selected layer: Position and look, Effects, Transitions, Rig, Physics, Controls, Mask. With nothing selected it shows the <strong>Project</strong>.</td></tr>
+          <tr><td>Timeline</td><td>At the bottom. A bar of buttons (play, keyframe, onion skin…), the <strong>frames bar</strong> of the selected drawing, and one row per layer.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>The logo menu</h3>
+      <p class="menupath">Tutorials… · New project · Open project… · Recent projects · Examples · Save project · Save as an example file… · Import files… · Record voice · Saved objects… · Export… · Project settings… · Settings…</p>
+
+      <h3>Layouts: desktop, tablet, phone</h3>
+      <p>The layout fits the window. Wide: tools left, properties right, timeline below. Medium: the properties panel slides over the stage (use the panel button or <kbd>I</kbd>). Narrow: the stage is on top, the tools sit in a strip, and a dock below has <em>Timeline</em> and <em>Layer</em> tabs. Choose one yourself in <em>Settings › Appearance › Layout</em>.</p>
+      <ul>
+        <li><strong>Big stage</strong> (<kbd>F</kbd>) hides the top bar and the panel so the picture fills the window. One menu button on the stage opens Settings, Export and New project. The timeline shows only the selected layers.</li>
+        <li><strong>Touch:</strong> two fingers pan and pinch-zoom the stage, a long press does what right-click does, and handles get bigger.</li>
+        <li><strong>Snapping and guides:</strong> the magnet in the top bar (or <kbd>;</kbd>). Hold <kbd>Alt</kbd> to switch it for one drag.</li>
+        <li><strong>Move around:</strong> hold <kbd>Space</kbd> and drag, use the middle mouse button, or pick the Hand tool.</li>
+      </ul>
+      <p>Hover over any button for a tip. The small <strong>?</strong> buttons open help for a panel.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="tools">
+      <h2><span class="num">3</span>Tools</h2>
+      <p>These are the tools in the tool bar. Each has a name, an id (used in the code) and a shortcut. Pick one by clicking it or pressing its key. Tools that look alike are grouped: press and hold a button, or right-click it, to choose another tool of the group.</p>
+
+      <h3>Choose and move</h3>
+      <div class="grid">
+        <div class="card wide"><h4>Select <kbd>V</kbd> <span class="id">select</span></h4>
+          <p>Select, move, resize and rotate.</p>
+          <ul><li>Click a layer. Drag it to move; drag a handle to resize or turn it.</li><li>Drag on empty space to box-select. <kbd>Shift</kbd>+click adds to the selection.</li><li>Two or more layers get one box around all of them.</li><li><kbd>Alt</kbd>+drag makes a copy.</li><li>With <em>This frame</em> on in the drawing bar, the box changes the lines of one frame, not the layer.</li></ul></div>
+        <div class="card"><h4>Hand <kbd>H</kbd> <span class="id">hand</span></h4>
+          <p>Move around the stage. Drag to pan. The bar has <strong>Fit</strong> and <strong>100%</strong>.</p></div>
+        <div class="card"><h4>Cut <kbd>C</kbd> <span class="id">cut</span></h4>
+          <p>Cut clips like scissors.</p>
+          <ul><li>Click a clip in the timeline where it should be cut.</li><li>Or click a layer on the stage to cut it at the playhead.</li><li>Press <kbd>C</kbd> again to put the scissors away.</li></ul></div>
+        <div class="card"><h4>Screens <kbd>M</kbd> <span class="id">screen</span></h4>
+          <p>Add and arrange screens (separate canvases on one board). Drag on empty space to draw a screen, or pick a size in the bar. See <a href="#screens">Screens and the board</a>.</p></div>
+      </div>
+
+      <h3>Draw</h3>
+      <div class="grid">
+        <div class="card wide"><h4>Brush <kbd>B</kbd> <span class="id">brush</span></h4>
+          <p>Draw freehand on the selected drawing.</p>
+          <ul><li>The <strong>brush chip</strong> picks or edits brushes. Set color and size (<kbd>[</kbd> and <kbd>]</kbd> change the size).</li><li><strong>Detailed</strong> keeps every wiggle; <strong>Simple curve</strong> makes a clean path with a few editable points.</li><li><strong>Smoothing</strong> and <strong>Stabilize</strong> (with a Rope length) steady a shaky hand. <strong>Pressure</strong> shows when you use a pen.</li><li><strong>Mirror</strong> draws everything again across a line; drag its dots to move or turn the line.</li><li>Hold <kbd>Ctrl</kbd> and drag across loose ends to trim them.</li></ul></div>
+        <div class="card"><h4>Fill brush <kbd>Shift</kbd>+<kbd>G</kbd> <span class="id">fillbrush</span></h4>
+          <p>Paint solid shapes with no outline. Draw around an area and it fills with the color. The result is an editable filled path.</p></div>
+        <div class="card"><h4>Eraser <kbd>E</kbd> <span class="id">eraser</span></h4>
+          <p>Cuts lines and shapes on the current frame of the selected drawing. It has Size, Smoothing, Stabilize and Mirror. <kbd>Ctrl</kbd>+drag trims loose ends here too.</p></div>
+        <div class="card"><h4>Fill <kbd>G</kbd> <span class="id">fill</span></h4>
+          <p>The paint bucket. Pick a color, then click inside a closed area. Click a fill again to recolor it. On a shape layer it sets the shape's fill.</p></div>
+        <div class="card"><h4>Gradient <kbd>Shift</kbd>+<kbd>F</kbd> <span class="id">gradient</span></h4>
+          <p>Drag across a shape or drawing to lay a gradient. Then drag its two ends, its line and its color dots to change it.</p></div>
+      </div>
+
+      <h3>Shape lines and vectors</h3>
+      <div class="grid">
+        <div class="card"><h4>Smooth <kbd>O</kbd> <span class="id">smooth</span></h4>
+          <p>Brush over wobbly lines to round them. Set <strong>Size</strong> and <strong>Strength</strong>.</p></div>
+        <div class="card"><h4>Width <kbd>W</kbd> <span class="id">width</span></h4>
+          <p>Brush over a line to make that part thicker (<strong>Thicker</strong>) or thinner (<strong>Thinner</strong>); hold <kbd>Alt</kbd> to do the opposite. <strong>Even widths</strong> resets the frame.</p></div>
+        <div class="card"><h4>Pull <kbd>U</kbd> <span class="id">pull</span></h4>
+          <p>Drag to stretch the nearby part of a line or shape, like pulling clay. <strong>Size</strong> sets how far it reaches and the falloff sets how it fades.</p></div>
+        <div class="card"><h4>Pen <kbd>P</kbd> <span class="id">pen</span></h4>
+          <p>Draw vector paths.</p>
+          <ul><li>Click for a corner. Click and drag for a curve.</li><li>Click the first point again to close the shape, or press <kbd>Enter</kbd> to finish.</li><li>Hold <kbd>Shift</kbd> to go level or upright from the last point.</li></ul></div>
+        <div class="card"><h4>Points <kbd>A</kbd> <span class="id">points</span></h4>
+          <p>Edit the points of drawings and paths.</p>
+          <ul><li>Click a point or box-select several. Drag to move them; arrow keys nudge (<kbd>Ctrl</kbd> for 10 px).</li><li>Double-click a point to bend it (handles show). The bar sets it <strong>Sharp</strong> or <strong>Smooth</strong>.</li><li>Double-click a line to add a point. <kbd>Alt</kbd>+click a point deletes it.</li><li><kbd>Ctrl</kbd>+<kbd>J</kbd> copies the selected parts to a new layer.</li></ul></div>
+      </div>
+
+      <h3>Rig tools</h3>
+      <div class="grid">
+        <div class="card"><h4>Bones <kbd>J</kbd> <span class="id">bone</span></h4>
+          <p>Draw bones for a rig, then pose them. See <a href="#rigs">Rigs and bones</a>.</p>
+          <ul><li>Click to place joints. Double-click or press <kbd>Enter</kbd> to finish the chain.</li><li>Drag a joint to change the rest pose; click a joint to grow a new bone from it.</li></ul></div>
+        <div class="card"><h4>Weights <span class="chip">inside a rig</span> <span class="id">weights</span></h4>
+          <p>Paint which parts of a bending layer follow the selected bone. It has no button of its own: choose <strong>Weights</strong> in the rig bar or <strong>Paint weights</strong> on a bone.</p></div>
+        <div class="card"><h4>Collision shape <span class="chip">inside physics</span> <span class="id">collider</span></h4>
+          <p>Edit the shape that physics uses for a layer. Drag its points, double-click a line to add one, <kbd>Alt</kbd>+click deletes one.</p></div>
+      </div>
+
+      <h3>Add buttons</h3>
+      <p>Under the tools are buttons that add a layer.</p>
+      <dl class="kv">
+        <dt>Drawing</dt><dd>A new drawing layer to draw on.</dd>
+        <dt>Text <kbd>T</kbd></dt><dd>A text layer. Press <kbd>Enter</kbd> to type in the selected text. Pick a font, size, color and more in the panel.</dd>
+        <dt>Shape</dt><dd>Rectangle, Rounded box, Circle, Polygon, Star or Arrow. Shapes keep their outline editable: right-click › <em>Convert to editable path</em> to edit points.</dd>
+        <dt>Import</dt><dd>Image, SVG, Video, Audio, Photoshop (PSD), Illustrator or PDF, and <em>Record voice</em>. You can also drop files anywhere on the window.</dd>
+      </dl>
+      <div class="callout"><b>Make the tool bar yours.</b> Click <strong>⋯</strong> at the bottom of the tool bar to hide tools or change their order. Choose a ready-made arrangement in <em>Settings › Appearance › Tool bar</em> (Toonzi 2D, Adobe Animate, Photoshop, OpenToonz, Every tool, Simple).</div>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="timeline">
+      <h2><span class="num">4</span>Timeline and keyframes</h2>
+      <p>Every layer is a <strong>clip</strong> in the timeline. A <strong>keyframe</strong> (a diamond) says what a value is at one moment. The app fills in the movement between keys. This is called a <em>tween</em>.</p>
+
+      <h3>Make a keyframe</h3>
+      <ol class="steps">
+        <li>Click a layer to select it.</li>
+        <li>Press <kbd>K</kbd> (<strong>Add keyframe</strong>). A diamond appears on the layer's row.</li>
+        <li>Click the <strong>ruler</strong> at another time. The playhead jumps there.</li>
+        <li>Move, turn or resize the layer on the stage.</li>
+        <li>Press <kbd>K</kbd> again. Press <kbd>Home</kbd> and then <kbd>Space</kbd> to play.</li>
+      </ol>
+      <ul>
+        <li><strong>Auto key</strong> (a timeline button) makes keyframes for you whenever you change something. Turn it off again so nothing changes by accident.</li>
+        <li><strong>Record motion</strong> (<kbd>R</kbd>) records while it plays: drag a layer, a bone or a controller and your movement becomes keys.</li>
+        <li><strong>Animation rows:</strong> right-click a layer › <em>Animate › Show animation rows</em> (or the <strong>Animation rows</strong> button) to see a row for each property with its own keys. <strong>Animated only</strong> hides the others.</li>
+        <li><kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Alt</kbd>+<kbd>→</kbd> jump to the previous and next keyframe. <strong>Snap to keys</strong> (<kbd>Alt</kbd>+<kbd>K</kbd>) makes the playhead stick to keys.</li>
+        <li>Right-click a layer › <em>Loop keyframes</em> repeats its motion. <em>Animate › Clean up keyframes</em> and <em>Remove all keyframes</em> tidy up.</li>
+      </ul>
+
+      <h3>Easing and curves</h3>
+      <p>Right-click a keyframe and choose <strong>Ease</strong> to say how it moves toward the next key:</p>
+      <p><span class="chip">Smooth</span> <span class="chip">Linear</span> <span class="chip">Speed up</span> <span class="chip">Slow down</span> <span class="chip">Overshoot</span> <span class="chip">Bounce</span> <span class="chip">Elastic</span> <span class="chip">Hold</span> <span class="chip">Custom curve…</span></p>
+      <p><strong>Custom curve…</strong> opens a speed graph. Drag the handles to shape how it speeds up and slows down (drag above or below the box to overshoot). Double-click the curve to add a point. While it is open the stage plays that stretch over and over so you see the change live. <strong>Hold</strong> keeps the value until the next key, with no tween.</p>
+
+      <h3>Motion path</h3>
+      <p>Select an animated layer and the route it travels shows as a dotted line, with a tick per frame. Drag a keyframe point to move it, drag a handle to bend the path, double-click the path to add a key, <kbd>Alt</kbd>+click a point to remove it. Drag the small round dot to bend the part between two keys.</p>
+
+      <h3>Clips: move, trim, cut</h3>
+      <ul>
+        <li>Drag a clip to move it in time. Drag its edges to trim.</li>
+        <li><kbd>S</kbd> (<strong>Cut at the playhead</strong>) cuts the selected clip in two. The <strong>Cut</strong> tool (<kbd>C</kbd>) cuts the clip you click.</li>
+        <li>A cut clip is two <em>parts</em>. Click one and press <kbd>Delete</kbd> to remove it; right-click › <em>Join the parts into one clip</em> to undo the cut.</li>
+        <li>Shift-click keys to pick several, then drag, copy (<em>Copy keyframes</em>) and paste at the playhead (<em>Paste keyframes at playhead</em>).</li>
+      </ul>
+
+      <h3>The timeline bar</h3>
+      <p>Buttons, left to right in the default layout: <strong>Go to start</strong>, <strong>Previous key</strong>, <strong>Back one frame</strong>, <strong>Play</strong>, <strong>Next key</strong>, <strong>Forward one frame</strong>, <strong>Loop</strong>, the <strong>Time</strong> display, <strong>Onion skin</strong>, <strong>Frame view</strong>, <strong>Whole frames</strong>, <strong>Record voice</strong>, <strong>Record motion</strong>, <strong>Interactions</strong>, <strong>Add keyframe</strong>, <strong>Blank keyframe</strong>, <strong>Auto key</strong>, and a <strong>Zoom</strong> slider. The <strong>⋯</strong> button lets you choose and order them. Other styles are in <em>Settings › Appearance › Timeline bar</em>.</p>
+      <ul>
+        <li><strong>Frame view</strong> counts frames instead of seconds. <strong>Whole frames</strong> keeps the playhead, keys and clips on exact frames.</li>
+        <li><strong>Record voice</strong> records from your microphone as a new audio layer.</li>
+        <li>Press <kbd>Space</kbd> to play or pause; <kbd>Home</kbd> and <kbd>End</kbd> go to the start and end.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="frames">
+      <h2><span class="num">5</span>Drawing frame by frame</h2>
+      <p>A drawing layer can hold many <strong>frames</strong>, like the pages of a flip book. Select the drawing and the <strong>frames bar</strong> shows each frame as a small picture.</p>
+      <ol class="steps">
+        <li>Pick the Brush and draw frame 1.</li>
+        <li>Click <strong>+</strong> in the frames bar to add frame 2. A faint copy of the frame before shows: that is the <strong>onion skin</strong>, a guide for placing the next drawing.</li>
+        <li>Draw frame 2. Repeat.</li>
+        <li>Press <kbd>Space</kbd> to play. Lower <strong>frames per second</strong> (a box in the frames bar) to slow the drawing down.</li>
+      </ol>
+      <ul>
+        <li><strong>Playback:</strong> <em>Hold</em> (a frame stays until a Frame keyframe picks another), <em>Loop</em>, <em>Play once</em>, <em>Ping-pong</em>.</li>
+        <li><kbd>,</kbd> and <kbd>.</kbd> step to the previous and next drawing frame. <kbd>Shift</kbd>+<kbd>D</kbd> duplicates the frame. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> copy the frame's drawing and paste it as a new frame.</li>
+        <li>Ctrl-click or Shift-click frames to pick several, then copy, drag or delete them.</li>
+        <li><strong>Onion skin</strong> is a button in the timeline bar. Drag its ends on the ruler to show more or fewer frames. <em>Settings › Appearance › Onion skin</em> sets frames before, frames after, their colors and the strength.</li>
+        <li><strong>Blank keyframe</strong> (<kbd>Shift</kbd>+<kbd>K</kbd>) starts an empty frame from the playhead on.</li>
+        <li>Right-click the layer for <em>Tween to frame by frame…</em> (turns smooth motion into held pictures, like drawn animation), <em>Bake into frames…</em> (turns morphs and animated lines into real frames) and <em>Copy this drawing to frames…</em>.</li>
+        <li>On a Frame keyframe, right-click › <em>Morph to the next keyframe</em> makes the drawing morph between two frames.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="layers">
+      <h2><span class="num">6</span>Layers, groups and shots</h2>
+      <p>Everything on the stage is a layer. The layer types are <strong>Drawing</strong>, <strong>Text</strong>, <strong>Shape</strong>, <strong>Image</strong>, <strong>Video</strong>, <strong>Audio</strong>, <strong>Group</strong>, <strong>Rig</strong> and <strong>Controller</strong>. The top row of the timeline is the front.</p>
+      <ul>
+        <li>Each row has an <strong>eye</strong> (show or hide, or mute for audio) and a <strong>lock</strong>. Drag a row's name to reorder it or drop it into a group.</li>
+        <li><strong>Right-click a layer</strong> for its menu: <em>Rename, Layer color…, Duplicate, Copy, Delete, Group layers, Make a shot, Arrange, Flip, Order, Animate, Effects, Mask, Rig, Physics…</em> and <em>Hide</em> / <em>Lock</em>. <em>Show only this in the timeline</em> hides every other row.</li>
+        <li><strong>Group</strong> (<kbd>Ctrl</kbd>+<kbd>G</kbd>) puts layers together to move, scale and animate as one. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> ungroups.</li>
+        <li><strong>Arrange</strong> (with two or more layers): Align left, centers, right, tops, middles, bottoms; Spread across or down evenly; Bring to front, Bring forward, Send backward, Send to back.</li>
+        <li><strong>Combine into one drawing</strong> (<kbd>Ctrl</kbd>+<kbd>E</kbd>) merges drawings; <em>Split back into layers</em> undoes it.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>D</kbd> duplicates, <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd> copy, cut and paste, <kbd>Ctrl</kbd>+<kbd>A</kbd> selects all.</li>
+        <li><strong>Video and audio:</strong> import a file and it is a clip you trim and cut. Right-click a video › <em>Split sound into its own layer</em>, and <em>Hold this frame</em> to freeze it.</li>
+      </ul>
+      <h3>Shots</h3>
+      <p>A <strong>shot</strong> is a group with its own time. Select layers and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (<strong>Make shot</strong>). Move and trim it like a clip, <strong>double-click</strong> it to open and edit inside, and <kbd>Esc</kbd> goes back. Right-click a shot › <em>Shot</em> for <em>Fit to its layers</em> and <em>Line up all shots end to end</em>. Shots are good for building a film out of scenes.</p>
+      <h3>Saved objects</h3>
+      <p>Right-click layers › <em>Saved objects › Save as a saved object</em> (a rig brings along every layer that bends with it). Place copies in any screen from logo menu › <strong>Saved objects…</strong>. Edit the saved original once (the pencil), choose <em>Save and update everywhere</em>, and every copy updates. Each copy keeps its own animation.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="masks">
+      <h2><span class="num">7</span>Masks</h2>
+      <p>A mask is a window: one shape decides what you can see of the layers below it.</p>
+      <ol class="steps">
+        <li>Put the shape on top of the layer. Press <kbd>Ctrl</kbd>+<kbd>A</kbd> to select both.</li>
+        <li>Right-click the shape and choose <strong>Mask › Mask with the top layer</strong> (for one layer: <em>Use as mask for the layer below</em>).</li>
+        <li>With the mask selected, choose <strong>Show inside</strong> or <strong>Show outside</strong> in the bar above the stage (or the <em>Mask</em> menu). Outside makes the shape a hole.</li>
+        <li>Choose <strong>Mask shape visible</strong> if you want to see the shape itself.</li>
+      </ol>
+      <p>Drag the mask and the window moves. Animate it for a reveal. Any shape, drawing or text can be a mask. To undo: right-click the mask › <em>Mask › Stop using as mask</em>. The panel keeps a small <em>Mask</em> section too. SVG clip paths and masks, Photoshop clipping and layer masks, and Illustrator/PDF clipping come in as working masks.</p>
+      <p><span class="chip pink">Heads up</span> Masks need a format that supports them: Blender (FBX) can't show masks, and Rive can't show them either.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="fx">
+      <h2><span class="num">8</span>Effects and transitions</h2>
+      <p>Effects are ready-made motion and looks. Transitions make a layer arrive or leave. Right-click a layer and open <strong>Effects</strong>, or use the <em>Effects</em> and <em>Transitions</em> sections in the panel.</p>
+      <ol class="steps">
+        <li>Right-click a layer › <strong>Effects</strong> and pick a group, then an effect.</li>
+        <li>It shows as a block in the layer's timeline row. Drag to move it, drag its edge to change its length. Right-click the block for <em>Settings…</em>, <em>Preview</em>, <em>Turn off</em> or <em>Delete</em>.</li>
+        <li>Tweak its amount and speed in the panel. The panel can also copy and paste effects to other layers.</li>
+      </ol>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Group</th><th>Built-in effects</th></tr></thead>
+        <tbody>
+          <tr><td>Transitions in</td><td>Fade in, Pop in, Slide in, Zoom in, Wipe in, Blur in, Spin in, Draw on, Typewriter</td></tr>
+          <tr><td>Transitions out</td><td>Fade out, Pop out, Slide out, Zoom out, Wipe out, Blur out, Spin out, Draw off, Break apart</td></tr>
+          <tr><td>Animated effects</td><td>Shake, Hand-drawn boil, Wave, Wobble, Float, Pulse, Jelly, Spin, Swing, Blink, Rainbow, Marching dashes, Draw loop</td></tr>
+          <tr><td>Looks</td><td>Glow, Blur, Directional blur, Black &amp; white, Drop shadow, Outline, Inner shadow, Change color, Duplicate (grid)</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Make your own</h3>
+      <ul>
+        <li><strong>Design an effect</strong> / <strong>Design a transition</strong> (buttons in the panel, or <em>Settings › Effects</em> and <em>Settings › Transitions</em>) build one without code. An effect is a list of changes (move, scale, turn, fade, blur, colors, glow, shadow) and how each happens. A transition has its own small timeline where you animate the layer, and can mask it, cut holes in it or break it into pieces. Designed effects show with a ✦ and transitions with a ★, saved in the project.</li>
+        <li><strong>Effects as code:</strong> <em>Settings › Effects</em> lets you paste a small piece of code for one effect, with examples for a look, an animated effect and a transition. They are kept on this device.</li>
+      </ul>
+      <div class="callout"><b>Heads up.</b> Not every export can show every effect. The app greys out what the format you chose can't carry, and lists what was left out after an export. See <a href="#export">Exporting</a>.</div>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="rigs">
+      <h2><span class="num">9</span>Rigs and bones</h2>
+      <p>A <strong>rig</strong> is a skeleton of bones. Attach drawings to it, then pose the bones to move the character.</p>
+
+      <h3>Build and pose</h3>
+      <ol class="steps">
+        <li>Pick the <strong>Bones</strong> tool (<kbd>J</kbd>). Click where each joint goes. Double-click the last one (or press <kbd>Enter</kbd>) to finish the chain.</li>
+        <li>Right-click the drawing layer › <strong>Rig › Bend with a rig…</strong> and click a bone. The drawing now stretches with the bones like skin. Use <strong>Attach to a bone…</strong> instead to keep a layer stiff, like a hat or a hand.</li>
+        <li>Pick the <strong>Select</strong> tool and drag a bone's tip. The whole chain follows (this is IK). Press <kbd>K</kbd> to keep the pose.</li>
+        <li>Move the playhead, pose again, press <kbd>K</kbd>. Play.</li>
+      </ol>
+      <p>The rig bar above the stage has three steps: <strong>Bones</strong> (draw and adjust), <strong>Pose</strong> (rotate, move or scale bones) and <strong>Weights</strong>. A <strong>Controls</strong> button there adds controllers. <strong>Keyframe the pose</strong> keeps the whole pose.</p>
+
+      <h3>Bone settings</h3>
+      <p>Select a bone in the panel's <strong>Bones</strong> list: Rest length, Rest angle, Parent, <strong>Pin</strong>, <strong>Dynamic</strong> (swings with follow-through, good for tails and hair) and <strong>Segments</strong>.</p>
+
+      <h3>Weights and bending</h3>
+      <p><strong>Weights</strong> say how much each bone moves each part of a drawing. Colors show it: red is a lot, blue is nothing.</p>
+      <ol class="steps">
+        <li>Select a bone, then click <strong>Paint weights</strong> in its card (or pick <strong>Weights</strong> in the rig bar).</li>
+        <li>Choose a weight tool: <strong>Brush</strong> (<kbd>[</kbd> and <kbd>]</kbd> change its size), <strong>Smooth</strong> (evens weights out), <strong>Gradient</strong> (drag a line: full weight where you start, none where you end), <strong>Lasso</strong> (draw a loop: the bone takes the area, or lets it go) or <strong>Goal curve</strong>.</li>
+        <li><strong>Goal curve</strong> is the clever one: pose the rig where it looks bad, then draw how the edge should look. The weights fix themselves.</li>
+      </ol>
+      <ul>
+        <li><strong>Smooth bending:</strong> set a bone's <strong>Segments</strong> (up to 16) to make a chain of equal pieces that curves smoothly. A <em>Bend controller</em> (Controls menu) curls it with one knob.</li>
+        <li><strong>Softness</strong> (on a layer that bends with a rig) makes the bend rounder. <strong>Rebind at this pose</strong> re-attaches it where it is. <strong>Also bend with…</strong> adds a second rig.</li>
+      </ul>
+
+      <h3>Rig lock</h3>
+      <p>A layer attached to a rig has a <strong>Rig lock</strong> button in the panel. When it is on, the rig moves the layer, so you can't move, turn or scale it by accident, and dragging it on the stage poses the bones instead. You can still select it, draw on it and add effects. Turn it off to place the layer again, then <em>Keep it here</em> or <em>Rebind</em>. The rig itself also has <strong>Lock the rig</strong> / <strong>Unlock the rig</strong>: a locked rig's bones can still be posed and keyframed but not moved, added or changed.</p>
+
+      <h3>Actions and action strips</h3>
+      <ul>
+        <li><strong>Actions</strong> are an animation library for one rig (walk, run, jump…). In the rig's <em>Actions</em> section choose <strong>Make actions</strong> or <strong>New action</strong> (<strong>From this one</strong> copies). Click an action to edit it. Each has its own keyframes and length. Rename, duplicate and delete are the small buttons.</li>
+        <li><strong>Action strips</strong> put actions one after another on the timeline. In <em>Action strips</em> choose <strong>Add at the playhead</strong>, pick the action and set <strong>Blend</strong> (seconds to change smoothly from the action before). Untick <em>Strips</em> to edit one action on its own.</li>
+        <li>Unity, Godot and Blender export one animation per action. Rive too.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="controls">
+      <h2><span class="num">10</span>Controllers and constraints</h2>
+      <h3>Controllers</h3>
+      <p>A <strong>controller</strong> is a small knob that moves inside a box, along a line, or freely. You record how layers look with the knob at a few spots, and moving the knob blends between them. One knob can drive eyes, a mouth, a whole turn of the head.</p>
+      <ol class="steps">
+        <li>Right-click the layer › <strong>Controller › Drive with a controller</strong> (or right-click the stage › <em>Add a controller</em>).</li>
+        <li>Pick a kind: <strong>Left–right</strong>, <strong>Up–down</strong>, <strong>Box (both)</strong>, <strong>Free</strong>, or <strong>Custom</strong> (<em>Design a controller…</em> lets you pick a box or circle, size and key points).</li>
+        <li>Put the knob at a spot, click that point in the Controls section, change the layer (position, size, rotation, colors, drawing frame, effect amounts, bone angles…), then <strong>Save</strong>.</li>
+        <li>Drag the knob. The layer blends between the points. Keyframe the knob to animate it.</li>
+      </ol>
+      <p><strong>Eyes follow a controller…</strong> does the whole setup for pupils in two clicks. Dragging the knob moves the knob; dragging the box's dashed edge moves the whole controller. <em>Reset controller</em> puts it back at rest.</p>
+
+      <h3>Constraints</h3>
+      <p>A constraint makes a layer follow something else. Right-click the layer › <strong>Controller › Follow</strong>, then choose a type and <strong>Pick a target on the stage</strong> (a layer, a controller, or a bone of a rig):</p>
+      <dl class="kv">
+        <dt>Follow</dt><dd>Move and turn with it.</dd>
+        <dt>Move toward</dt><dd>Drift toward it, within a Range.</dd>
+        <dt>Look at</dt><dd>Turn toward it.</dd>
+        <dt>Copy position, rotation, scale</dt><dd>Copy those values from the target.</dd>
+      </dl>
+      <p>Each constraint has <strong>Active</strong> (a switch you can keyframe), <strong>Influence</strong> and <strong>Space</strong> (Relative or Exact). Key <em>Active</em> on and off to make a hand grab a ball and let go. With a rig as target, pick the <strong>Bone</strong> and where on it: Head, Middle or Tip.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="physics">
+      <h2><span class="num">11</span>Physics</h2>
+      <p>Physics makes things fall, bounce and tumble by themselves, with no keyframes.</p>
+      <ol class="steps">
+        <li>Right-click the ball › <strong>Physics › Body (falls and bounces)</strong>.</li>
+        <li>Right-click the floor › <strong>Physics › Surface (others land on it)</strong>. A surface can be any shape, even a slope.</li>
+        <li>Play. The ball drops. Press <kbd>Home</kbd> to try again.</li>
+        <li>Select the ball and open the <strong>Physics</strong> section: <strong>Bounce %</strong>, <strong>Friction %</strong>, <strong>Weight</strong>, <strong>Air drag %</strong>, <strong>Spin °/s</strong>, and <strong>Gravity</strong>.</li>
+        <li>To throw it, drag the orange handle from the ball.</li>
+      </ol>
+      <ul>
+        <li><strong>Hang from a bone…</strong> makes a layer swing from a rig's bone on a rope.</li>
+        <li><strong>Dynamic</strong> on a bone makes tails and hair swing with follow-through.</li>
+        <li>Switch physics on at a chosen moment by keyframing it (<em>Simulate</em>).</li>
+        <li>Collisions follow the layer's outline, or a box, circle or custom polygon. The <strong>Collision shape</strong> tool edits the polygon.</li>
+        <li><em>Remove physics</em> in the same menu.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="interactive">
+      <h2><span class="num">12</span>Interactive mode</h2>
+      <p>On a web page, people can touch your animation. Interactions are <strong>rules in plain words</strong>: <em>WHEN</em> something happens, <em>IF</em> conditions hold, <em>DO</em> some actions.</p>
+      <ol class="steps">
+        <li>Click the <strong>Made for</strong> chip at the top (it says <em>Video</em>) and choose <strong>Interactive</strong>. (Or <em>Settings › Made for</em>.)</li>
+        <li>Click <strong>Interactions</strong> in the timeline bar.</li>
+        <li>Choose <strong>Add a rule</strong>. Say WHEN (for example <em>Click / tap</em> on a layer), then DO (for example <em>Play animation</em>, or <em>Go to screen</em>).</li>
+        <li>Press <strong>Preview</strong> and try it on the stage: click, hover, drag and press keys. <kbd>Esc</kbd> stops.</li>
+        <li>Export with <strong>Export as › Interactive › HTML</strong>.</li>
+      </ol>
+      <div class="tablewrap"><table class="wide">
+        <thead><tr><th>WHEN</th><th>IF</th><th>DO</th></tr></thead>
+        <tbody><tr>
+          <td style="white-space:normal;font-weight:400">Click / tap, Press, Release, Hover, Leave, Pointer moves, Drag, Key, Screen opens, Animation ends, After time, Every frame</td>
+          <td style="white-space:normal;font-weight:400">Animation is, Animation time, Pointer is pressed, Pointer is over, Pointer position, Layer value, Controller, Key is held, Screen is, Variable, Layer is shown, Drawing frame is, Chance, Rule ran</td>
+          <td style="white-space:normal;font-weight:400">Play animation, Pause, Resume, Play / pause, Go to a time, Move a controller, Follow the pointer, Drag the layer, Go to screen, Play an effect, Set a layer, Change a variable, Show / hide a layer, Show a drawing frame, Wait, Open a link</td>
+        </tr></tbody>
+      </table></div>
+      <ul>
+        <li>An animation is a screen, or an action of a rig. Screens can change with <em>Cut, Fade, Slide, Wipe, Zoom</em> or <em>Break apart</em>.</li>
+        <li><strong>Let viewers drag a controller:</strong> right-click the controller › <em>Make it interactive (viewer can drag it)</em>.</li>
+        <li>The panel can show the rules as a list or as a flow graph. A rule can be turned off without deleting it.</li>
+        <li><strong>Rive</strong> can do some of this (pointer, key, end and time triggers, mouse follow). The export tells you which rules it had to skip; use HTML for everything.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="screens">
+      <h2><span class="num">13</span>Screens and the board</h2>
+      <p>A <strong>screen</strong> is a canvas with its own size, frame rate, length, background and layers. Several screens sit side by side on a <strong>board</strong>. Use them for scenes, for animations of one character (Idle, Walk, Jump) or for different sizes of the same art.</p>
+      <ul>
+        <li>Pick the <strong>Screens</strong> tool (<kbd>M</kbd>) and drag on empty space to draw a screen. Or use <em>Add a screen…</em> in the bar for a size or <em>From template</em>.</li>
+        <li>Click a screen to work on it. Drag a screen's name to move it; double-click the name for its settings. Drag a layer onto another screen to move it there.</li>
+        <li><strong>Screen settings</strong> (or <em>Project settings</em> with one screen): name, size (Wide 16:9, Vertical 9:16, Square 1:1, Classic 4:3, Portrait 4:5, Cinema 21:9, Sprite 512, or a custom size), frame rate (12, 24, 25, 30, 60), length, and background (color, image, or a texture).</li>
+        <li><strong>Screen templates:</strong> <em>Save as screen template</em> makes a screen the original. <em>Add a screen › From template</em> makes linked copies that keep their own animation. Change the original, press <strong>Update</strong>, and the copies follow. A rig then starts from the same pose in every animation.</li>
+        <li>For game engines, one screen becomes one animation.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="export">
+      <h2><span class="num">14</span>Exporting</h2>
+      <p>Open the logo menu and choose <strong>Export…</strong>. Everything is made right on your device; nothing is uploaded. Choose the screens, then <strong>Export as</strong>:</p>
+      <div class="tablewrap"><table class="wide">
+        <thead><tr><th>Export as</th><th>You get</th><th>Options</th></tr></thead>
+        <tbody>
+          <tr><td>Video</td><td>MP4, WebM, MOV or MKV, with sound. WebM and MKV can keep a transparent background.</td><td>Format, Transparent background, Frame rate, Size, Quality (Standard, High, Best)</td></tr>
+          <tr><td>Sprite sheet</td><td>All frames in one image (PNG, JPG, WebP, AVIF or SVG), with a JSON file for Phaser, PixiJS and similar.</td><td>Format, Transparent background, Columns (Automatic, 4, 8, 16, One row), JSON data file, Frame rate, Size</td></tr>
+          <tr><td>Images (ZIP)</td><td>Every frame as a numbered picture, zipped.</td><td>Format (PNG, JPG, WebP, AVIF), Transparent background, Frame rate, Size, Quality</td></tr>
+          <tr><td>SVG animation</td><td>An animated SVG. Each frame is kept as shapes (sharp at any size) and they show in turn, with no script. Plays in browsers, web pages and a GitHub README.</td><td>Loop, Transparent background, Frame rate, Size. A lower frame rate makes a smaller file.</td></tr>
+          <tr><td>Interactive</td><td>Pick a Format:<br><strong>HTML</strong>: one web page that plays everything like Preview (rules, screens, rigs, controllers, effects, morphs).<br><strong>Rive</strong>: a <code>.riv</code> file with a state machine.<br><strong>SVG</strong>: waits on its first frame and plays when you click or point at it.</td><td>HTML: none (needs the app served over http).<br>Rive: <em>Also save a web page that plays it</em>, <em>Edit interactions</em>, Morphs.<br>SVG: <em>Starts</em> (When you click it / When you point at it), Loop, Frame rate, Size.</td></tr>
+          <tr><td>Game Engine</td><td><strong>Unity</strong>: a <code>.unitypackage</code> with sprites, a prefab of the rig (bones as GameObjects), masks, controllers and an Animator, one animation per screen (and per action). Needs Unity 2022.3 or newer; bending layers need the 2D Animation package.<br><strong>Godot</strong>: a Godot 4 folder with a scene (Sprite2D, Skeleton2D, Polygon2D), masks and an AnimationPlayer.</td><td>Format (Unity or Godot), Frame rate, Morphs, Animated lines</td></tr>
+          <tr><td>Blender (FBX)</td><td>An FBX file with planes for the layers, a skeleton for the bones, and the animation. One file per screen (and per action).</td><td>Also save the pictures as PNG files, Frame rate, Morphs</td></tr>
+          <tr><td>Lottie (web)</td><td>A Lottie JSON file for lottie-web and Lottie players in apps.</td><td>Also make a web page that plays it, Transparent background, Frame rate</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>More than one screen</h3>
+      <p>The <strong>Screen</strong> box in the dialog has a check box for each screen. For video, sheets, images and SVG you get one file per screen in a ZIP, or tick <strong>Combine them into one (as they sit on the board)</strong>. For Unity, Godot and Rive, all chosen screens go into one file, each as an animation.</p>
+
+      <h3>What a format can't show</h3>
+      <p>Set what a screen is <strong>Made for</strong> (the chip in the top bar, or <em>Settings › Made for</em>) and the app greys out what that format can't carry, with the reason in a tip.</p>
+      <dl class="kv">
+        <dt>Video</dt><dd>No limits. Every tool, effect and format works.</dd>
+        <dt>Interactive</dt><dd>Interactive web page with clicks, hovers and drags. Rive skips effects and video.</dd>
+        <dt>Game Engine</dt><dd>No filters, glow, shadows, blend modes, video or sound.</dd>
+        <dt>Blender (FBX)</dt><dd>No fading, filters, masks, blend modes, video or sound.</dd>
+      </dl>
+      <p>After an export, the dialog lists what was left out. Formats that can't morph lines (Unity, Godot, Blender, Rive) turn each morph into in-between pictures: choose how many in <strong>Morphs</strong>. Animated brush lines (boil, marching dashes, pulse, flow) become a loop of pictures in game engines.</p>
+
+      <div class="callout tip"><b>Tip</b> For a GitHub README use <strong>SVG animation</strong>; for a website use <strong>Interactive › HTML</strong> or <strong>Lottie</strong>; for a game use <strong>Game Engine</strong>; for social media use <strong>Video</strong>. The app has no GIF export.</div>
+      <div class="callout warn"><b>Needs internet.</b> The Lottie and Rive web pages load their players from a CDN, so they need a connection when opened. Video export needs a browser with WebCodecs (Chrome, Edge); otherwise the animation is recorded while it plays (MP4 or WebM only).</div>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="settings">
+      <h2><span class="num">15</span>Settings</h2>
+      <p>Open <strong>Settings…</strong> from the logo menu (or the gear in the top bar). Settings are kept on this device.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Tab</th><th>What is in it</th></tr></thead>
+        <tbody>
+          <tr><td>Made for</td><td>What this screen is for: Video, Interactive, Game Engine or Blender (FBX). It decides what is greyed out.</td></tr>
+          <tr><td>Project</td><td>The <strong>layer colors</strong> (one set for light, one for dark mode) and the <strong>Tutorial maker…</strong> button. Size, length and background are in <em>Project settings…</em> / <em>Screen settings</em> (logo menu).</td></tr>
+          <tr><td>Appearance</td><td><strong>Theme</strong> (Match my device, Light, Dark), <strong>Layout</strong> (Automatic, Desktop, Tablet, Phone), <strong>Tool bar</strong> and <strong>Timeline bar</strong> layouts, <strong>Show the welcome again</strong>, <strong>Tool names</strong> and <strong>Button names</strong>, and <strong>Onion skin</strong> (frames before, frames after, strength, colors).</td></tr>
+          <tr><td>Shortcuts</td><td>Every shortcut, a <strong>Preset</strong> (Toonzi 2D, Adobe Premiere Pro, Adobe After Effects, Adobe Animate), <strong>Record a new action…</strong>, and <strong>Reset all</strong>. See <a href="#keys">Shortcuts</a>.</td></tr>
+          <tr><td>Effects</td><td>Designed effects (<strong>New effect…</strong>) and effects as code.</td></tr>
+          <tr><td>Transitions</td><td>Designed transitions (<strong>New transition…</strong>).</td></tr>
+        </tbody>
+      </table></div>
+      <p>The <strong>welcome</strong> (shown the first time) offers styles that set the shortcuts, tool bar and timeline bar together: <em>Toonzi 2D</em>, <em>Adobe Animate</em>, <em>OpenToonz</em>, <em>Premiere / After Effects</em> and <em>Simple</em>, plus Light, Dark or match your device.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="keys">
+      <h2><span class="num">16</span>Shortcuts and your own actions</h2>
+      <p>These are the defaults. Change any of them in <em>Settings › Shortcuts</em>: click a shortcut, then press the new keys (<kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears).</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Group</th><th>Shortcuts</th></tr></thead>
+        <tbody>
+          <tr><td>Playback</td><td><kbd>Space</kbd> Play or pause · <kbd>Shift</kbd>+<kbd>←</kbd> / <kbd>→</kbd> Back or forward one frame · <kbd>,</kbd> / <kbd>.</kbd> Previous or next drawing frame · <kbd>Home</kbd> / <kbd>End</kbd> Start or end · <kbd>R</kbd> Record motion</td></tr>
+          <tr><td>Tools</td><td><kbd>V</kbd> Select · <kbd>A</kbd> Points · <kbd>B</kbd> Brush · <kbd>P</kbd> Pen · <kbd>E</kbd> Eraser · <kbd>G</kbd> Fill · <kbd>Shift</kbd>+<kbd>G</kbd> Fill brush · <kbd>Shift</kbd>+<kbd>F</kbd> Gradient · <kbd>O</kbd> Smooth · <kbd>W</kbd> Width · <kbd>U</kbd> Pull · <kbd>J</kbd> Bones · <kbd>H</kbd> Hand · <kbd>M</kbd> Screens · <kbd>T</kbd> Add text · <kbd>[</kbd> / <kbd>]</kbd> Brush smaller or bigger</td></tr>
+          <tr><td>Edit</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> or <kbd>Ctrl</kbd>+<kbd>Y</kbd> Redo · <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd> Copy, cut, paste · <kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate · <kbd>Delete</kbd> Delete · <kbd>Ctrl</kbd>+<kbd>A</kbd> Select all · <kbd>Ctrl</kbd>+<kbd>G</kbd> Group · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> Ungroup · <kbd>Ctrl</kbd>+<kbd>E</kbd> Combine into one drawing · <kbd>Ctrl</kbd>+<kbd>J</kbd> Selected parts to a new layer (copy) · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd> (move out) · <kbd>Ctrl</kbd>+<kbd>S</kbd> Save project · <kbd>Ctrl</kbd>+<kbd>O</kbd> Open project</td></tr>
+          <tr><td>Frames</td><td><kbd>Shift</kbd>+<kbd>D</kbd> Duplicate the frame · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> Copy the frame's drawing · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> Paste it as a new frame</td></tr>
+          <tr><td>Timeline</td><td><kbd>S</kbd> Cut at the playhead · <kbd>C</kbd> Cut tool · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> Make a shot · <kbd>K</kbd> Add keyframe · <kbd>Shift</kbd>+<kbd>K</kbd> Blank keyframe · <kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd> Previous or next keyframe · <kbd>Alt</kbd>+<kbd>K</kbd> Snap to keyframes on or off · <kbd>Enter</kbd> Type in the selected text</td></tr>
+          <tr><td>View</td><td><kbd>Ctrl</kbd>+<kbd>=</kbd> Zoom in · <kbd>Ctrl</kbd>+<kbd>-</kbd> Zoom out · <kbd>Ctrl</kbd>+<kbd>0</kbd> Fit to screen · <kbd>F</kbd> Big stage · <kbd>;</kbd> Snapping and guides · <kbd>I</kbd> Properties panel</td></tr>
+          <tr><td>Move</td><td>Arrow keys move the selection 1 px; with <kbd>Ctrl</kbd> 10 px. With nothing to move, <kbd>←</kbd> <kbd>→</kbd> step one frame.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Handy modifiers: <kbd>Shift</kbd> while drawing a line or dragging a bone keeps it level or upright, and rotates in 15° steps. <kbd>Alt</kbd> while dragging a layer copies it. <kbd>Ctrl</kbd> while brushing trims loose ends.</p>
+
+      <h3>Record your own actions</h3>
+      <p>Do a few things once, then play them again with one key.</p>
+      <ol class="steps">
+        <li>Open <em>Settings › Shortcuts</em> and press <strong>Record a new action…</strong>.</li>
+        <li>A <em>Recording an action</em> bar appears. Press shortcuts (Duplicate, Flip, Group, Add keyframe, picking a tool…) and choose items from a layer's right-click menu (for example <em>Effects › Looks › Glow</em>). Each step is listed in the bar.</li>
+        <li>Press <strong>Stop</strong>. Give it a name, click the <strong>Shortcut</strong> box and press the keys you want, take out steps you don't want, and <strong>Save</strong>.</li>
+        <li>Press your shortcut: the steps run in order on what is selected. Your actions are listed under <strong>My actions</strong> in Settings › Shortcuts, where you can play, rename or delete them.</li>
+      </ol>
+      <div class="callout"><b>Note.</b> A step that can't run (for example a layer menu item with no layer selected) is skipped, and the app tells you how many.</div>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="tutorials">
+      <h2><span class="num">17</span>Tutorials and the tutorial maker</h2>
+      <p>Open logo menu › <strong>Tutorials…</strong>. A guide character, <strong>Pip</strong> (or <strong>Mo</strong>), talks you through a task on a practice screen. The guide points at what to click, and notices when you did it, so you can't get lost. There are 15 tutorials in groups:</p>
+      <dl class="kv">
+        <dt>Start here</dt><dd>Drawing: brush and eraser · Frame by frame · Keyframes and tweens</dd>
+        <dt>Drawing</dt><dd>Drawing: fills and shaping · Vectors: the Pen</dd>
+        <dt>Animation</dt><dd>Follow: a hand grabs a ball · Physics: drop and bounce</dd>
+        <dt>Rigs and controllers</dt><dd>Bones and rigs · Controllers: eyes that follow · Advanced rigs: weights and bending</dd>
+        <dt>Effects and video</dt><dd>Effects and transitions · Masks: a window for a layer · Video editing basics</dd>
+        <dt>Interactive and export</dt><dd>Interactive: let people play · Game engines: Unity and Godot</dd>
+      </dl>
+
+      <h3>Make your own tutorial</h3>
+      <ol class="steps">
+        <li>Open <em>Settings › Project › Tutorial maker…</em>. A small panel appears at the bottom of the screen.</li>
+        <li>Set up the screen the way the tutorial should start, then <strong>⋯ › Start like this screen (layers and settings)</strong>.</li>
+        <li>Add steps: write what the guide says, pick the guide's face, say when the step goes on (the "magic rules": a tool picked, a key pressed, a menu item chosen…), and what it points at.</li>
+        <li>Or press <strong>Record</strong> and do the thing in the app. Every action becomes a step with its text, its rule and its pointer.</li>
+        <li>Draw on the screen to explain: arrows, lines, boxes, rings, free paths and dots.</li>
+        <li>Try it, then <strong>⋯ › Save as a file for the tutorials folder</strong> to share it. Put the file in <code>tutorials/my-tutorials/</code> and list it in <code>tutorials/config.js</code>. Tutorials you make are kept on this device and listed under <em>My tutorials</em>.</li>
+      </ol>
+      <p>You can also change the guide's look (animated SVG pictures, one per mood), add new guides, and change the gallery groups and order, all without touching the app's code. See <code>tutorials/README.md</code> in the repository.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="demos">
+      <h2><span class="num">18</span>Made in Toonzi 2D</h2>
+      <p>These animations were made and exported by the app itself. This page can run JavaScript, so it can show <strong>interactive</strong> exports too.</p>
+
+      <!-- TOONZI: interactive demos
+           How to add yours:
+           1. In the app: logo menu > Export... > Export as: Interactive > HTML (or SVG). Save the file in docs/media/.
+           2. Copy one <figure class="demo"> below, change the src (media/your-file.html) and the caption.
+           An animated SVG that plays by itself can go in an <img>. A click-to-play SVG goes in an <object> and an HTML
+           page in an <iframe> (clicks and script do not work inside <img>).
+           iframes load only when you scroll to them (loading="lazy"). Only embed files you made or trust.
+           Serve this page over http(s) (GitHub Pages does). Full steps: docs/media/README.txt -->
+      <div class="demos">
+        <figure class="demo">
+          <img src="media/bouncing-ball.svg" width="1280" height="720" loading="lazy" alt="A ball bounces and squashes on a floor.">
+          <figcaption><strong>Animated SVG</strong> (Export as › SVG animation). Plays by itself, works in a README too.</figcaption>
+        </figure>
+        <figure class="demo">
+          <object data="media/click-to-play.svg" type="image/svg+xml" aria-label="A ball. Click it to play the animation."></object>
+          <figcaption><strong>Click to play</strong> (Export as › Interactive › SVG). Click it to start; click again to restart.</figcaption>
+        </figure>
+        <figure class="demo wide">
+          <iframe src="media/bouncing-ball.html" title="Interactive bouncing ball: click the ball, or drag it" loading="lazy" allow="fullscreen"></iframe>
+          <figcaption><strong>Interactive page</strong> (Export as › Interactive › HTML). Click the ball to make it wobble; drag it around.</figcaption>
+        </figure>
+      </div>
+      <p>Not showing? Serve the folder over http (<code>python3 -m http.server</code> in the project folder, then open <code>http://localhost:8000/docs/</code>) or read this page on GitHub Pages.</p>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="help">
+      <h2><span class="num">19</span>Help</h2>
+      <details class="more"><summary>Interactive › HTML says it can't read a file</summary>
+        <p>Serve the folder over http instead of opening <code>index.html</code> from disk. In the project folder run <code>python3 -m http.server 8000</code> and open <code>http://localhost:8000</code>. Browsers don't let a page opened from a file read other files, and this export packs the app's own files into one page.</p></details>
+      <details class="more"><summary>Video export says the browser has no video encoder</summary>
+        <p>Use Chrome or Edge. Other browsers record the animation while it plays and can only make MP4 or WebM.</p></details>
+      <details class="more"><summary>Something is greyed out</summary>
+        <p>The screen is <em>Made for</em> a format that can't carry it. Hover over it for the reason, or change the chip at the top (for example, back to <em>Video</em>).</p></details>
+      <details class="more"><summary>I can't move a layer</summary>
+        <p>It may be locked (the lock on its row), or <strong>Rig lock</strong> is on because it is attached to a rig. Turn the lock or Rig lock off.</p></details>
+      <details class="more"><summary>Where is my project?</summary>
+        <p>It is autosaved in this browser. Use <strong>Save project</strong> to get a file you can keep, and <strong>Open project…</strong> or <strong>Recent projects</strong> to load one.</p></details>
+      <details class="more"><summary>The fonts look different offline</summary>
+        <p>The app loads its fonts from Google Fonts. Without a connection it uses your system fonts. Text you export as SVG becomes shapes, so it looks the same everywhere.</p></details>
+      <details class="more"><summary>How do I get a GIF?</summary>
+        <p>The app has no GIF export. Export a <strong>Video</strong> (MP4) and convert it with another tool, or use an <strong>SVG animation</strong> for web pages and READMEs.</p></details>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  Toonzi 2D is free software under the GNU AGPL-3.0 license: change it and share it, but keep your changes open too. <a href="../index.html">Open the app</a> · <a href="#top">Back to top</a>
+</footer>
+
+<script>
+  // Contents list: highlight the section you are reading, and fold the list on narrow screens.
+  (function () {
+    var toc = document.getElementById('toc');
+    var links = Array.prototype.slice.call(toc.querySelectorAll('a[href^="#"]'));
+    var narrow = window.matchMedia('(max-width: 900px)');
+    function fold() { if (narrow.matches) toc.removeAttribute('open'); else toc.setAttribute('open', ''); }
+    fold(); if (narrow.addEventListener) narrow.addEventListener('change', fold);
+    links.forEach(function (a) { a.addEventListener('click', function () { if (narrow.matches) toc.removeAttribute('open'); }); });
+    // anchors on headings
+    Array.prototype.forEach.call(document.querySelectorAll('main section[id] > h2'), function (h) {
+      var a = document.createElement('a'); a.className = 'hash'; a.href = '#' + h.parentNode.id; a.setAttribute('aria-label', 'Link to this section'); a.textContent = '#'; h.appendChild(a);
+    });
+    if (!('IntersectionObserver' in window)) return;
+    var map = {}; links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var current = null;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var a = map[e.target.id]; if (!a || a === current) return;
+        if (current) current.classList.remove('on'); a.classList.add('on'); current = a;
+        if (!narrow.matches) { var r = a.getBoundingClientRect(), t = toc.getBoundingClientRect(); if (r.top < t.top || r.bottom > t.bottom) a.scrollIntoView({ block: 'nearest' }); }
+      });
+    }, { rootMargin: '-15% 0px -75% 0px' });
+    Array.prototype.forEach.call(document.querySelectorAll('main section[id]'), function (s) { io.observe(s); });
+  })();
+</script>
+</body>
+</html>

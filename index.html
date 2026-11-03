@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#FFFFFF">
+<title>Toonzi 2D</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300..700&family=Caveat:wght@600;700&family=Bangers&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app" class="app" data-layout="desktop">
+  <header class="top">
+    <span class="logo" aria-hidden="true"><img class="logo-l" src="assets/logo.svg" alt="" width="30" height="30"><img class="logo-d" src="assets/logo-dark.png" alt="" width="30" height="30"></span>
+    <input class="proj-name" id="projName" aria-label="Project name" value="Untitled animation">
+    <div class="grp" id="topLeft"></div>
+    <div class="spacer"></div>
+    <div class="grp" id="topRight"></div>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="Tools"></nav>
+
+  <main class="stage-area" id="stageWrap">
+    <div id="stageDoc" class="stage-doc" aria-hidden="true"></div>
+    <canvas id="stage" aria-label="Stage"></canvas>
+    <canvas id="ovl" aria-hidden="true"></canvas>
+    <div class="ctxbar" id="ctxbar"></div>
+    <div class="zoombadge" id="zoomBadge" aria-label="Stage zoom">
+      <button data-z="out" title="Zoom out">−</button><span id="zoomPct">100%</span><button data-z="in" title="Zoom in">+</button><button data-z="fit" title="Fit to screen">Fit</button>
+    </div>
+    <button class="focusmenu" id="focusMenu" type="button" title="Menu" aria-label="Menu"></button>
+  </main>
+
+  <aside class="inspector" id="inspector" aria-label="Properties"></aside>
+  <div class="insp-grip" id="inspGrip" title="Drag to resize the panel" aria-hidden="true"></div>
+
+  <section class="dock" id="dock">
+    <div class="dock-grip" id="dockGrip" title="Drag to resize"></div>
+    <div class="transport" id="transport"></div>
+    <div class="dock-tabs" id="dockTabs" role="tablist"></div>
+    <div class="dock-body" id="dockBody">
+      <div class="framesbar" id="framesBar"></div>
+      <div class="tl" id="tl"><div class="tl-inner" id="tlInner"></div></div>
+      <div class="dock-props" id="dockProps"></div>
+      <div class="ixpanel" id="ixPanel" hidden></div>
+    </div>
+  </section>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+<div class="modal" id="modal" hidden></div>
+<div id="avpool" aria-hidden="true"></div>
+
+<!-- Libraries -->
+<script src="vendor/mediabunny.js"></script>
+<script src="vendor/polygon-clipping.min.js"></script>
+<!-- Core: helpers, state, layer tree, keyframes, matrices -->
+<script src="js/core/util.js"></script>
+<script src="js/core/icons.js"></script>
+<script src="js/core/store.js"></script>
+<script src="js/core/tree.js"></script>
+<script src="js/core/tracks.js"></script>
+<script src="js/core/transform.js"></script>
+<!-- Drawing and rendering -->
+<script src="js/render/paths.js"></script>
+<script src="js/render/paint.js"></script>
+<script src="js/render/strokes.js"></script>
+<script src="js/render/brushtex.js"></script>
+<script src="js/render/raster.js"></script>
+<script src="js/render/bool.js"></script>
+<script src="js/render/scene.js"></script>
+<!-- Object types and editing commands -->
+<script src="js/model/frames.js"></script>
+<script src="js/model/framebake.js"></script>
+<script src="js/model/types/basic.js"></script>
+<script src="js/model/types/text.js"></script>
+<script src="js/model/types/media.js"></script>
+<script src="js/model/ops.js"></script>
+<script src="js/model/screens.js"></script>
+<script src="js/model/targets.js"></script>
+<script src="js/model/templates.js"></script>
+<!-- Effects: engine + library (add new effects in library.js) -->
+<script src="js/effects/engine.js"></script>
+<script src="js/effects/library.js"></script>
+<script src="js/effects/break.js"></script>
+<script src="js/effects/custom.js"></script>
+<!-- Rigs, physics, controllers, constraints (the engines) -->
+<script src="js/rig/rig.js"></script>
+<script src="js/rig/weightfix.js"></script>
+<script src="js/rig/physics.js"></script>
+<script src="js/rig/controls.js"></script>
+<!-- Interface -->
+<script src="js/ui/fields.js"></script>
+<script src="js/ui/menu.js"></script>
+<script src="js/ui/stage.js"></script>
+<script src="js/ui/overlays.js"></script>
+<script src="js/ui/textedit.js"></script>
+<script src="js/ui/playback.js"></script>
+<script src="js/tools/base.js"></script>
+<script src="js/tools/motionpath.js"></script>
+<script src="js/tools/select.js"></script>
+<script src="js/tools/groupbox.js"></script>
+<script src="js/tools/trim.js"></script>
+<script src="js/tools/mirror.js"></script>
+<script src="js/tools/draw.js"></script>
+<script src="js/tools/gradient.js"></script>
+<script src="js/tools/pen.js"></script>
+<script src="js/tools/framebox.js"></script>
+<script src="js/tools/sculpt.js"></script>
+<script src="js/tools/cut.js"></script>
+<script src="js/ui/shell.js"></script>
+<script src="js/ui/ctxbar.js"></script>
+<script src="js/ui/brushes.js"></script>
+<script src="js/ui/timeline.js"></script>
+<script src="js/ui/framesbar.js"></script>
+<script src="js/ui/inspector.js"></script>
+<script src="js/ui/menus.js"></script>
+<script src="js/ui/keys.js"></script>
+<script src="js/ui/settings.js"></script>
+<script src="js/ui/macros.js"></script>
+<script src="js/ui/colors.js"></script>
+<script src="js/ui/board.js"></script>
+<script src="js/ui/masks.js"></script>
+<script src="js/rig/ui.js"></script>
+<script src="js/rig/designer.js"></script>
+<script src="js/rig/library.js"></script>
+<script src="js/rig/actions.js"></script>
+<script src="js/rig/actseq.js"></script>
+<script src="js/ui/picker.js"></script>
+<script src="js/ui/transitions.js"></script>
+<script src="js/ui/fxdesigner.js"></script>
+<script src="js/ui/curves.js"></script>
+<!-- Files: media, import, export, project -->
+<script src="js/io/media.js"></script>
+<script src="js/io/zip.js"></script>
+<script src="js/io/svg.js"></script>
+<script src="js/io/psd.js"></script>
+<script src="js/io/import.js"></script>
+<script src="js/io/avif.js"></script>
+<script src="js/io/bake.js"></script>
+<script src="js/io/lottie.js"></script>
+<script src="js/io/fbx.js"></script>
+<script src="js/io/engines.js"></script>
+<script src="js/io/godot.js"></script>
+<script src="js/io/rive.js"></script>
+<script src="js/ui/framemorph.js"></script>
+<script src="js/ui/interact.js"></script>
+<script src="js/io/unity.js"></script>
+<script src="js/io/webpage.js"></script>
+<script src="js/io/svgctx.js"></script>
+<script src="js/io/gif.js"></script>
+<script src="js/io/sheeteditor.js"></script>
+<script src="js/io/export.js"></script>
+<script src="js/io/project.js"></script>
+<script src="js/example.js"></script>
+<script src="js/io/examples.js"></script>
+<script src="js/ui/welcome.js"></script>
+<script src="tutorials/config.js"></script>
+<script src="js/tours/tours.js"></script>
+<script src="js/tours/faces.js"></script>
+<script src="js/tours/maker.js"></script>
+<script src="js/tours/studio.js"></script>
+<script src="js/tours/load.js"></script>
+<script src="examples/index.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

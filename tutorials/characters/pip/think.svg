@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="200" height="200" class="thinking">
+<!-- Pip, think. Edit freely: keep the viewBox; the classes body, eyes and mouth are what the animations below move. -->
+<style>
+.body{transform-origin:50px 92px;animation:breathe 3.2s ease-in-out infinite}
+.eyes{transform-origin:50px 46px;animation:blink 4.6s infinite}
+.talking .mouth{transform-origin:50px 62px;animation:talk .3s ease-in-out infinite alternate}
+.cheering .body{animation:hop .55s ease-in-out infinite alternate}
+.happy .body{animation:bob 1.4s ease-in-out infinite}
+.winking .eyes{animation:none}
+.spark{transform-box:fill-box;transform-origin:center;animation:twinkle .8s ease-in-out infinite alternate}.spark.s2{animation-delay:.4s}
+.bulb{animation:glow 1.1s ease-in-out infinite alternate}
+.dots circle{animation:dot 1.5s ease-in-out infinite}.dots circle:nth-child(2){animation-delay:.25s}.dots circle:nth-child(3){animation-delay:.5s}
+.thinking .body{animation:tilt 3s ease-in-out infinite;transform-origin:50px 92px}
+.surprised .body{animation:jump .9s ease-out infinite}
+.looking .eyes{animation:look 2.4s ease-in-out infinite}
+.tear{animation:tear 2.2s ease-in infinite}
+@keyframes breathe{50%{transform:scale(1.03,.97)}}
+@keyframes blink{0%,93%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes talk{from{transform:scaleY(.35)}to{transform:scaleY(1.1)}}
+@keyframes hop{to{transform:translateY(-6px)}}
+@keyframes bob{50%{transform:translateY(-2px) rotate(-2deg)}}
+@keyframes twinkle{from{transform:scale(.6);opacity:.5}to{transform:scale(1.15);opacity:1}}
+@keyframes glow{to{filter:drop-shadow(0 0 4px #FFE36E)}}
+@keyframes dot{50%{transform:translateY(-2px);opacity:1}}
+@keyframes tilt{50%{transform:rotate(-4deg)}}
+@keyframes jump{0%,100%{transform:translateY(0)}20%{transform:translateY(-5px)}}
+@keyframes look{50%{transform:translateX(3px)}}
+@keyframes tear{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(14px);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+<g class="body"><path d="M50 14 Q56 4 64 9 Q57 9 56 16 Q84 22 86 55 Q88 90 50 92 Q12 90 14 55 Q16 20 50 14Z" fill="#7B5CFF"/><ellipse cx="50" cy="72" rx="22" ry="15" fill="#A58BFF" opacity=".7"/><g class="eyes"><circle cx="35" cy="43" r="4.2" fill="#2B1D6B"/><circle cx="36.47" cy="41.53" r="1.344" fill="#fff"/><circle cx="59" cy="43" r="4.2" fill="#2B1D6B"/><circle cx="60.47" cy="41.53" r="1.344" fill="#fff"/></g><path class="mouth" d="M44 62 H56" stroke="#2B1D6B" stroke-width="3" stroke-linecap="round"/></g><g class="dots"><circle cx="80" cy="14" r="3" fill="#2B1D6B" opacity=".5"/><circle cx="88" cy="8" r="2.2" fill="#2B1D6B" opacity=".4"/><circle cx="94" cy="3" r="1.6" fill="#2B1D6B" opacity=".3"/></g>
+</svg>
