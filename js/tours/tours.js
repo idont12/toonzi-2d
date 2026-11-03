@@ -91,7 +91,7 @@
     const t0 = performance.now(), loop = () => { const t = (performance.now() - t0) / 1000; draws.forEach(d => d(t)); raf.id = requestAnimationFrame(loop); };
     fillSide();
     const dlg = SB.dialog.sheet([h('h2', null, opt.first ? 'Learn Toonzi in a few minutes' : 'Tutorials'),
-      h('p.sub', null, opt.first ? 'New here? Try a short hands-on lesson with a guide: start with Basics, at the top. Each one makes its own practice screen. You can open them again any time from File › Tutorials.' : 'Short hands-on lessons with a guide. Each one makes its own practice screen, so your project stays as it is.'),
+      h('p.sub', null, opt.first ? 'New here? Try a short hands-on lesson with a guide: start with Basics, at the top. Each one makes its own practice screen. You can open them again any time: click the logo at the top left › Tutorials…' : 'Short hands-on lessons with a guide. Each one makes its own practice screen, so your project stays as it is.'),
       chips, h('div.tg', null, grid, side), opt.first ? h('div.sheet-actions', null, W.btn('Skip, I\'ll explore on my own', () => dlg.close(), { cls: 'ghost' })) : null].filter(Boolean),
       { size: 'wide', onClose: () => { cancelAnimationFrame(raf.id); if (!started && opt.onSkip) opt.onSkip(); } });
     loop();

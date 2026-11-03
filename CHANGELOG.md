@@ -1024,4 +1024,8 @@ Both use `js/io/engines.js`, which samples the chosen screens frame by frame (li
 - **Tutorials gallery**: up to 1360 px wide on big screens, with up to 4 columns of cards next to a wider details column.
 
 ## Round 61 changes
-- **First visit: tutorials right after the welcome.** Pressing Start in the welcome now opens the tutorials gallery ("Learn Toonzi in a few minutes"), so new users can try a lesson first. "Skip, I'll explore on my own" (or closing it) goes on to the usual start dialog. File › Tutorials is unchanged.
+- **First visit: tutorials right after the welcome.** Pressing Start in the welcome now opens the tutorials gallery ("Learn Toonzi in a few minutes"), so new users can try a lesson first. "Skip, I'll explore on my own" (or closing it) goes on to the usual start dialog. The logo menu › Tutorials… is unchanged.
+
+## Round 62 changes
+- **README: a fun, simple first view.** The top of README.md now has the mascot (the light or dark logo, matching GitHub's theme), the slogan "Everyone can animate", two big buttons (Open Toonzi 2D: https://idont12.github.io/toonzi-2d/, Read the docs: https://idont12.github.io/toonzi-2d/docs; drawn as docs/media/btn-open.svg and btn-docs.svg), the hero animation, four friendly feature tiles and "Start in 3 steps". All the technical parts are kept below, under "For developers". Out-of-date lines fixed (24 tutorials with Toonzi as the guide, GIF export, the Pages links).
+- The first-visit tutorials text now names the logo menu (click the logo › Tutorials…) instead of a File menu.

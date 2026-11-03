@@ -1,8 +1,23 @@
-<p align="center"><img src="assets/logo.svg" alt="Toonzi, the Toonzi 2D mascot" width="110"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <img src="assets/logo.svg" alt="Toonzi, the Toonzi 2D mascot" width="120">
+  </picture>
+</p>
 
-# Toonzi 2D
+<h1 align="center">Toonzi 2D</h1>
 
-**Draw, rig, animate and export 2D animation in your browser. No install, no build step, nothing uploaded.**
+<p align="center">
+  <b>Everyone can animate.</b><br>
+  Draw it, move it, share it, right in your browser.<br>
+  Free · no install · no sign-up · your work stays on your device
+</p>
+
+<p align="center">
+  <a href="https://idont12.github.io/toonzi-2d/"><img src="docs/media/btn-open.svg" alt="Open Toonzi 2D" height="56"></a>
+  &nbsp;
+  <a href="https://idont12.github.io/toonzi-2d/docs"><img src="docs/media/btn-docs.svg" alt="Read the docs" height="56"></a>
+</p>
 
 <!-- TOONZI: hero animation. An animated SVG made in Toonzi 2D (Export > SVG animation).
      Replace docs/media/hero.svg with your own file; how: docs/media/README.txt -->
@@ -10,18 +25,37 @@
   <img src="docs/media/hero.svg" alt="Toonzi 2D: Draw, Rig, Animate, Export. A ball bounces, a star spins." width="720">
 </p>
 
+<table align="center">
+  <tr>
+    <td align="center" width="170">✏️<br><b>Draw</b><br><sub>Brushes, vectors, fills</sub></td>
+    <td align="center" width="170">🎬<br><b>Animate</b><br><sub>Frame by frame or keyframes</sub></td>
+    <td align="center" width="170">🦴<br><b>Rig</b><br><sub>Bones, controllers, physics</sub></td>
+    <td align="center" width="170">🚀<br><b>Share</b><br><sub>Video, GIF, web, Unity, Godot</sub></td>
+  </tr>
+</table>
+
+### Start in 3 steps
+
+1. **[Open Toonzi 2D](https://idont12.github.io/toonzi-2d/)** in Chrome or Edge.
+2. **Pick a tutorial.** Toonzi, the little guide, shows you where to click. The tutorials open by themselves the first time; later, click the logo › Tutorials…
+3. **Make something and export it** as a video, a GIF or a web page.
+
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#what-it-can-do">Features</a> ·
-  <a href="docs/index.html">Documentation</a> ·
+  <a href="https://idont12.github.io/toonzi-2d/">Open the app</a> ·
+  <a href="https://idont12.github.io/toonzi-2d/docs">Documentation</a> ·
   <a href="tutorials/README.md">Tutorials</a> ·
+  <a href="#for-developers">For developers</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="LICENSE">AGPL-3.0 license</a>
 </p>
 
-Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw frame by frame or with vectors, set keyframes, build bone rigs, add physics, then export to video, SVG, Lottie, Rive, Unity, Godot, Blender and more. It has built-in tutorials taught by a little guide character.
+---
 
-## What it can do
+## For developers
+
+Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw frame by frame or with vectors, set keyframes, build bone rigs, add physics, then export to video, GIF, SVG, Lottie, Rive, Unity, Godot, Blender and more. It has built-in tutorials taught by a little guide character.
+
+### What it can do
 
 **Draw**
 
@@ -56,6 +90,7 @@ Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw fram
 | Export as | What you get |
 |---|---|
 | Video | MP4, WebM, MOV or MKV, with sound |
+| GIF | An animated GIF (looping, optionally with a transparent background) |
 | Sprite sheet | One image (PNG, JPG, WebP, AVIF or SVG) plus a JSON file for Phaser, PixiJS and similar |
 | Images (ZIP) | Every frame as PNG, JPG, WebP or AVIF |
 | SVG animation | An animated SVG that plays by itself (this is what the hero above is) |
@@ -66,10 +101,10 @@ Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw fram
 
 **Learn**
 
-- 15 built-in tutorials in the app (logo menu › Tutorials…) with a guide character, **Pip** or **Mo**, who points at what to click and checks what you did.
+- 24 built-in tutorials in the app (logo menu › Tutorials…; they open by themselves on the first visit) with a guide character, **Toonzi** (or **Pip** or **Mo**), who points at what to click and checks what you did.
 - A **tutorial maker** (Settings › Project › Tutorial maker…) to record and write your own.
 
-## Quick start
+### Run it on your computer
 
 Toonzi 2D runs in the browser. You need a modern browser; Chrome or Edge are best (video export uses WebCodecs, which Chromium has).
 
@@ -89,24 +124,24 @@ npx serve
 
 Your work is autosaved in the browser. Use **Save project** (Ctrl+S) to get a `.json` file with everything in it, and **Open project…** to load it.
 
-### First steps
+#### First steps
 1. Click the logo at the top left, choose **Tutorials…** and start with **Drawing: brush and eraser**, **Frame by frame** and **Keyframes and tweens**.
 2. Or pick **Examples** from the same menu and press Space to play.
 3. Press **F** for the big stage. The small **?** buttons explain a panel.
 
-## Documentation
+### Documentation
 
-[`docs/index.html`](docs/index.html) explains every tool and feature with short steps for beginners: the toolbar, timeline, layers, masks, effects, rigs, controllers, physics, interactive mode, every export format, settings and shortcuts. It is one self-contained page that works offline.
+Online at **https://idont12.github.io/toonzi-2d/docs**, and in the repository as [`docs/index.html`](docs/index.html). It explains every tool and feature with short steps for beginners: the toolbar, timeline, layers, masks, effects, rigs, controllers, physics, interactive mode, every export format, settings and shortcuts. It is one self-contained page that works offline.
 
-### Run the docs on GitHub Pages
+#### Run the docs on GitHub Pages
 1. Push the repository to GitHub.
 2. Go to **Settings › Pages**. Under **Build and deployment**, choose **Deploy from a branch**, select your main branch and the **/ (root)** folder, and save.
 3. After a minute the app runs at `https://<your-name>.github.io/<repo>/` and the docs at `https://<your-name>.github.io/<repo>/docs/`. Because the site comes from a web server, **Interactive › HTML** export works there too.
-4. Put your Pages link here: <!-- TOONZI: replace with your Pages URL --> `https://<your-name>.github.io/<repo>/docs/`
+4. This repository's site: the app at https://idont12.github.io/toonzi-2d/ and the docs at https://idont12.github.io/toonzi-2d/docs
 
 Choose **root**, not the `/docs` folder: the docs link to the app and to the examples next to it. The empty `.nojekyll` file tells Pages to serve the files as they are.
 
-## Put your own animations in this README and the docs
+### Put your own animations in this README and the docs
 
 A GitHub README cannot run JavaScript, but it can show an **animated SVG** in an `<img>`, and Toonzi 2D exports exactly that.
 
@@ -116,9 +151,9 @@ A GitHub README cannot run JavaScript, but it can show an **animated SVG** in an
 
 The docs page **can** run JavaScript, so it can show interactive exports. Export **Interactive › HTML**, save it in `docs/media/`, and add it to the marked section of `docs/index.html` (`<!-- TOONZI: interactive demos -->`) as an `<iframe>`. Full steps, and every export menu name, are in [`docs/media/README.txt`](docs/media/README.txt).
 
-The app has no GIF export. Animated SVG is the format for READMEs.
+Animated SVG is the best format for READMEs (sharp and small); an exported GIF works too.
 
-## Project structure
+### Project structure
 
 ```
 index.html            loads everything in order (read it top to bottom)
@@ -143,7 +178,7 @@ CHANGELOG.md          the long development history, round by round
 
 Everything hangs off one global, `SB`. Every file starts with a comment that says what it does.
 
-## Add a tutorial
+### Add a tutorial
 
 Tutorials are plain files in `tutorials/`, and you don't need to touch the app's code.
 
@@ -153,7 +188,7 @@ Tutorials are plain files in `tutorials/`, and you don't need to touch the app's
 
 All of it is explained in [`tutorials/README.md`](tutorials/README.md). Open `tutorials/preview.html` to see every guide in every mood.
 
-## Contributing
+### Contributing
 
 Contributions are welcome: bug fixes, new tutorials, new effects, new export targets, docs.
 
