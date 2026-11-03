@@ -1225,3 +1225,7 @@ body.ts-open .toast { z-index: 930; }
 .top .proj-name { font-weight: 600; font-size: 16px; }
 /* The guide character gets a white outline, so it reads on dark screens too */
 .tour-guide .tg-char > img, .tour-guide .tg-char > .tg-face, .tour-guide .tg-char > svg { filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff); }
+/* Tutorials gallery: wider on wide screens, up to 4 columns of cards beside the details */
+.sheet.wide:has(> .tg) { width: min(1360px, 100%); }
+.sheet.wide:has(> .tg) .tg { grid-template-columns: minmax(0, 1fr) 300px; }
+.sheet.wide:has(> .tg) .tg-grid { grid-template-columns: repeat(auto-fill, minmax(max(190px, calc((100% - 36px) / 4)), 1fr)); }

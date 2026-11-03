@@ -1019,3 +1019,6 @@ Both use `js/io/engines.js`, which samples the chosen screens frame by frame (li
   - the guide has a white outline, so it reads on dark screens;
   - the mouse wheel scrolls the dimmed panels during a step (e.g. down the right panel to a bone's segments);
   - "Effects and video" is now the second group.
+
+## Round 60 changes
+- **Tutorials gallery**: up to 1360 px wide on big screens, with up to 4 columns of cards next to a wider details column.
