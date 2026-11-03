@@ -1022,3 +1022,6 @@ Both use `js/io/engines.js`, which samples the chosen screens frame by frame (li
 
 ## Round 60 changes
 - **Tutorials gallery**: up to 1360 px wide on big screens, with up to 4 columns of cards next to a wider details column.
+
+## Round 61 changes
+- **First visit: tutorials right after the welcome.** Pressing Start in the welcome now opens the tutorials gallery ("Learn Toonzi in a few minutes"), so new users can try a lesson first. "Skip, I'll explore on my own" (or closing it) goes on to the usual start dialog. File › Tutorials is unchanged.

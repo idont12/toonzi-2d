@@ -59,8 +59,9 @@
   document.head.appendChild(style);
 
   // ================= the gallery
-  function open() {
-    if (!TS.list.length) return SB.toast('No tutorials yet.');
+  /** opt.first: the first visit (right after the welcome): a friendlier title and a way to skip; opt.onSkip runs when it closes without a tutorial. */
+  function open(opt = {}) {
+    if (!TS.list.length) { if (opt.onSkip) opt.onSkip(); return SB.toast('No tutorials yet.'); }
     let cur = TS.list.find(d => !TS.list.some(x => x.replaces === d.id)) || TS.list[0]; const raf = { id: 0 }, cards = [], side = h('div.tg-side'), draws = [];
     const preview = (def, cv) => { const c = cv.getContext('2d'); return t => { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cv.width, cv.height); c.save(); try { def.preview && def.preview(c, t, cv.width, cv.height); } catch (e) { console.error(e); } c.restore(); }; };
     const shown = TS.list.filter(d => !TS.list.some(x => x.replaces === d.id)); // your own copy of a tutorial can stand in for it
@@ -86,11 +87,13 @@
         cur.learn && cur.learn.length ? [h('div.tg-learn-t', null, 'You will learn'), h('ul.tg-learn', null, cur.learn.map(x => h('li', null, x)))] : null,
         h('div.sheet-actions', null, W.btn('Start', () => go(cur), { cls: 'primary', icon: 'play' }))].flat().filter(Boolean));
     }
-    const go = def => { dlg.close(); start(def.id); };
+    let started = false; const go = def => { started = true; dlg.close(); start(def.id); };
     const t0 = performance.now(), loop = () => { const t = (performance.now() - t0) / 1000; draws.forEach(d => d(t)); raf.id = requestAnimationFrame(loop); };
     fillSide();
-    const dlg = SB.dialog.sheet([h('h2', null, 'Tutorials'), h('p.sub', null, 'Short hands-on lessons with a guide. Each one makes its own practice screen, so your project stays as it is.'),
-      chips, h('div.tg', null, grid, side)], { size: 'wide', onClose: () => cancelAnimationFrame(raf.id) });
+    const dlg = SB.dialog.sheet([h('h2', null, opt.first ? 'Learn Toonzi in a few minutes' : 'Tutorials'),
+      h('p.sub', null, opt.first ? 'New here? Try a short hands-on lesson with a guide: start with Basics, at the top. Each one makes its own practice screen. You can open them again any time from File › Tutorials.' : 'Short hands-on lessons with a guide. Each one makes its own practice screen, so your project stays as it is.'),
+      chips, h('div.tg', null, grid, side), opt.first ? h('div.sheet-actions', null, W.btn('Skip, I\'ll explore on my own', () => dlg.close(), { cls: 'ghost' })) : null].filter(Boolean),
+      { size: 'wide', onClose: () => { cancelAnimationFrame(raf.id); if (!started && opt.onSkip) opt.onSkip(); } });
     loop();
   }
 
