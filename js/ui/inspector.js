@@ -41,7 +41,7 @@
     lab.addEventListener('pointerdown', e => { e.preventDefault(); lab.setPointerCapture(e.pointerId); const x0 = e.clientX, v0 = FL.read(o, f), st = (opt.step || 1) * (e.shiftKey ? 10 : 1); let moved = false;
       const mv = ev => { moved = true; const v = U.r2(v0 + Math.round((ev.clientX - x0) / 2) * st); inp.value = v; FL.write(o, f, v, false); };
       const up = () => { lab.removeEventListener('pointermove', mv); lab.removeEventListener('pointerup', up); if (moved) FL.write(o, f, parseFloat(inp.value), true); else inp.focus(); };
-      lab.addEventListener('pointermove', mv); lab.addEventListener('pointerup', up); });
+      lab.addEventListener('pointermove', mv); lab.addEventListener('pointerup', up); lab.addEventListener('pointercancel', () => { lab.removeEventListener('pointermove', mv); lab.removeEventListener('pointerup', up); if (moved) FL.write(o, f, parseFloat(inp.value), true); }, { once: true }); });
     const el = h('div.cf' + (opt.locked ? '.locked' : ''), { title: opt.locked || opt.title || '' }, FL.keyButton(o, k), lab, inp, opt.unit ? h('span.cf-u', null, opt.unit) : null); // a div, not a label: a label would pass clicks on to the key button
     if (opt.locked) inp.disabled = true;
     return el;
@@ -128,14 +128,15 @@
       ? FL.row(o, { label: p.label, type: 'select', options: p.options, get: () => e[k] ?? p.def, set: (x, v) => (x === o ? [e] : (x.effects || []).filter(y => y.type === e.type)).forEach(y => y[k] = v) })
       : p.type === 'color' ? FL.row(o, { k: `fx:${e.id}:${k}`, label: p.label, type: 'color', anim: true, single: true })
       : FL.row(o, { k: `fx:${e.id}:${k}`, label: p.label, type: 'range', min: p.min, max: p.max, step: p.step, anim: true, single: true }));
-    const lost = !SB.fx.usable(d); // the project's target can't carry it: it stays here but isn't exported
-    return h('div.fxitem' + (on ? '' : '.off') + (lost ? '.lost' : ''), null, lost ? h('p.hint.warn', null, `Not exported to ${SB.targets.short()}.`) : null, h('div.hd', null, h('span.row', null, FL.keyButton(o, `fx:${e.id}:on`), chk), d.designed ? W.iconBtn('edit', 'Edit this transition', () => SB.transitions.open((S.doc.transitions || []).find(t => 'tr:' + t.id === e.type)), 'sm') : d.fxDesign && SB.fxDesigner ? W.iconBtn('edit', 'Edit this effect in the designer', () => SB.fxDesigner.open(SB.fxDesigner.find(d.fxDesign)), 'sm') : null, SB.fx.timed(e) ? W.iconBtn('play', 'Preview it on the stage (the playhead runs over it once)', () => SB.fx.preview(o, e), 'sm') : null, W.iconBtn('x', 'Remove', () => { SB.fx.remove(o, e.id); tree.others(o).forEach(x => (x.effects || []).filter(y => y.type === e.type).forEach(y => SB.fx.remove(x, y.id))); SB.commit(); }, 'sm')), ...rows);
+    const lost = !SB.fx.usable(d), warned = !lost && SB.fx.warned(d); // the project's target can't carry it (not exported), or only drawn into pictures (yellow)
+    const wtxt = warned ? (SB.targets.get() === 'blender' ? `Not recommended for Blender: drawn frame by frame when exporting (heavier files, can’t be changed in Blender).` : `Not recommended for game engines: drawn onto the sprite (when it doesn’t change) or frame by frame when exporting. Heavier, and it can look a little different.`) : '';
+    return h('div.fxitem' + (on ? '' : '.off') + (lost ? '.lost' : '') + (warned ? '.warned' : ''), warned ? { title: wtxt } : null, lost ? h('p.hint.warn', null, `Not exported to ${SB.targets.short()}.`) : warned ? h('p.hint.bake.fx-nr.keep', { title: wtxt }, h('b', null, `(${SB.targets.NOT_REC}) `), SB.targets.get() === 'blender' ? 'Blender can’t make it: drawn frame by frame.' : 'Game engines can’t make it: drawn into the pictures.') : null, h('div.hd', null, h('span.row', null, FL.keyButton(o, `fx:${e.id}:on`), chk), d.designed ? W.iconBtn('edit', 'Edit this transition', () => SB.transitions.open((S.doc.transitions || []).find(t => 'tr:' + t.id === e.type)), 'sm') : d.fxDesign && SB.fxDesigner ? W.iconBtn('edit', 'Edit this effect in the designer', () => SB.fxDesigner.open(SB.fxDesigner.find(d.fxDesign)), 'sm') : null, SB.fx.timed(e) ? W.iconBtn('play', 'Preview it on the stage (the playhead runs over it once)', () => SB.fx.preview(o, e), 'sm') : null, W.iconBtn('x', 'Remove', () => { SB.fx.remove(o, e.id); tree.others(o).forEach(x => (x.effects || []).filter(y => y.type === e.type).forEach(y => SB.fx.remove(x, y.id))); SB.commit(); }, 'sm')), ...rows);
   }
   /** "Add …" picker for some kinds of effects, grouped by kind. */
   function fxAdder(o, cats, text) {
     const avail = SB.fx.available(o).filter(d => cats.includes(d.cat)); if (!avail.length) return null;
     const sel = h('select.addsel', { 'aria-label': text }, h('option', { value: '' }, text),
-      cats.map(cat => { const list = avail.filter(d => d.cat === cat); return list.length ? h('optgroup', { label: SB.FX_CATS[cat] }, list.map(d => h('option', { value: d.id, disabled: !SB.fx.usable(d) }, d.label + (SB.fx.usable(d) ? '' : ` (not in ${SB.targets.short()})`)))) : null; }));
+      cats.map(cat => { const list = avail.filter(d => d.cat === cat); return list.length ? h('optgroup', { label: SB.FX_CATS[cat] }, list.map(d => h('option', { value: d.id, disabled: !SB.fx.usable(d) }, d.label + (!SB.fx.usable(d) ? ` (not in ${SB.targets.short()})` : SB.fx.warned(d) ? ` (${SB.targets.NOT_REC})` : '')))) : null; }));
     sel.onchange = () => { if (!sel.value) return; const d = SB.effects.get(sel.value); SB.fx.add(tree.selected(), sel.value); if (!S.playing && !tree.inRange(o)) tree.goLocal(o, 0.0001); SB.toast(`${d.label} added${d.cat === 'in' ? '. It plays at the start of the clip' : d.cat === 'out' ? '. It plays at the end of the clip' : ''}. Press Space to preview.`); };
     return sel;
   }
@@ -145,7 +146,7 @@
     const list = o.effects.filter(e => { const d = SB.effects.get(e.type); return d && cats.includes(d.cat); });
     const timed = list.some(SB.fx.timed);
     const tgt = SB.targets ? SB.targets.get() : 'video';
-    return sec(title, [...list.map(e => fxItem(o, e)), fxAdder(o, cats, addText), tgt !== 'video' ? h('p.hint', null, `Made for ${SB.targets.LIST[tgt].short}: effects it can’t carry are greyed out.`) : null,
+    return sec(title, [...list.map(e => fxItem(o, e)), fxAdder(o, cats, addText), tgt !== 'video' ? h('p.hint', null, tgt === 'game' || tgt === 'blender' ? `Made for ${SB.targets.LIST[tgt].short}: effects it can’t make itself still work, marked yellow (${SB.targets.NOT_REC}): they are drawn into pictures when exporting.` : `Made for ${SB.targets.LIST[tgt].short}: effects it can’t carry are greyed out.`) : null,
       cats.includes('in') && SB.transitions ? h('div.row.btns', null, W.btn('Design a transition…', () => SB.transitions.open(null, tr => { SB.fx.add(tree.selected(), 'tr:' + tr.id); }), { cls: 'sm ghost', icon: 'plus' })) : null,
       cats.includes('loop') && SB.fxDesigner ? h('div.row.btns', null, W.btn('Design an effect…', () => SB.fxDesigner.open(null), { cls: 'sm ghost', icon: 'fx', title: 'Make your own effect: pick what changes and how, no code' })) : null,
       timed && !o.showProps ? h('div.row.btns', null, W.btn('Time them in the timeline', () => { o.showProps = true; SB.commit(); }, { cls: 'sm ghost', icon: 'rows' })) : null], { key, closed: !list.length, badge: list.length ? h('span.badge', null, String(list.length)) : null });
@@ -186,13 +187,14 @@
     ]) : null;
     const scr = sec(many ? 'This screen' : 'Project', [
       many ? FL.row(act, { k: 'name', label: 'Screen name', type: 'text', single: true, after: () => SB.dirty() }) : FL.row(p, { k: 'name', label: 'Name', type: 'text', single: true, after: () => SB.invalidate('top') }),
+      W.row('Frame rate', W.num(p.fps, { min: 1, max: 240, step: 1, label: 'Frame rate (any number, 1 to 240)', change: v => { const f = U.clamp(Math.round(+v || p.fps), 1, 240); if (f !== p.fps) { p.fps = f; SB.commit(); SB.invalidate('inspector', 'timeline'); } } }), h('span.hint', null, 'fps')),
       W.row('Length (s)', W.num(p.duration, { min: 0.5, max: 600, step: 0.5, label: 'Length', change: v => { p.duration = U.clamp(v, 0.5, 600); p.fixedLen = true; SB.commit(); } })),
       h('p.hint', null, 'Layers longer than the screen keep their keyframes; the animation just ends here.'),
       tmplRow(act),
-      h('p.hint', null, `${p.w} × ${p.h} px, ${p.fps} fps. ` + (many ? 'Every screen has its own size, length, background and timeline.' : 'Change the size, frame rate and background in Project settings.')),
+      h('p.hint', null, `${p.w} × ${p.h} px. ` + (many ? 'Every screen has its own size, length, background and timeline.' : 'Change the size, frame rate and background in Project settings.')),
       h('div.row.btns', null, W.btn(many ? 'Screen settings' : 'Project settings', () => SB.settings.open('project'), { cls: 'sm', icon: 'gear' }), many ? null : W.btn('Add a screen', e => addScreenMenu(e.currentTarget), { cls: 'sm ghost', icon: 'screen' })),
     ]);
-    return h('div', null, screens, scr, sec('Getting around', [h('p.hint', null, 'Drag with two fingers, the middle mouse button or Space to move around the stage. Pinch, Ctrl + wheel or the + − buttons zoom. Long-press or right-click anything for more options.'), SB.keys.cheatsheet()], { closed: true }));
+    return h('div', null, screens, scr, ...(I.project || []).map(f => f()), sec('Getting around', [h('p.hint', null, 'Drag with two fingers, the middle mouse button or Space to move around the stage. Pinch, Ctrl + wheel or the + − buttons zoom. Long-press or right-click anything for more options.'), SB.keys.cheatsheet()], { closed: true }));
   }
   function render() {
     const el = U.$('#inspector'), o = tree.sel(), top = el.scrollTop;

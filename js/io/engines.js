@@ -10,8 +10,14 @@
                        its group, skin (bends with bones) or follow (joint key it rides on)
                rig     the rig;  joint  one bone (or one joint of a segmented bone), parent = joint or rig
                ctrl    a controller (an empty object in the engine)
+               particles  a particles layer: ps = its settings (js/model/types/particles.js); the engine makes its own particle node
      clips   [{ name, n, dur, tracks: Map key → { W: [DOMMatrix stage px], a: [alpha], fi: [frame], on: [bool] } }]
      order   leaf keys front to back;  warnings  Set of things that can't be carried
+     baked   names of layers drawn frame by frame (opt.bakeFx: effects the engine can't do; opt.pixelFrames: a
+             pixel art screen as one picture a frame, nd.pixel = keep its pixels sharp). They work, but a picture
+             a frame is heavier and can't be changed in the engine, so the export marks them in yellow.
+     still   names of layers whose still looks (an outline, shadow, glow… that doesn't change, opt.stillFx) are drawn
+             into their sprite once: the layer keeps its bones, controllers and keys (nd.still: those effects).
    Writers turn world matrices into local ones under whatever parent they choose. */
 'use strict';
 (function (SB) {
@@ -33,8 +39,75 @@
   const dataBytes = url => { const b = atob(url.split(',')[1]), out = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i); return out; };
   const png = pic => pic.bytes || (pic.bytes = dataBytes(pic.cv.toDataURL('image/png')));
 
+  // ---------- frame by frame: a layer with effects, or a whole pixel art screen, as one picture per frame
+  const BAKE_BASE = 2e9, PIXEL_KEY = 'toonzi-pixel-art';
+  /** Effects on o that the game engines can't do (they are drawn into the pictures when baked). */
+  const fxBad = (o, t = 'game') => (o.effects || []).filter(e => { const d = SB.effects.get(e.type); return e.on !== false && d && SB.targets && !SB.targets.fxOk(t, d); }).map(e => SB.effects.get(e.type).label);
+  /** Still looks: effects that never change (Looks, not keyed), drawn into the layer's own picture (opt.stillFx). */
+  const STILL_NO = ['duplicate']; // a grid of copies sits in the parent's space: not one sprite
+  const varies = (o, e) => Object.keys(o.tracks || {}).some(k => k.startsWith('fx:' + e.id + ':') && k !== 'fx:' + e.id + ':on' && new Set(o.tracks[k].map(q => JSON.stringify(q.v))).size > 1)
+    || ((o.tracks || {})['fx:' + e.id + ':on'] || []).some(q => q.v === false);
+  /** Can o's effects the engine can't do all go onto its sprite? (a layer, not a group or mask; every one a still look) */
+  const fxStill = (o, t = 'game') => {
+    if (o.type === 'group' || o.type === 'particles' || o.isMask || o.type === 'video' || o.type === 'audio') return false;
+    const bad = (o.effects || []).filter(e => { const d = SB.effects.get(e.type); return e.on !== false && d && SB.targets && !SB.targets.fxOk(t, d); });
+    return bad.length > 0 && bad.every(e => { const d = SB.effects.get(e.type); return d.cat === 'static' && !STILL_NO.includes(d.id) && !varies(o, e); });
+  };
+  const hashOf = (d) => { let a = 2166136261, b = 0; for (let i = 0; i < d.length; i += 4) { a = Math.imul(a ^ (d[i] | d[i + 1] << 8 | d[i + 2] << 16 | d[i + 3] << 24), 16777619); b = (b + a) | 0; } return (a >>> 0).toString(36) + (b >>> 0).toString(36); };
+  const work = U.h('canvas', { width: 2, height: 2 });
+  /** What a canvas holds, cut to what's drawn: a picture { cv, x0, y0, w, h, k } in stage units (ox, oy: where the canvas' corner sits), or null. */
+  function cropped(cv, k, ox, oy) {
+    const W = cv.width, H = cv.height, d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data; let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = 0; y < H; y++) { const r = y * W * 4; for (let x = 0; x < W; x++) if (d[r + x * 4 + 3] > 2) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; } }
+    if (x1 < 0) return null; const w = x1 - x0 + 1, h = y1 - y0 + 1, out = U.h('canvas', { width: w, height: h }), c = out.getContext('2d', { willReadFrequently: true });
+    c.drawImage(cv, x0, y0, w, h, 0, 0, w, h);
+    return { cv: out, x0: ox + x0 / k, y0: oy + y0 / k, w: w / k, h: h / k, k, hash: hashOf(c.getImageData(0, 0, w, h).data) + ':' + x0 + ',' + y0 };
+  }
+  /** Add a frame's picture to a node (the same picture again is reused): its frame number. */
+  function keep(nd, pic) {
+    nd.bh = nd.bh || new Map(); if (nd.bh.has(pic.hash)) return nd.bh.get(pic.hash);
+    const f = BAKE_BASE + nd.pics.length; pic.f = f; pic.label = 'frame ' + (nd.pics.length + 1); nd.pics.push(pic); nd.bh.set(pic.hash, f); return f;
+  }
+  /** A layer's picture with its still looks drawn in (outline, shadow, glow…), in its own space like raster(). */
+  function rasterStill(info, f) {
+    const base = raster(info, f); if (!base) return null;
+    const o = info.o, v = info.v, looks = (v.effects || []).filter(e => { const d = SB.effects.get(e.type); return e.on !== false && d && d.cat === 'static' && !STILL_NO.includes(d.id); });
+    if (!looks.length) return base;
+    const pad = Math.ceil(Math.max(base.w, base.h) * 0.25 + 80), k = Math.min(base.k, 4096 / (Math.max(base.w, base.h) + 2 * pad)), W = Math.max(1, Math.round((base.w + 2 * pad) * k)), H = Math.max(1, Math.round((base.h + 2 * pad) * k));
+    const src = U.h('canvas', { width: W, height: H }), sc = src.getContext('2d'); sc.imageSmoothingEnabled = true; sc.drawImage(base.cv, pad * k, pad * k, base.w * k, base.h * k);
+    const st = SB.fx.state(Object.assign({}, v, { effects: looks }), info.lt, SB.tracks.transform(o, info.lt), { sc: k }); st.opacity = 1; st.blend = 'normal';
+    const out = U.h('canvas', { width: W, height: H }), oc = out.getContext('2d', { willReadFrequently: true });
+    SB.scene.composite(oc, src, st, k, st.glowColor || '#FFD84D', false);
+    const pic = cropped(out, k, base.x0 - pad, base.y0 - pad); if (!pic) return base;
+    delete pic.hash; pic.f = f; pic.label = base.label; return pic;
+  }
+  /** One layer (with its effects, its children for a group) at time T, drawn where it sits on the stage (info from B.walk).
+      pm: its parent's matrix, pt: the parent's clock. Only the part of the stage around it is drawn (effects cost by area). */
+  function bakeLayer(o, T, pm, pt, info) {
+    const pr = S.project, k = Math.min(2, 2048 / Math.max(pr.w, pr.h)), m = 0.5;
+    let x0 = -pr.w * m, y0 = -pr.h * m, x1 = pr.w * (1 + m), y1 = pr.h * (1 + m);
+    const b = info && !(o.effects || []).some(e => e.type === 'duplicate') ? SB.scene.bounds(info.v, info.lt, info.fi) : null;
+    if (b && isFinite(b.x0) && info.M) {
+      const P = [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]].map(([x, y]) => info.M.transformPoint(new DOMPoint(x, y)));
+      let ax = Math.min(...P.map(q => q.x)), ay = Math.min(...P.map(q => q.y)), bx = Math.max(...P.map(q => q.x)), by = Math.max(...P.map(q => q.y)); const pad = 0.3 * Math.max(bx - ax, by - ay) + 100;
+      x0 = Math.max(x0, ax - pad); y0 = Math.max(y0, ay - pad); x1 = Math.min(x1, bx + pad); y1 = Math.min(y1, by + pad); if (x1 <= x0 || y1 <= y0) return null;
+    }
+    const W = Math.max(1, Math.ceil((x1 - x0) * k)), H = Math.max(1, Math.ceil((y1 - y0) * k));
+    if (work.width !== W || work.height !== H) { work.width = W; work.height = H; }
+    const c = work.getContext('2d', { willReadFrequently: true }); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, W, H);
+    const root = new DOMMatrix([k, 0, 0, k, -x0 * k, -y0 * k]); SB.stamp++;
+    SB.scene.renderList(c, [o], pt, root.multiply(pm || new DOMMatrix()), { T, root }, k, 0);
+    return cropped(work, k, x0, y0);
+  }
+  /** The whole pixel art screen at time T, at its pixel size (no background). */
+  function bakePixels(T) {
+    const pr = S.project, z = SB.pixel.size(), k = z.w / pr.w; if (work.width !== z.w || work.height !== z.h) { work.width = z.w; work.height = z.h; }
+    const c = work.getContext('2d', { willReadFrequently: true }); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, z.w, z.h);
+    SB.scene.render(c, T, k, { noBg: true }); return cropped(work, k, 0, 0);
+  }
+
   async function collect(screens, opt) {
-    const fps = opt.fps, nodes = [], byKey = new Map(), clips = [], warnings = new Set(), names = new Map();
+    const fps = opt.fps, nodes = [], byKey = new Map(), clips = [], warnings = new Set(), names = new Map(), baked = new Set(), stilled = new Set();
     /** A drawing with animated lines (opt.lineFrames): its frame fi at lt is one of a loop of pictures. */
     const lineFi = (o, fi, lt) => (o.expLine ?? opt.lineFrames) > 0 && o.type === 'draw' && fi < B.MORPH_BASE && SB.lineMotion && SB.lineMotion(o) ? LINE_BASE + fi * 100 + Math.floor(lt * LRATE + 1e-4) % (o.expLine ?? opt.lineFrames) : fi;
     const unique = (nm, kind) => { const base = (nm || kind).replace(/[\/\\:."]/g, ' ').trim() || kind; let n = base, i = 2; const used = names.get(kind) || new Set(); names.set(kind, used); while (used.has(n)) n = `${base} ${i++}`; used.add(n); return n; };
@@ -75,34 +148,57 @@
         // a pose grid: the controller sits at each spot in turn (row by row, top first), at the screen's start
         const pc = job.pose && tree.find(job.pose.ctrlId), keepC = pc && { live: pc._live };
         if (job.pose && !pc) return;
+        // a pixel art screen, frame by frame: one picture of the whole screen a frame, sharp pixels (opt.pixelFrames)
+        if (!pc && opt.pixelFrames && SB.pixel && SB.pixel.on()) {
+          const nd = add(PIXEL_KEY, { kind: 'layer', name: 'Pixel art', parent: null, o: { id: PIXEL_KEY, name: 'Pixel art', type: 'pixels', frames: [] }, pics: [], first: null, pixel: true, baked: true }), t = track(PIXEL_KEY);
+          baked.add(`${s.name} (pixel art screen)`);
+          for (let i = 0; i < n; i++) {
+            if (S.cancelExport) throw 'cancel'; if (i % 6 === 0 && opt.prog) { opt.prog(0.7 * (done + i) / total, `${label}: frame ${i + 1} of ${n}`); await U.sleep(0); }
+            const pic = bakePixels(i / fps); t.W[i] = new DOMMatrix(); t.a[i] = 1; t.on[i] = !!pic; t.fi[i] = pic ? keep(nd, pic) : (t.fi[i - 1] ?? BAKE_BASE);
+          }
+          void nd; return;
+        }
         try {
         for (let i = 0; i < n; i++) {
           if (S.cancelExport) throw 'cancel'; if (i % 6 === 0 && opt.prog) { opt.prog(0.7 * (done + i) / total, `${label}: frame ${i + 1} of ${n}`); await U.sleep(0); }
           const T = pc ? 0 : i / fps;
           if (pc) { const P = job.pose, col = i % P.nx, row = Math.floor(i / P.nx), u = P.nx > 1 ? -1 + 2 * col / (P.nx - 1) : 0, v = P.ny > 1 ? -1 + 2 * row / (P.ny - 1) : 0;
             pc._live = { x: (pc.rx ?? pc.x) + u * P.rw, y: (pc.ry ?? pc.y) + v * P.rh }; SB.bump(); } // like dragging it (js/rig/controls.js)
+          const under = new Set(), gm = new Map(); // layers inside a baked group (drawn with it); each group's matrix and clock
           B.walk(T, info => {
             const o = info.o, key = K(o), def = SB.types.get(o.type);
+            if (info.parent && under.has(info.parent.id)) { under.add(o.id); return; }
             if (o.type === 'video' || o.type === 'audio') { warnings.add('Video and sound'); return; }
+            const still = opt.stillFx && fxStill(o), bake = !still && opt.bakeFx && !o.isMask && o.type !== 'particles' && fxBad(o).length > 0;
+            if (o.type === 'group') { gm.set(o.id, { M: info.M, t: o.seq ? info.lt + (o.inPoint || 0) : o.start + info.lt }); if (bake) under.add(o.id); }
             let nd = byKey.get(key);
             if (!nd) {
               const parent = info.parent ? K(info.parent) : null;
-              nd = add(key, { kind: o.type === 'group' ? 'group' : 'layer', name: o.name, parent, o, pics: [], first: null });
-              if (nd.kind === 'layer') {
+              nd = add(key, { kind: bake ? 'layer' : o.type === 'group' ? 'group' : o.type === 'particles' ? 'particles' : 'layer', name: o.name, parent, o, pics: [], first: null, baked: bake || undefined });
+              if (nd.kind === 'particles') { nd.ps = SB.particles.settings(o, info.lt); nd.prevLeaf = prev; if (SB.particles.keyed(o)) warnings.add('Keyframed particle settings (they export with their value at the start)'); }
+              if (still && !nd.baked) { nd.still = fxBad(o); stilled.add(`${o.name} (${nd.still.join(', ')})`); }
+              if (nd.baked) { nd.prevLeaf = prev; baked.add(`${o.name} (${fxBad(o).join(', ')})`); }
+              else if (nd.kind === 'layer') {
                 if (o.isMask) nd.mask = { mode: o.isMask, visible: !!o.maskVisible };
                 if (o.bind && o.bind.mode === 'follow' && o.bind.rig) { const r = tree.find(o.bind.rig); if (r) nd.follow = `${K(r)}/${o.bind.bone}/0`; }
                 if (o.bind && o.bind.mode === 'deform') nd.bend = true;
                 nd.prevLeaf = prev;
               }
             }
+            if (nd.baked) { // drawn with its effects where it sits on the stage, so its track is the stage itself
+              const t = track(key), p = info.parent && gm.get(info.parent.id), own = U.clamp(info.st.opacity, 0, 1), pic = info.visible ? bakeLayer(o, T, p && p.M, p ? p.t : T, info) : null;
+              t.W[i] = new DOMMatrix(); t.a[i] = own > 0.001 ? U.clamp(info.alpha / own, 0, 1) : 0; t.on[i] = !!pic; t.fi[i] = pic ? keep(nd, pic) : (t.fi[i - 1] ?? BAKE_BASE);
+              if (pic && !nd.first) nd.first = info; prev = key; return;
+            }
             // animated lines (opt.lineFrames): the drawing becomes a loop of that many pictures
             if (nd.kind === 'layer' && !info.morph) info.fi = lineFi(o, info.fi, info.lt);
             const t = track(key); t.W[i] = info.M; t.a[i] = info.alpha; t.fi[i] = info.fi; t.on[i] = info.visible;
+            if (nd.kind === 'particles') { prev = key; return; } // the engine makes them itself: a particle node with the same settings
             if (nd.kind === 'layer') {
               prev = key;
-              if (info.visible) { if (!nd.first) nd.first = info; if (!nd.pics.some(p => p.f === info.fi)) { const pic = raster(info, info.fi); if (pic) nd.pics.push(pic); } }
+              if (info.visible) { if (!nd.first) nd.first = info; if (!nd.pics.some(p => p.f === info.fi)) { const pic = (nd.still ? rasterStill : raster)(info, info.fi); if (pic) nd.pics.push(pic); } }
               rope(o, info, key, T, nd, i);
-              (o.effects || []).forEach(e => { const d = SB.effects.get(e.type); if (e.on !== false && d && SB.targets && !SB.targets.fxOk('game', d)) warnings.add(`The ${d.label} effect`); });
+              if (!nd.still) (o.effects || []).forEach(e => { const d = SB.effects.get(e.type); if (e.on !== false && d && SB.targets && !SB.targets.fxOk('game', d)) warnings.add(`The ${d.label} effect`); });
               if (o.blend && o.blend !== 'normal') warnings.add('Blend modes');
               if (o.isMask === 'out') warnings.add('Masks that show the outside (Godot clips to the inside only)');
             }
@@ -131,7 +227,7 @@
         // (track.fev: [time, frame] at each change; the writers key the picture from it)
         if (!pc) for (const o of tree.all()) { const msteps = o.expMorph ?? opt.morphSteps; if (!(msteps > 0)) continue; /* a layer can set its own count */
           if ((o.type !== 'draw' && o.type !== 'shape') || !o.frames || o.frames.length < 2) continue;
-          const key = K(o), t = clip.tracks.get(key), nd = byKey.get(key); if (!t || !nd || nd.kind !== 'layer' || nd.skin) continue;
+          const key = K(o), t = clip.tracks.get(key), nd = byKey.get(key); if (!t || !nd || nd.kind !== 'layer' || nd.skin || nd.baked) continue;
           const ev = []; let fine = false;
           for (let i = 0; i < n; i++) {
             ev.push([i / fps, t.fi[i]]); if (i === n - 1 || !t.on[i]) continue;
@@ -142,23 +238,24 @@
               const T = (i + q / SUB) / fps, lt = tree.localTime(o, T), ms = B.morphShown(o, lt, msteps); if (!ms) continue;
               const fi = ms.strokes ? ms.fi : lineFi(o, ms.fi, lt); if (fi === last) continue; // a plain frame keeps the animated-line loop numbering
               last = fi; ev.push([T, fi]); fine = true;
-              if (!ms.strokes && !nd.pics.some(p => p.f === fi)) { const pic = raster({ o, v: SB.scene.viewOf(o, lt), lt, morph: null }, fi); if (pic) nd.pics.push(pic); }
-              if (ms.strokes && !nd.pics.some(p => p.f === ms.fi)) { const pic = raster({ o, v: SB.scene.viewOf(o, lt), lt, morph: ms }, ms.fi); if (pic) nd.pics.push(pic); }
+              const rs = nd.still ? rasterStill : raster;
+              if (!ms.strokes && !nd.pics.some(p => p.f === fi)) { const pic = rs({ o, v: SB.scene.viewOf(o, lt), lt, morph: null }, fi); if (pic) nd.pics.push(pic); }
+              if (ms.strokes && !nd.pics.some(p => p.f === ms.fi)) { const pic = rs({ o, v: SB.scene.viewOf(o, lt), lt, morph: ms }, ms.fi); if (pic) nd.pics.push(pic); }
             }
           }
           if (fine) t.fev = ev.filter((e, k) => k === 0 || e[1] !== ev[k - 1][1]);
         }
         if (pc) [...clip.tracks.keys()].forEach(k => { const nd = byKey.get(k); if (nd && nd.kind === 'ctrl') clip.tracks.delete(k); }); // the poses never move the controllers themselves
         // bending layers: their mesh and weights, bound where the layer sits at the start
-        for (const nd of nodes) if (nd.bend && !nd.skin && clip.tracks.has(nd.key) && tree.find(nd.o.id) === nd.o) nd.skin = skinOf(nd, clip.tracks.get(nd.key), K, warnings);
+        for (const nd of nodes) if (nd.bend && !nd.baked && !nd.skin && clip.tracks.has(nd.key) && tree.find(nd.o.id) === nd.o) nd.skin = skinOf(nd, clip.tracks.get(nd.key), K, warnings);
       }
       done += n;
     }
     // draw order: front to back, as first seen; layers new in a later screen go right after the layer drawn before them
     const order = [];
-    for (const nd of nodes) if (nd.kind === 'layer') { const at = nd.prevLeaf ? order.indexOf(nd.prevLeaf) : -1; order.splice(at + 1, 0, nd.key); }
+    for (const nd of nodes) if (nd.kind === 'layer' || nd.kind === 'particles') { const at = nd.prevLeaf ? order.indexOf(nd.prevLeaf) : -1; order.splice(at + 1, 0, nd.key); }
     // a layer that rides on a bone, or bends: only once it has a picture
-    return { fps, nodes, byKey, clips, order, warnings, w: screens[0].proj.w, h: screens[0].proj.h, png };
+    return { fps, nodes, byKey, clips, order, warnings, baked: [...baked], still: [...stilled], w: screens[0].proj.w, h: screens[0].proj.h, png };
   }
 
   /** A grid over the picture, weighted like the stage weights it, for one bending layer. */
@@ -199,5 +296,27 @@
   const picName = pic => pic.label || String(pic.f + 1);
   /** A layer's picture changes in a clip: [[time, frame], …] (exact morph in-betweens when there are, else one per frame change). */
   function picKeys(tr, n, fps) { if (!tr) return [[0, 0]]; if (tr.fev) return tr.fev; const out = []; for (let i = 0; i < n; i++) { const f = tr.fi[i] || 0; if (!out.length || out[out.length - 1][1] !== f) out.push([i / fps, f]); } return out; }
-  SB.engines = { collect, raster, local, filled, keyOf, picName, picKeys, LINE_BASE };
+  /** Layers of these screens the export would draw frame by frame: [label] (for the export dialog's yellow note). */
+  function bakeList(screens, opt, t = 'game') {
+    const out = [];
+    for (const s of screens) {
+      if (opt.pixelFrames && s.proj && s.proj.pixel && s.proj.pixel.on) { out.push(`${s.name} (pixel art screen)`); continue; }
+      if (!opt.bakeFx) continue; (function w(list, inBaked) { for (const o of list || []) { const bad = !inBaked && !o.isMask && o.type !== 'particles' && !(opt.stillFx && fxStill(o, t)) ? fxBad(o, t) : []; if (bad.length) out.push(`${o.name} (${bad.join(', ')})`); if (o.children) w(o.children, inBaked || bad.length > 0); } })(s.objects, false);
+    }
+    return [...new Set(out)];
+  }
+  /** Every layer of these screens using effects the format can't make itself, and how each goes:
+      [{ screen, name, fx: [labels], how: 'sprite' (drawn onto its sprite once) | 'frames' (frame by frame) | 'out' (left out) }]. */
+  function fxPlaces(screens, opt, t = 'game') {
+    const out = [];
+    for (const s of screens) {
+      if (opt.pixelFrames && s.proj && s.proj.pixel && s.proj.pixel.on) continue; // the whole screen goes as pictures
+      (function w(list, inBaked) { for (const o of list || []) {
+        const bad = !o.isMask && o.type !== 'particles' ? fxBad(o, t) : [], still = bad.length && opt.stillFx && fxStill(o, t), frames = !still && bad.length && opt.bakeFx;
+        if (bad.length && !inBaked) out.push({ screen: s.name, name: o.name, fx: bad, how: still ? 'sprite' : frames ? 'frames' : 'out' });
+        if (o.children) w(o.children, inBaked || !!frames); } })(s.objects, false);
+    }
+    return out;
+  }
+  SB.engines = { collect, raster, rasterStill, local, filled, keyOf, picName, picKeys, fxBad, fxStill, fxPlaces, bakeList, bakeLayer, keep, LINE_BASE, BAKE_BASE, PIXEL_KEY };
 })(window.SB);

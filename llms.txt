@@ -1,0 +1,9 @@
+# Toonzi 2D
+
+> A free 2D animation editor that runs in the browser: keyframes, frame-by-frame drawing, bone rigs, controllers, particles, pixel art, interactive mode, and export to video, GIF, Lottie, web pages, Unity, Godot and Blender. AI assistants can make an animation as a JSON project and hand it back as a link that opens the editor with it.
+
+- [AGENTS.md](https://github.com/idont12/toonzi-2d/blob/main/AGENTS.md): how an AI makes an animation with Toonzi (project format, rules for groups, rigs, controllers, pixel art and frame by frame, the command line, how to hand it back)
+- [Editor](https://idont12.github.io/toonzi-2d/): opens a project from `#project=<deflate-raw base64url JSON>` or `?open=<url of a .json>`
+- [Docs](https://idont12.github.io/toonzi-2d/docs/): the manual for people
+- [Examples](https://github.com/idont12/toonzi-2d/tree/main/ai/examples): complete projects to start from
+- [Command line](https://github.com/idont12/toonzi-2d/blob/main/tools/toonzi.mjs): check, link, editor, preview, unlink, serve (Node 18+, no packages)

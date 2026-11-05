@@ -131,5 +131,5 @@
     const o = tree.sel(), t = o && active(o), v = t && t.get(); if (!v || P().kind(v) !== 'grad') return; const p = P().parse(v); if (p.stops.length <= 2) return;
     e.preventDefault(); e.stopPropagation(); t.set(P().grad(p.type, p.angle, p.stops.filter((s, i) => i !== S.gradStop), p)); S.gradStop = null; SB.commit(); SB.invalidate('ctxbar', 'inspector');
   }, true);
-  SB.gradientTool = { targets, active, handles };
+  SB.gradientTool = { targets, active, handles, placed };
 })(window.SB);

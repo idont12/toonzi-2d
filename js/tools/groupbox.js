@@ -1,6 +1,7 @@
 /* The group box: with two or more layers selected, one box goes around all of them (like PowerPoint).
-   Its corners scale every layer together (around the opposite corner; Alt: around the middle), its sides
-   stretch them (Alt: from the middle), and its round handle turns them all around the middle (Shift: 15° steps).
+   Its corners stretch every layer together, in width and height freely (around the opposite corner; Alt: around the middle;
+   Shift: the ratio stays), its sides stretch one way (Shift: the ratio stays), and its round handle turns them all around
+   the middle (Shift: 15° steps).
    Each layer keeps its place in the group: its position moves with the box, its own size and angle change with it.
    The Select tool (js/tools/select.js) asks hit() before the handles of one layer. */
 'use strict';
@@ -42,16 +43,21 @@
       move: (P2, e2) => drag(d, P2, e2), up: () => { if (d.moved) SB.commit(); else SB.dirty(); }, cancel: () => { if (d.moved) SB.revert(); } };
     return true;
   }
+  /** Set only what differs from now (so Auto key doesn't add keys for sizes that didn't change). */
+  const setChanged = (o, vals) => { const cur = TR.keyed(o, tree.localTime(o)); for (const id in vals) if (Math.abs((cur[id] ?? (id === 'scx' || id === 'scy' ? 1 : 0)) - vals[id]) > 1e-6) TR.set(o, id, vals[id]); };
   /** Where a stage point of the group goes for this drag (used for the layers' positions and to draw the box). */
   function drag(d, P, e) {
     const { b, C, h } = d; let map, f = 1, fx = 1, fy = 1, ang = 0;
-    if (h.k === 'corner') {
+    if (h.k === 'corner') { // width and height change freely; Shift keeps the ratio
       const Cs = corners(b), F = e.altKey ? C : Cs[(h.i + 2) % 4], v0 = { x: d.P0.x - F.x, y: d.P0.y - F.y }, L = v0.x * v0.x + v0.y * v0.y || 1;
-      f = U.clamp(((P.x - F.x) * v0.x + (P.y - F.y) * v0.y) / L, 0.02, 50); map = p => ({ x: F.x + (p.x - F.x) * f, y: F.y + (p.y - F.y) * f });
-    } else if (h.k === 'side') {
+      if (e.shiftKey) { f = U.clamp(((P.x - F.x) * v0.x + (P.y - F.y) * v0.y) / L, 0.02, 50); map = p => ({ x: F.x + (p.x - F.x) * f, y: F.y + (p.y - F.y) * f }); }
+      else { fx = Math.abs(v0.x) < 1 ? 1 : U.clamp((P.x - F.x) / v0.x, 0.02, 50); fy = Math.abs(v0.y) < 1 ? 1 : U.clamp((P.y - F.y) / v0.y, 0.02, 50); map = p => ({ x: F.x + (p.x - F.x) * fx, y: F.y + (p.y - F.y) * fy }); }
+    } else if (h.k === 'side') { // Shift: the ratio stays (the box grows from this side)
       const horiz = h.s === 'l' || h.s === 'r', Fx = e.altKey ? C.x : h.s === 'r' ? b.x0 : b.x1, Fy = e.altKey ? C.y : h.s === 'b' ? b.y0 : b.y1;
-      if (horiz) { fx = U.clamp((P.x - Fx) / ((d.P0.x - Fx) || 1), 0.02, 50); map = p => ({ x: Fx + (p.x - Fx) * fx, y: p.y }); }
-      else { fy = U.clamp((P.y - Fy) / ((d.P0.y - Fy) || 1), 0.02, 50); map = p => ({ x: p.x, y: Fy + (p.y - Fy) * fy }); }
+      const g = horiz ? U.clamp((P.x - Fx) / ((d.P0.x - Fx) || 1), 0.02, 50) : U.clamp((P.y - Fy) / ((d.P0.y - Fy) || 1), 0.02, 50);
+      if (e.shiftKey) { f = g; const F = horiz ? { x: Fx, y: C.y } : { x: C.x, y: Fy }; map = p => ({ x: F.x + (p.x - F.x) * f, y: F.y + (p.y - F.y) * f }); }
+      else if (horiz) { fx = g; map = p => ({ x: Fx + (p.x - Fx) * fx, y: p.y }); }
+      else { fy = g; map = p => ({ x: p.x, y: Fy + (p.y - Fy) * fy }); }
     } else {
       ang = Math.atan2(P.y - C.y, P.x - C.x) - d.a0; if (e.shiftKey) ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
       const c = Math.cos(ang), s = Math.sin(ang); map = p => ({ x: C.x + (p.x - C.x) * c - (p.y - C.y) * s, y: C.y + (p.x - C.x) * s + (p.y - C.y) * c });
@@ -59,10 +65,11 @@
     d.map = map; d.moved = true;
     for (const it of d.its) {
       const nw = map(it.aw), a = it.PInv.transformPoint(U.pt(nw.x, nw.y)), z = it.PInv.transformPoint(U.pt(it.aw.x, it.aw.y)), k = it.k0, vals = { x: U.r1(k.x + a.x - z.x), y: U.r1(k.y + a.y - z.y) };
-      if (h.k === 'corner') vals.scale = U.r3(k.scale * f);
-      else if (h.k === 'side') { const g = fx !== 1 ? fx : fy, alongX = fx !== 1 ? it.xAxis : !it.xAxis; vals[alongX ? 'scx' : 'scy'] = U.r3((k[alongX ? 'scx' : 'scy'] ?? 1) * g); }
-      else vals.rot = U.r1(k.rot + ang * 180 / Math.PI);
-      TR.setMany(it.o, vals);
+      if (h.k === 'rot') vals.rot = U.r1(k.rot + ang * 180 / Math.PI);
+      else { // sizes count from the start of the drag, so Shift keeps the ratio the layers had then
+        vals.scale = U.r3(k.scale * f); vals.scx = k.scx ?? 1; vals.scy = k.scy ?? 1;
+        if (f === 1) { const gx = it.xAxis ? fx : fy, gy = it.xAxis ? fy : fx; vals.scx = U.r3((k.scx ?? 1) * gx); vals.scy = U.r3((k.scy ?? 1) * gy); } } // each layer stretches along its own axes
+      setChanged(it.o, vals);
     }
     SB.bump();
   }

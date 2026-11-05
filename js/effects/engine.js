@@ -62,7 +62,9 @@
     /** Effects available for an object. The same effect can be added more than once (two shadows, two glows…). */
     available(o) { return SB.effects.where(d => !d.only || d.only.includes(o.type)); },
     /** Can the project's target (Unity, Lottie…) carry effect d? Others stay listed, greyed out. */
-    usable(d) { const t = SB.targets ? SB.targets.get() : 'video'; return t === 'video' || !d || SB.targets.fxOk(t, d); },
+    usable(d) { const t = SB.targets ? SB.targets.get() : 'video'; return t === 'video' || !d || SB.targets.fxUsable(t, d); },
+    /** Usable in this project's target, but only drawn into pictures (game engines, Blender): marked "not recommended". */
+    warned(d) { const t = SB.targets ? SB.targets.get() : 'video'; return !!d && !!SB.targets && SB.targets.fxWarn(t, d); },
     add(items, type) {
       if (!E.usable(SB.effects.get(type))) { SB.targets.blocked(`The ${SB.effects.get(type).label} effect`); return 0; }
       let n = 0; for (const x of items) { const t = SB.types.get(x.type); if (!t.fx) continue; const d = SB.effects.get(type); if (d.only && !d.only.includes(x.type)) continue; const e = E.make(type); if (d.init) d.init(e, x); x.effects.push(e); n++; }

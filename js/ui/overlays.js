@@ -84,7 +84,7 @@
     const o = tree.sel(), on = S.onionOpt; if (!S.onion || S.playing || !o || !SB.types.get(o.type).frames || o.frames.length < 2 || !tree.inRange(o) || tree.hidden(o)) return;
     const n = o.frames.length, i = SB.frames.index(o, tree.rawLocal(o)), wrap = o.play !== 'once' && o.play !== 'library', seen = new Set([i]), c = O.c;
     c.save(); c.setTransform(O.M(X.world(o)));
-    const layer = (cnt, dir, col) => { for (let k = cnt; k >= 1; k--) { let j = i + dir * k; if (wrap) j = ((j % n) + n) % n; if (j < 0 || j >= n || seen.has(j)) continue; seen.add(j); c.globalAlpha = on.alpha * (1 - (k - 1) / (cnt + 0.5)); SB.strokes.draw(c, o.frames[j].strokes, { tint: col, skipErase: true }); } };
+    const layer = (cnt, dir, col) => { for (let k = cnt; k >= 1; k--) { let j = i + dir * k; if (wrap) j = ((j % n) + n) % n; if (j < 0 || j >= n || seen.has(j)) continue; seen.add(j); c.globalAlpha = on.alpha * (1 - (k - 1) / (cnt + 0.5)); if (o.type === 'pixels') { const px = o.frames[j].px || {}, tint = {}; for (const key in px) tint[key] = col; SB.types.get('pixels').draw(c, o, { px: tint }); } /* pixel art: its squares in the onion color */ SB.strokes.draw(c, o.frames[j].strokes || [], { tint: col, skipErase: true }); } };
     layer(on.before, -1, on.cb); layer(on.after, 1, on.ca); c.restore();
   }
   /** Layers that hang past the canvas edge show faintly around it, so you can grab them. */

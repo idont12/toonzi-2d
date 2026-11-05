@@ -70,20 +70,28 @@
     const connect = (kind, a, b, prop) => conns.push(N('C', [Sx(kind), L(a), L(b)].concat(prop ? [Sx(prop)] : [])));
 
     // ---------- sample the scene: layers (bake) and rigs, frame by frame
-    const nodes = new Map(), rigs = SB.rig ? SB.rig.rigs() : []; let order = 0;
+    const nodes = new Map(), rigs = SB.rig ? SB.rig.rigs() : [], E = SB.engines, baked = new Set(); let order = 0;
     const rigFrames = new Map(rigs.map(r => [r.id, []]));
     for (let i = 0; i < n; i++) {
       if (S.cancelExport) throw 'cancel'; if (i % 6 === 0 && opt.prog) { opt.prog(0.6 * i / n, `Reading frame ${i + 1} of ${n}`); await U.sleep(0); }
       const T = i / fps;
+      const under = new Set(), gm = new Map(); // opt.bakeFx: a layer with effects FBX can't carry is drawn frame by frame (SB.engines.bakeLayer)
       B.walk(T, info => {
-        const o = info.o; let nd = nodes.get(o.id); if (!nd) nodes.set(o.id, nd = { o, parent: info.parent, order: order++, M: [], a: [], fi: [], first: null });
+        const o = info.o; if (info.parent && under.has(info.parent.id)) { under.add(o.id); return; }
+        const bake = opt.bakeFx && E && !o.isMask && o.type !== 'particles' && o.type !== 'video' && o.type !== 'audio' && E.fxBad(o, 'blender').length > 0;
+        if (o.type === 'group') { gm.set(o.id, { M: info.M, t: o.seq ? info.lt + (o.inPoint || 0) : o.start + info.lt }); if (bake) under.add(o.id); }
+        let nd = nodes.get(o.id); if (!nd) { nodes.set(o.id, nd = { o, parent: info.parent, order: order++, M: [], a: [], fi: [], first: null, baked: bake, pics: [] }); if (bake) baked.add(`${o.name} (${E.fxBad(o, 'blender').join(', ')})`); }
+        if (nd.baked) {
+          const p = info.parent && gm.get(info.parent.id), own = U.clamp(info.st.opacity, 0, 1), pic = info.visible ? E.bakeLayer(o, T, p && p.M, p ? p.t : T, info) : null;
+          nd.M[i] = new DOMMatrix(); nd.a[i] = pic && own > 0.001 ? U.clamp(info.alpha / own, 0, 1) : 0; nd.fi[i] = pic ? E.keep(nd, pic) : (nd.fi[i - 1] ?? E.BAKE_BASE); if (pic && !nd.first) nd.first = info; return;
+        }
         nd.M[i] = info.M; nd.a[i] = info.alpha; nd.fi[i] = info.fi; if (info.visible && !nd.first) nd.first = info; if (info.morph) (nd.morphs || (nd.morphs = new Map())).set(info.fi, info.morph);
       }, { morphSteps: opt.morphSteps || 0 });
       for (const r of rigs) rigFrames.get(r.id)[i] = { W: X.worldAt(r, T), P: SB.rig.poseAt(r, T) };
     }
     const list = [...nodes.values()].sort((a, b) => a.order - b.order);
     // depth: front layers nearer the camera
-    const leaves = list.filter(nd => nd.o.type !== 'group'); leaves.forEach((nd, k) => nd.z = (leaves.length - k) * 0.5 * zdir);
+    const leaves = list.filter(nd => nd.o.type !== 'group' || nd.baked); leaves.forEach((nd, k) => nd.z = (leaves.length - k) * 0.5 * zdir);
 
     // ---------- helpers: a Model with animated TRS
     const decomposeLocal = (M, parentM) => { const loc = parentM ? (Math.abs(parentM.a * parentM.d - parentM.b * parentM.c) < 1e-9 ? null : parentM.inverse().multiply(M)) : M; return loc ? B.decompose(conv(loc)) : null; };
@@ -141,25 +149,25 @@
     for (const nd of list) {
       const o = nd.o, pn = nd.parent && nodes.get(nd.parent.id), parentId = pn ? groupIds.get(pn.o.id) : sceneRoot;
       const frames = nd.M.map((M, i) => decomposeLocal(M, pn ? pn.M[i] : null));
-      if (o.type === 'group') { groupIds.set(o.id, model(o.name, 'Null', parentId, frames)); continue; }
+      if (o.type === 'group' && !nd.baked) { groupIds.set(o.id, model(o.name, 'Null', parentId, frames)); continue; }
       if (o.type === 'video' || o.type === 'audio') { warn.add('Video and sound'); continue; }
       if (!nd.first) continue;
-      const anyFx = (o.effects || []).filter(e => e.on !== false && SB.targets && !SB.targets.fxOk('blender', SB.effects.get(e.type) || {})); anyFx.forEach(e => warn.add(`The ${(SB.effects.get(e.type) || { label: e.type }).label} effect`));
+      const anyFx = nd.baked ? [] : (o.effects || []).filter(e => e.on !== false && SB.targets && !SB.targets.fxOk('blender', SB.effects.get(e.type) || {})); anyFx.forEach(e => warn.add(`The ${(SB.effects.get(e.type) || { label: e.type }).label} effect`));
       if (nd.a.some(a => a > 0.001 && a < 0.995)) warn.add('See-through and fading layers (FBX planes are drawn fully)');
       if (o.isMask) { warn.add('Masks'); continue; } if (o.blend && o.blend !== 'normal') warn.add('Blend modes');
       const lid = model(o.name, 'Null', parentId, frames, nd.z), fis = [...new Set(nd.fi.filter((f, i) => nd.a[i] > 0.001))]; if (!fis.length) fis.push(nd.fi[0] || 0);
-      const bend = o.bind && o.bind.mode === 'deform' && SB.rig ? o.bind : null;
+      const bend = !nd.baked && o.bind && o.bind.mode === 'deform' && SB.rig ? o.bind : null;
       if (bend && nd.M.some(M => Math.abs(M.e - nd.M[0].e) > 0.01 || Math.abs(M.f - nd.M[0].f) > 0.01 || Math.abs(M.a - nd.M[0].a) > 1e-4)) warn.add(`${o.name} moves on its own while bending (in FBX only the bones move a bending layer)`);
       for (const f of fis) {
         const pic = raster(nd, f); if (!pic) continue;
         const vis = nd.fi.map((x, i) => (x === f && nd.a[i] > 0.001) ? 1 : 0.0001), always = vis.every(v => v === 1);
         const mesh = plane(pic, bend ? Math.max(2, Math.min(24, Math.round(Math.max(pic.w, pic.h) / 32))) : 1);
         const gid = id(); objects.push(N('Geometry', [L(gid), Sx(cls(o.name, 'Geometry')), Sx('Mesh')], mesh.nodes));
-        const mid = id(); objects.push(N('Model', [L(mid), Sx(cls(fis.length > 1 ? `${o.name} frame ${nd.morphs && nd.morphs.get(f) ? nd.morphs.get(f).label : f + 1}` : `${o.name} mesh`, 'Model')), Sx('Mesh')], [N('Version', [I(232)]),
+        const mid = id(); objects.push(N('Model', [L(mid), Sx(cls(fis.length > 1 ? `${o.name} frame ${nd.morphs && nd.morphs.get(f) ? nd.morphs.get(f).label : nd.baked ? (nd.pics.find(p => p.f === f) || {}).label : f + 1}` : `${o.name} mesh`, 'Model')), Sx('Mesh')], [N('Version', [I(232)]),
           P70(vec('Lcl Translation', 0, 0, 0), vec('Lcl Rotation', 0, 0, 0), vec('Lcl Scaling', vis[0], vis[0], 1), P('DefaultAttributeIndex', 'int', 'Integer', '', I(0))), N('MultiLayer', [I(0)]), N('MultiTake', [I(0)]), N('Shading', [C(true)]), N('Culling', [Sx('CullingOff')])]));
         connect('OO', mid, lid); connect('OO', gid, mid); models.push(mid);
         if (!always) animate(mid, 'Lcl Scaling', [vis, vis, vis.map(() => 1)], true);
-        material(o.name + (fis.length > 1 ? ' ' + (f + 1) : ''), pic, mid);
+        material(o.name + (fis.length > 1 ? ' ' + (nd.baked ? fis.indexOf(f) + 1 : f + 1) : ''), pic, mid);
         if (bend) skin(nd, mesh, gid, mid, bend, warn);
       }
     }
@@ -171,6 +179,7 @@
 
     // ---------- pictures, planes, materials, skins
     function raster(nd, f) {
+      if (nd.baked) { const p = nd.pics.find(q => q.f === f); return p ? Object.assign(p, { key: nd.o.id + ':' + f }) : null; }
       const o = nd.o, info = nd.first, v = info.v, mo = nd.morphs && nd.morphs.get(f), fr = mo ? { strokes: mo.strokes } : o.frames[f] || o.frames[0] || { strokes: [] }, def = SB.types.get(o.type);
       const b = mo ? SB.paths.bounds(mo.strokes) : SB.scene.bounds(v, info.lt, f); if (!b) return null; const pad = 2, x0 = b.x0 - pad, y0 = b.y0 - pad, w = b.x1 - b.x0 + pad * 2, h = b.y1 - b.y0 + pad * 2;
       const k = Math.min(2, 2048 / Math.max(w, h)), cv = U.h('canvas', { width: Math.max(1, Math.ceil(w * k)), height: Math.max(1, Math.ceil(h * k)) }), c = cv.getContext('2d');
@@ -251,7 +260,7 @@
     if (opt.prog) opt.prog(0.95, 'Writing the file…');
     const base = opt.base || U.slug(name) || 'animation', fbx = encode(top), files = [{ name: base + '.fbx', blob: fbx }];
     if (opt.textures) for (const p of pngs) files.push({ name: 'textures/' + p.name, blob: new Blob([p.data], { type: 'image/png' }) });
-    return { files, warnings: [...warn] };
+    return { files, warnings: [...warn], baked: [...baked] };
   }
   SB.fbx = { build, encode };
 })(window.SB);

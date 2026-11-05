@@ -294,41 +294,56 @@
   let WVER = 0; const wChanged = () => { WVER++; };
   function weights(B, ids, segs, px, py, s2) { return rawWeights(B, ids, segs, px, py, s2); }
   function rawWeights(B, ids, segs, px, py, s2) {
-    const n = ids.length, W = new Array(n), base = new Array(n), P = B.paint || {}, grads = []; let sum = 0, bsum = 0;
+    const n = ids.length, W = new Array(n), base = new Array(n), P = B.paint || {}, ops = []; let sum = 0, bsum = 0;
+    // Goal-curve and Even out fixes (B.goals: [x, y, r, { boneId: weight }, at]) set the weights near them. Everything is applied
+    // in the order it was made, so brush, gradient and lasso edits made after a fix still add or remove weight there.
+    // (Fixes without a time count as made at B.goalsAt, or after everything when that is missing too: older projects.)
+    const goals = B.goals && B.goals.length ? B.goals : null, gT = g => g[4] != null ? g[4] : B.goalsAt != null ? B.goalsAt : Infinity;
+    let tFirst = Infinity; if (goals) for (const g of goals) { const t = gT(g); if (t < tFirst) tFirst = t; }
+    const atOf = d => (d[0] === 'l' ? d[5] : d[0] === 'g' ? d[6] : d[0] === 's' ? d[5] : d[4]) || 0;
     for (let i = 0; i < n; i++) {
       const d2 = distSeg2(px, py, segs[i]); let w = 1 / ((d2 + s2) * (d2 + s2)), m = 0; const dabs = P[ids[i]]; base[i] = w; bsum += w;
       if (dabs) for (const d of dabs) {
+        if (d[0] === 'g' || d[0] === 'l') { ops.push([atOf(d), i, d]); continue; }
+        if (atOf(d) > tFirst) { ops.push([atOf(d), i, d]); continue; } // a brush dab made after a fix: on top of it
         if (d[0] === 's') { const [, sx, sy, r, k] = d, q = ((px - sx) * (px - sx) + (py - sy) * (py - sy)) / (r * r); if (q < 1) m *= 1 - k * (1 - q) * (1 - q); continue; } // smooth: painted weight eases back to the soft automatic falloff
-        if (d[0] === 'g' || d[0] === 'l') { grads.push([i, d]); continue; }
         const [dx, dy, r, v] = d, q = ((px - dx) * (px - dx) + (py - dy) * (py - dy)) / (r * r); if (q < 1) { const f = 1 - q; m += v * f * f; } }
       if (m) w *= Math.exp(U.clamp(m, -12, 12) * 2.5); W[i] = w; sum += w;
     }
     for (let i = 0; i < n; i++) W[i] /= sum || 1;
-    grads.sort((a, b) => ((a[1][0] === 'l' ? a[1][5] : a[1][6]) || 0) - ((b[1][0] === 'l' ? b[1][5] : b[1][6]) || 0)); // gradients and lassos in the order they were drawn
-    for (const [i, d] of grads) {
-      const wi = W[i]; let target;
-      if (d[0] === 'l') { // lasso ['l', v, soft, pts, only]: inside → 100% (v > 0) or 0% (v < 0); "only" also takes the bone away outside
-        const [, v, soft, pts, only] = d, f = lassoCover(pts, px, py, soft), s = U.clamp(Math.abs(v), 0, 1);
-        if (only) target = f * (wi + (1 - wi) * s) + (1 - f) * wi * (1 - s);
-        else { const k = s * f; if (k <= 0) continue; target = v > 0 ? wi + (1 - wi) * k : wi * (1 - k); }
-      } else {
-        const [, ax, ay, bx, by, v] = d, L2 = (bx - ax) * (bx - ax) + (by - ay) * (by - ay) || 1, t = U.clamp(((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2, 0, 1);
-        const k = U.clamp(Math.abs(v), 0, 1) * (1 - t); if (k <= 0) continue;
-        target = v > 0 ? wi + (1 - wi) * k : wi * (1 - k);
-      }
-      const rest = 1 - wi, left = 1 - target;
+    if (goals) { // the fixes near this point, one step per batch (all the fixes made by one goal curve or one Even out dab)
+      const by = new Map();
+      for (const g of goals) { const dx = px - g[0], dy = py - g[1], r2 = g[2] * g[2], d2 = dx * dx + dy * dy; if (d2 >= r2) continue; const f = (1 - d2 / r2) ** 2, t = gT(g); let e = by.get(t); if (!e) by.set(t, e = { gs: 0, acc: new Array(n).fill(0) }); e.gs += f; for (let i = 0; i < n; i++) e.acc[i] += f * (g[3][ids[i]] || 0); }
+      for (const [t, e] of by) ops.push([t, -1, e]);
+    }
+    if (!ops.length) return W;
+    /** Bone i's share there becomes `target`; the other bones share what is left in the same proportions as before. */
+    const setShare = (i, target) => {
+      const wi = W[i], rest = 1 - wi, left = 1 - target;
       if (rest > 1e-9) { const f = left / rest; for (let j = 0; j < n; j++) if (j !== i) W[j] *= f; }
       else { let o = 0; for (let j = 0; j < n; j++) if (j !== i) o += base[j]; for (let j = 0; j < n; j++) if (j !== i) W[j] = o > 0 ? left * base[j] / o : 0; } // it had everything: the rest goes back by distance
       W[i] = target;
+    };
+    const renorm = () => { let s = 0; for (let i = 0; i < n; i++) s += W[i]; if (s > 1e-9) for (let i = 0; i < n; i++) W[i] /= s; };
+    ops.sort((a, b) => a[0] - b[0]);
+    for (const [, i, d] of ops) {
+      if (i < 0) { const m = Math.min(1, d.gs); for (let j = 0; j < n; j++) W[j] = W[j] * (1 - m) + d.acc[j] / d.gs * m; renorm(); continue; } // a batch of fixes
+      const wi = W[i];
+      if (d[0] === 'l') { // lasso ['l', v, soft, pts, only]: inside → 100% (v > 0) or 0% (v < 0); "only" also takes the bone away outside
+        const [, v, soft, pts, only] = d, f = lassoCover(pts, px, py, soft), s = U.clamp(Math.abs(v), 0, 1);
+        if (only) setShare(i, f * (wi + (1 - wi) * s) + (1 - f) * wi * (1 - s));
+        else { const k = s * f; if (k <= 0) continue; setShare(i, v > 0 ? wi + (1 - wi) * k : wi * (1 - k)); }
+      } else if (d[0] === 'g') { // gradient: eases from what was there toward 100% (Add) or 0% (Remove), full at its start
+        const [, ax, ay, bx, by, v] = d, L2 = (bx - ax) * (bx - ax) + (by - ay) * (by - ay) || 1, t = U.clamp(((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2, 0, 1);
+        const k = U.clamp(Math.abs(v), 0, 1) * (1 - t); if (k <= 0) continue; setShare(i, v > 0 ? wi + (1 - wi) * k : wi * (1 - k));
+      } else if (d[0] === 's') { // Undo paint after a fix: back toward the automatic falloff
+        const [, sx, sy, r, k] = d, q = ((px - sx) ** 2 + (py - sy) ** 2) / (r * r); if (q >= 1) continue; const f = U.clamp(k * (1 - q) * (1 - q), 0, 1); for (let j = 0; j < n; j++) W[j] += (base[j] / (bsum || 1) - W[j]) * f;
+      } else { // a brush dab after a fix: Add raises the share, Remove lowers it
+        const [dx, dy, r, v] = d, q = ((px - dx) ** 2 + (py - dy) ** 2) / (r * r); if (q >= 1) continue; const s = U.clamp(Math.abs(v) * (1 - q) * (1 - q) * 1.5, 0, 1);
+        setShare(i, v > 0 ? wi + (1 - wi) * s : wi * (1 - s));
+      }
     }
-    if (grads.length) { let s = 0; for (let i = 0; i < n; i++) s += W[i]; if (s > 1e-9) for (let i = 0; i < n; i++) W[i] /= s; }
-    // goal-curve fixes (B.goals: [x, y, r, { boneId: weight }]): near each, the weights become the ones solved there
-    if (B.goals && B.goals.length) {
-      let gs = 0; const acc = new Array(n).fill(0);
-      for (const g of B.goals) { const dx = px - g[0], dy = py - g[1], r2 = g[2] * g[2], d2 = dx * dx + dy * dy; if (d2 >= r2) continue; const f = (1 - d2 / r2) ** 2; gs += f; for (let i = 0; i < n; i++) acc[i] += f * (g[3][ids[i]] || 0); }
-      if (gs > 1e-9) { const m = Math.min(1, gs); let t = 0; for (let i = 0; i < n; i++) { W[i] = W[i] * (1 - m) + acc[i] / gs * m; t += W[i]; } if (t > 1e-9) for (let i = 0; i < n; i++) W[i] /= t; }
-    }
-    void bsum; return W;
+    renorm(); return W;
   }
   /** How much of a lasso covers (px, py): 1 well inside, 0 well outside, easing across a band `soft` wide on each side of its edge. */
   function lassoCover(pts, px, py, soft) {
@@ -408,7 +423,7 @@
       // even out neighbouring answers (along the edge), so the edge bends smoothly instead of in steps
       const smo = U.clamp(opt.smooth ?? 0, 0, 1), passes = 2 + Math.round(smo * 6), nb = step * (2.5 + smo * 3); // opt.smooth: a smoother, rounder result (less exact)
       for (let pass = 0; pass < passes; pass++) { const sm = fresh.map((g, gi) => { const acc = {}; let ws = 0; fresh.forEach((h2, hi) => { const d = Math.hypot(h2[0] - g[0], h2[1] - g[1]); if (d > nb) return; const wt = hi === gi ? 2 : 1; ws += wt; for (const id in h2[3]) acc[id] = (acc[id] || 0) + h2[3][id] * wt; }); for (const id in acc) acc[id] = U.r3(acc[id] / ws); return acc; }); fresh.forEach((g, gi) => g[3] = sm[gi]); }
-      B.goals = goals.concat(fresh);
+      { const at = nextAt(); fresh.forEach(g => g[4] = at); } B.goals = goals.concat(fresh);
       // neighbouring fixes blend into each other: a few rounds bring each point back to its own answer
       for (let round = 0; round < 3 - Math.round(smo * 2); round++) jobs.forEach((j, gi) => {
         const g = fresh[gi], cur = weights(B, ids, segs, j.p[0], j.p[1], s2), want = solveW(j.qs, j.tgt, cur, 8), next = {}; let t = 0;
@@ -435,8 +450,8 @@
       });
       if (!jobs.length) continue; changed += jobs.length;
       const r = Math.max(step * 2.2, 6), toObj = w => { const obj = {}; let t = 0; ids.forEach((id, b) => { const v = Math.max(0, w[b]); if (v > 1e-4) { obj[id] = v; t += v; } }); for (const id in obj) obj[id] = U.r3(obj[id] / (t || 1)); return obj; };
-      const fresh = jobs.map(j => [U.r1(j.p[0]), U.r1(j.p[1]), U.r1(r), toObj(j.want)]);
-      B.goals = (B.goals || []).filter(g => !jobs.some(j => Math.hypot(g[0] - j.p[0], g[1] - j.p[1]) < r * 0.5)).concat(fresh);
+      const fresh = jobs.map(j => [U.r1(j.p[0]), U.r1(j.p[1]), U.r1(r), toObj(j.want)]), at = nextAt();
+      B.goals = (B.goals || []).filter(g => !jobs.some(j => Math.hypot(g[0] - j.p[0], g[1] - j.p[1]) < r * 0.5)).concat(fresh.map(g => (g[4] = at, g)));
       for (let round = 0; round < 2; round++) jobs.forEach((j, gi) => { // neighbouring fixes blend: bring each point to its own answer
         const cur = weights(B, ids, segs, j.p[0], j.p[1], s2), g = fresh[gi]; g[3] = toObj(ids.map((id, b) => (g[3][id] || 0) + 0.7 * (j.want[b] - cur[b])));
       });
@@ -444,7 +459,7 @@
     wChanged(); SB.bump(); return changed;
   }
   const hasGoals = rig => tree.all().some(o => bendsWith(o, rig) && o.bind.goals && o.bind.goals.length);
-  function clearGoals(rig) { tree.all().forEach(o => { if (bendsWith(o, rig)) delete o.bind.goals; }); wChanged(); SB.bump(); }
+  function clearGoals(rig) { tree.all().forEach(o => { if (bendsWith(o, rig)) { delete o.bind.goals; delete o.bind.goalsAt; } }); wChanged(); SB.bump(); }
   /** How each joint of B-bone b moved since binding: n + 1 stage matrices, plus the bound bone's line to place points along it.
       At binding the joints' frames are stored (B.bbf); older bindings count from the straight bone. */
   function bbDeform(r, b, B, T) {
@@ -455,17 +470,19 @@
   }
   /** Paint a weight dab for a bone on every layer that bends with the rig. */
   /** A weight gradient for a bone on every layer that bends with the rig: full at A, none at B (stage points). */
-  function gradient(rig, boneId, A, B, v) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push(['g', U.r1(A.x), U.r1(A.y), U.r1(B.x), U.r1(B.y), U.r3(v), at]); }); SB.bump(); }
+  /** An edit made now (at) goes on top of the fixes already there (older fixes had no time: they count as made just before). */
+  const stampGoals = (B, at) => { if (B.goals && B.goals.length && B.goalsAt == null) B.goalsAt = at - 0.5; };
+  function gradient(rig, boneId, A, B, v) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push(['g', U.r1(A.x), U.r1(A.y), U.r1(B.x), U.r1(B.y), U.r3(v), at]); }); SB.bump(); }
   let lastAt = 0; const nextAt = () => (lastAt = Math.max(Date.now(), lastAt + 1)); // drawing order of gradients and lassos
   /** Lasso: inside the loop pts (flat, rig space) the bone gets 100% (mode 'add'), 0% ('sub'), or 100% inside and 0% outside ('only').
       soft: how wide the eased edge is; k: strength (1 = all the way). */
   function lasso(rig, boneId, pts, mode, soft, k) {
     wChanged(); const flat = simplifyLoop(pts, Math.max(0.5, soft * 0.05)).map(U.r1), v = U.r3((mode === 'sub' ? -1 : 1) * U.clamp(k, 0.05, 1)), at = nextAt();
-    tree.all().forEach(o => { if (!bendsWith(o, rig)) return; const pnt = o.bind.paint || (o.bind.paint = {}), rec = ['l', v, U.r1(soft), flat, mode === 'only' ? 1 : 0, at]; (pnt[boneId] = pnt[boneId] || []).push(rec); }); SB.bump();
+    tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}), rec = ['l', v, U.r1(soft), flat, mode === 'only' ? 1 : 0, at]; (pnt[boneId] = pnt[boneId] || []).push(rec); }); SB.bump();
   }
   /** Fewer points on a drawn loop (keeps it under ~160 points). */
   function simplifyLoop(pts, tol) { let out = pts; for (let k = 0; k < 6 && (k === 0 || out.length > 320); k++, tol *= 1.8) { const r = [out[0], out[1]]; for (let i = 2; i < out.length; i += 2) if (Math.hypot(out[i] - r[r.length - 2], out[i + 1] - r[r.length - 1]) >= tol) r.push(out[i], out[i + 1]); out = r; } return out; }
-  function paint(rig, boneId, P, R, v) { wChanged(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push([U.r1(P.x), U.r1(P.y), U.r1(R), U.r3(v)]); }); SB.bump(); }
+  function paint(rig, boneId, P, R, v) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push([U.r1(P.x), U.r1(P.y), U.r1(R), U.r3(v), at]); }); SB.bump(); }
 
   // ---------- the rig layer type
   SB.types.add({
@@ -478,7 +495,7 @@
   });
 
   /** Smooth: softens what was painted around P (for every bone there), back toward the automatic falloff. */
-  function smoothW(rig, P, R, k) { wChanged(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; const pnt = o.bind.paint || (o.bind.paint = {}); bindBoneIds(o.bind).forEach(id => { if (pnt[id] && pnt[id].length) pnt[id].push(['s', U.r1(P.x), U.r1(P.y), U.r1(R), U.r3(U.clamp(k, 0, 1))]); }); }); SB.bump(); }
+  function smoothW(rig, P, R, k) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; const B = o.bind, pnt = B.paint || (B.paint = {}); stampGoals(B, at); bindBoneIds(B).forEach(id => { if ((pnt[id] && pnt[id].length) || (B.goals && B.goals.length)) (pnt[id] = pnt[id] || []).push(['s', U.r1(P.x), U.r1(P.y), U.r1(R), U.r3(U.clamp(k, 0, 1)), at]); }); }); SB.bump(); }
   /** Where a bone's weight is sampled on a layer: a grid over it, in stage space. */
   function weightSamples(o, boneId, N = 24, keep) {
     const B = o.bind, ids = bindBoneIds(B), bi = ids.indexOf(boneId); if (bi < 0) return []; const b = SB.scene.bounds(o); if (!b) return [];
@@ -492,7 +509,7 @@
   function normalizeW(rig, boneId) {
     const layers = tree.all().filter(o => bendsWith(o, rig) && o.bind.paint && (o.bind.paint[boneId] || []).length); if (!layers.length) return 0;
     const peak = () => Math.max(0, ...layers.flatMap(o => weightSamples(o, boneId, 32, paintedUp(o.bind.paint[boneId]))));
-    const keep = layers.map(o => o.bind.paint[boneId].map(d => d.slice())), scale = f => { wChanged(); layers.forEach((o, li) => { o.bind.paint[boneId] = keep[li].map(d => d[0] === 'g' ? Object.assign(d.slice(), { 5: U.r3(d[5] * f) }) : d[0] === 'l' ? Object.assign(d.slice(), { 1: U.r3(d[1] * f) }) : d[0] === 's' ? d.slice() : [d[0], d[1], d[2], U.r3(d[3] * f)]); }); };
+    const keep = layers.map(o => o.bind.paint[boneId].map(d => d.slice())), scale = f => { wChanged(); layers.forEach((o, li) => { o.bind.paint[boneId] = keep[li].map(d => d[0] === 'g' ? Object.assign(d.slice(), { 5: U.r3(d[5] * f) }) : d[0] === 'l' ? Object.assign(d.slice(), { 1: U.r3(d[1] * f) }) : d[0] === 's' ? d.slice() : Object.assign(d.slice(), { 3: U.r3(d[3] * f) })); }); };
     if (peak() >= 0.98) return 1;
     let lo = 1, hi = 8; scale(hi); if (peak() < 0.98) { SB.bump(); return hi; }
     for (let it = 0; it < 14; it++) { const mid = (lo + hi) / 2; scale(mid); if (peak() >= 0.98) hi = mid; else lo = mid; }
@@ -500,5 +517,5 @@
   }
   /** Clear the painted weights of one bone (or every bone when boneId is null) on the layers bending with the rig. */
   function clearW(rig, boneId) { wChanged(); tree.all().forEach(o => { if (!bendsWith(o, rig) || !o.bind.paint) return; if (boneId) delete o.bind.paint[boneId]; else delete o.bind.paint; }); SB.bump(); }
-  SB.rig = { goalCurve, blurW, clearGoals, hasGoals, wChanged, setParent, deleteBoneOnly, editSnap, keepAttached, smoothW, normalizeW, clearW, weightSamples, gradient, lasso, AF, BONE_P, nSegs, chainOf, boneProps, boneVals, placeBone, bbFrames, boneById, rigs, cached, ancSig, poseRaw, pose, poseAt, boneFrameAt, sim, hasDyn, dynOn, segsWorld, distSeg2, nearestBone, hit, toRig, make, addBone, deleteBone, ikChain, solveIK, bindTo, rebind, unbendFrom, bindRigs, boneOwner, bindBoneIds, bendsWith, weights, paint, matArr, arrMat };
+  SB.rig = { nextAt, goalCurve, blurW, clearGoals, hasGoals, wChanged, setParent, deleteBoneOnly, editSnap, keepAttached, smoothW, normalizeW, clearW, weightSamples, gradient, lasso, AF, BONE_P, nSegs, chainOf, boneProps, boneVals, placeBone, bbFrames, boneById, rigs, cached, ancSig, poseRaw, pose, poseAt, boneFrameAt, sim, hasDyn, dynOn, segsWorld, distSeg2, nearestBone, hit, toRig, make, addBone, deleteBone, ikChain, solveIK, bindTo, rebind, unbendFrom, bindRigs, boneOwner, bindBoneIds, bendsWith, weights, paint, matArr, arrMat };
 })(window.SB);

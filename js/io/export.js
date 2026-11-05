@@ -258,20 +258,34 @@
   async function blender(job, o, prog) {
     if (!SB.fbx) throw new Error('FBX export is not available.');
     // a rig with actions: one FBX per action
-    Sc.sync(); const vs = SB.actions ? SB.actions.variants(job.screen.objects, job.screen.proj) : [], files = [], warn = new Set();
-    const one = async (name, base, v) => { const r = await onScreen(job.screen, () => v ? SB.actions.during(v.rigId, v.act.id, () => SB.fbx.build(name, { fps: o.fps, base, facing: 'blender', textures: !!o.textures, morphSteps: o.morphSteps, prog })) : SB.fbx.build(name, { fps: o.fps, base, facing: 'blender', textures: !!o.textures, morphSteps: o.morphSteps, prog })); r.files.forEach(f => files.push(f)); r.warnings.forEach(w => warn.add(w)); };
+    Sc.sync(); const vs = SB.actions ? SB.actions.variants(job.screen.objects, job.screen.proj) : [], files = [], warn = new Set(), baked = new Set();
+    const one = async (name, base, v) => { const r = await onScreen(job.screen, () => v ? SB.actions.during(v.rigId, v.act.id, () => SB.fbx.build(name, { fps: o.fps, base, facing: 'blender', textures: !!o.textures, morphSteps: o.morphSteps, bakeFx: o.bakeFx !== false, prog })) : SB.fbx.build(name, { fps: o.fps, base, facing: 'blender', textures: !!o.textures, morphSteps: o.morphSteps, bakeFx: o.bakeFx !== false, prog })); r.files.forEach(f => files.push(f)); r.warnings.forEach(w => warn.add(w)); (r.baked || []).forEach(b => baked.add(b)); };
     if (!vs.length) await one(job.name, o.base); else for (const v of vs) await one(v.act.name, `${o.base}-${U.slug(v.act.name)}`, v);
-    return { files, zip: files.length > 1, note: warn.size ? `Left out (FBX can’t carry them): ${[...warn].join(', ')}.` : '' };
+    return { files, zip: files.length > 1, baked: [...baked], note: warn.size ? `Left out (FBX can’t carry them): ${[...warn].join(', ')}.` : '' };
   }
   // ---------- Unity and Godot: every chosen screen is one animation of the same scene
+  /** The one yellow warning about visual effects a game engine or Blender can't make itself, with a "Show where" list.
+      items: [{ label: 'Screen › Layer: Outline', how: 'sprite' | 'frames' | 'out' }] */
+  const HOW = { sprite: 'drawn onto its sprite', frames: 'frame by frame', out: 'left out' };
+  function fxWarnBox(items, who) {
+    if (!items.length) return null; const n = items.length;
+    return h('div.hint.bake.fx-warn', null, h('b', null, '⚠ You are using visual effects. '),
+      `${who} can’t make them itself, so they are drawn into pictures. That can make your animation heavier and can have small bugs (an edge cut off, a shadow turning with the layer), so be aware and check it in ${who}.`,
+      h('details.fx-where', null, h('summary', null, `Show where (${n} layer${n > 1 ? 's' : ''})`),
+        h('ul', null, items.map(it => h('li', null, h('span', null, it.label), h('span.nr', null, ` (${SB.targets ? SB.targets.NOT_REC : 'not recommended'})`), h('small', null, ` · ${HOW[it.how] || it.how}`))))));
+  }
+  /** After exporting: the pixel art note, and the one visual effects warning (what went onto sprites and frame by frame). */
+  const bakeNote = (list, kind, still) => { const l = [...(list || [])], who = NAME[kind] || kind, px = l.filter(x => / \(pixel art screen\)$/.test(x)), fx = l.filter(x => !px.includes(x)), st = [...(still || [])]; if (!l.length && !st.length) return null;
+    const items = fx.map(x => ({ label: x.replace(/ \((.*)\)$/, ': $1'), how: 'frames' })).concat(st.map(x => ({ label: x.replace(/ \((.*)\)$/, ': $1'), how: 'sprite' })));
+    return h('div', null, px.length ? h('p.hint.bake', null, h('b', null, 'Frame by frame: '), `${px.map(x => x.replace(/ \(pixel art screen\)$/, '')).join(', ')} (pixel art): one sharp picture a frame, so it keeps its pixel look.`) : null, fxWarnBox(items, who)); };
   const engineNote = (who, w) => w.length ? `Left out (${who} can’t show them): ${w.join(', ')}.` : '';
   async function unity(job, o, prog) {
-    const r = await SB.unity.build(job.screens, { fps: o.fps, base: o.base, title: S.project.name, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, prog });
-    return { files: r.files, note: [engineNote('Unity', r.warnings), ...(r.tips || [])].filter(Boolean).join(' ') };
+    const r = await SB.unity.build(job.screens, { fps: o.fps, base: o.base, title: S.project.name, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, bakeFx: o.bakeFx !== false, stillFx: o.stillFx !== false, pixelFrames: o.pixelFrames !== false, prog });
+    return { files: r.files, project: r.project, baked: r.baked, still: r.still, note: [engineNote('Unity', r.warnings), ...(r.tips || [])].filter(Boolean).join(' ') };
   }
   async function godot(job, o, prog) {
-    const r = await SB.godot.build(job.screens, { fps: o.fps, base: o.base, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, prog });
-    return { files: r.files.map(f => ({ name: f.name, blob: new Blob([f.data]) })), zip: true, note: engineNote('Godot', r.warnings) };
+    const r = await SB.godot.build(job.screens, { fps: o.fps, base: o.base, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, bakeFx: o.bakeFx !== false, stillFx: o.stillFx !== false, pixelFrames: o.pixelFrames !== false, prog });
+    return { files: r.files.map(f => ({ name: f.name, blob: new Blob([f.data]) })), project: r.project, baked: r.baked, still: r.still, zip: true, note: engineNote('Godot', r.warnings) };
   }
   async function rive(job, o, prog) {
     const cfg = SB.interact ? SB.interact.config() : null, r = await SB.rive.build(job.screens, { fps: o.fps, base: o.base, title: job.name, interact: cfg, morphSteps: o.morphSteps, prog }); if (cfg && cfg.skipped && cfg.skipped.length) r.warnings.push(`Interactions Rive can’t do (${cfg.skipped.join(', ')}): use the web page export for those`);
@@ -284,6 +298,9 @@
   }
   // engines that show drawings as pictures: a morph becomes in-between pictures (js/io/bake.js morphShown)
   const MORPH_KINDS = { unity: 1, godot: 1, blender: 1, rive: 1 };
+  const BAKE_KINDS = { unity: 1, godot: 1, blender: 1 }; // effects the format can't do can be drawn frame by frame
+  const PIXEL_KINDS = { unity: 1, godot: 1 }; // a pixel art screen can go as one sharp picture a frame
+  const STILL_KINDS = { unity: 1, godot: 1 }; // still looks can be drawn onto the sprite (the rig and controllers keep working)
   const LINE_KINDS = { unity: 1, godot: 1 }; // animated lines can be baked into a loop of pictures
   const hasLineMotion = () => SB.lineMotion && SB.tree.all(S.screens.flatMap(s => s.objects || [])).concat(SB.tree.all()).some(o => o.type === 'draw' && SB.lineMotion(o));
   const hasMorph = () => SB.tree.all(S.screens.flatMap(s => s.objects || [])).concat(SB.tree.all()).some(o => (o.type === 'draw' || o.type === 'shape') && o.frames && o.frames.length > 1 && ((o.morph && o.morph.mode === 'morph') || (o.tracks && o.tracks.frame || []).some(k => k.morph) || (o.drv || []).some(L => L.morph)));
@@ -296,7 +313,7 @@
     async open(pre) {
       if (S.recording) SB.record.stop(); SB.time.pause(); Sc.ensure(); Sc.sync(); await probe();
       const p = S.project, act = Sc.active();
-      const o = Object.assign({ kind: 'video', morphSteps: 3, lineFrames: 8, vfmt: 'mp4', ifmt: 'png', scale: p.w * p.h > 2.5e6 ? 0.5 : 1, fps: [12, 24, 25, 30, 60].includes(p.fps) ? p.fps : 24, quality: 0.14, iq: 0.85, trV: false, trI: true, cols: 0, json: true, combine: false, svgLoop: true, svgStart: 'click' }, lastOpts);
+      const o = Object.assign({ kind: 'video', morphSteps: 3, lineFrames: 8, vfmt: 'mp4', ifmt: 'png', scale: p.w * p.h > 2.5e6 ? 0.5 : 1, fps: p.fps >= 1 && p.fps <= 240 ? p.fps : 24, quality: 0.14, iq: 0.85, trV: false, trI: true, cols: 0, json: true, combine: false, svgLoop: true, svgStart: 'click' }, lastOpts);
       o.screens = [act.id]; // starts on the screen you worked on last
       if (o.kind === 'fbx') o.kind = 'blender';
       const tgt = SB.targets ? SB.targets.get() : 'video'; if (tgt !== 'video' && (!lastOpts.kind || lastOpts.target !== tgt)) o.kind = KIND_OF_TARGET[tgt] || o.kind; o.target = tgt; if (o.html == null) o.html = true;
@@ -304,22 +321,50 @@
       if (ENGINE[o.kind] && S.screens.length > 1 && o.allEngine !== false) o.screens = S.screens.map(s => s.id); // all screens: one animation each
       // a format only takes screens that can be exported to it: made for it, or using nothing it can't show
       const REQ = { lottie: 'lottie', unity: 'game', godot: 'game', blender: 'blender' };
-      const why = s => { if (s.editOf) return 'being edited'; const r = REQ[o.kind]; if (!r || !SB.targets) return ''; if ((s.proj.target || 'video') === r) return ''; const pr = SB.targets.problems(r, s.objects || []); return pr.length ? `made for ${SB.targets.short(s.proj.target || 'video')}; uses ${pr.slice(0, 2).join(', ')}` : ''; };
+      /** What a screen uses that this format can't carry, less what goes frame by frame (effects, a pixel art screen). */
+      const leftOut = (s, r) => { const pr = SB.targets.problems(r, s.objects || []); if (!pr.length || !SB.engines) return pr;
+        if (PIXEL_KINDS[o.kind] && o.pixelFrames !== false && s.proj && s.proj.pixel && s.proj.pixel.on) return pr.filter(x => x === 'video' || x === 'audio' || /video|sound/i.test(x));
+        if (!BAKE_KINDS[o.kind] || o.bakeFx === false) return pr; const fx = new Set(SB.tree.all(s.objects || []).flatMap(x => SB.engines.fxBad(x, r))); return pr.filter(x => !fx.has(x)); };
+      const why = s => { if (s.editOf) return 'being edited'; const r = REQ[o.kind]; if (!r || !SB.targets) return ''; if ((s.proj.target || 'video') === r) return ''; const pr = leftOut(s, r); return pr.length ? `made for ${SB.targets.short(s.proj.target || 'video')}; uses ${pr.slice(0, 2).join(', ')}` : ''; };
       const fits = s => !why(s), pool = () => S.screens.filter(fits);
       const settle = () => { o.screens = o.screens.filter(id => { const s = S.screens.find(x => x.id === id); return s && fits(s); }); if (!o.screens.length) { const f = fits(act) ? act : pool()[0]; if (f) o.screens = [f.id]; } };
       const chosen = () => S.screens.filter(s => o.screens.includes(s.id) && fits(s)), many = () => chosen().length > 1;
+      /** Frame by frame options (Unity, Godot, Blender): effects the format can't do, pixel art screens; a yellow note lists what goes that way. */
+      const bakeRows = () => {
+        if (!BAKE_KINDS[o.kind] || !SB.engines) return []; Sc.sync(); const scr = chosen(), t = o.kind === 'blender' ? 'blender' : 'game', who = NAME[o.kind], stillOk = !!STILL_KINDS[o.kind];
+        const pix = PIXEL_KINDS[o.kind] && scr.some(sc => sc.proj && sc.proj.pixel && sc.proj.pixel.on), fx = scr.some(sc => SB.tree.all(sc.objects || []).some(x => SB.engines.fxBad(x, t).length));
+        const opt = { bakeFx: o.bakeFx !== false, stillFx: stillOk && o.stillFx !== false, pixelFrames: !!pix && o.pixelFrames !== false };
+        const list = SB.engines.bakeList(scr, opt, t), places = SB.engines.fxPlaces(scr, opt, t);
+        return [
+          pix ? W.row('Pixel art', W.check(o.pixelFrames !== false, 'Pixel art screens frame by frame', v => { o.pixelFrames = v; form(true); }), W.info(`A pixel art screen goes as one sharp picture a frame (no smoothing), so it keeps its pixel look in ${who}. Off: its layers go one by one, smooth, like any screen.`)) : null,
+          fx && stillOk ? W.row('Effects', W.check(opt.stillFx, 'Still effects onto the sprite (keeps rigs and controllers)', v => { o.stillFx = v; form(true); }), W.info(`An outline, shadow, glow or other look that doesn’t change is drawn into the layer’s picture once. The layer stays one sprite in ${who}, so its bones, controllers and keyframes keep working. Off: those layers go frame by frame instead, without their rig or controllers.`)) : null,
+          fx ? W.row(stillOk ? '' : 'Effects', W.check(o.bakeFx !== false, stillOk ? 'Other effects frame by frame' : `Effects ${who} can’t do: frame by frame`, v => { o.bakeFx = v; form(true); }), W.info(`Effects that change over time${stillOk ? ' (or all of them, when the box above is off)' : ''} become a picture a frame for those layers, so they look the same. Off: they are left out.`)) : null,
+          ...bakeLines(list, who), fxWarnBox(places.map(x => ({ label: `${scr.length > 1 ? x.screen + ' › ' : ''}${x.name}: ${x.fx.join(', ')}`, how: x.how })), who)];
+      };
+      const bakeLines = (list, who) => { const px = list.filter(x => / \(pixel art screen\)$/.test(x));
+        return [px.length ? h('p.hint.bake', null, h('b', null, 'Frame by frame: '), `${px.map(x => x.replace(/ \(pixel art screen\)$/, '')).join(', ')} (pixel art). Each frame goes as one sharp picture, so it keeps its pixel look. Its layers can’t be moved one by one in ${who}.`) : null];
+      };
       const jobs = () => { const l = chosen(); if (ENGINE[o.kind]) return [Object.assign(screenJob(l[0]), { name: p.name, screens: l, engine: true })]; return l.length > 1 && o.combine && !BAKED[o.kind] ? [combinedJob(l)] : l.map(s => Object.assign(screenJob(s), { active: s === Sc.active(), screen: s })); };
       const body = h('div.exp'), bar = h('div.bar', null, h('i')), status = h('p.hint'), prog = (f, msg) => { bar.firstChild.style.width = Math.round(U.clamp(f, 0, 1) * 100) + '%'; if (msg) status.textContent = msg; };
       const go = W.btn('Export', async () => {
         Object.assign(lastOpts, o); delete lastOpts.screens;
-        const list = jobs(), proj = U.slug(p.name), sep = list.length > 1, files = []; let note = '';
+        const list = jobs(), proj = U.slug(p.name), sep = list.length > 1, files = [], baked = new Set(), still = new Set(); let note = '', linked = null, done = null;
+        if (o.toProject && (o.kind === 'unity' || o.kind === 'godot') && SB.gameLink && SB.gameLink.supported()) { // straight into the game project: get the folder while this is still a click
+          try { linked = await SB.gameLink.ready(o.kind); } catch (e) { if (e && e.name === 'AbortError') return; SB.toast(e.message || String(e)); return; } if (!linked) return; }
         bar.hidden = false; status.textContent = ''; body.replaceChildren(bar, status); go.hidden = true; cancel.textContent = 'Stop'; S.exporting = true; S.cancelExport = false; S.playing = false; SB.media.pauseAll();
         try {
           for (let j = 0; j < list.length; j++) {
             const job = list[j], name = Sc.many() && !job.engine ? `${proj}-${U.slug(job.name)}` : proj, sub = (f, msg) => prog((j + f) / list.length, (sep ? `${job.name}: ` : '') + (msg || ''));
             const r = await RUN[o.kind](job, Object.assign({}, o, { base: name, transparent: o.kind === 'video' ? o.trV : o.trI }), sub);
             r.files.forEach(f => { f.name = f.name || `${name}.${f.ext}`; if (sep || r.zip) f.name = (sep && r.zip ? U.slug(job.name) + '/' : '') + f.name; files.push(f); });
-            if (r.note && !note.includes(r.note)) note += r.note + ' ';
+            if (r.note && !note.includes(r.note)) note += r.note + ' '; (r.baked || []).forEach(b => baked.add(b)); (r.still || []).forEach(b => still.add(b));
+            if (linked && r.project) done = await SB.gameLink.write(o.kind, linked, r.project.files, r.project.own, sub);
+          }
+          if (done) { // written into the project: nothing to download
+            body.replaceChildren(h('div.exp-done', null, h('span.ok', { html: SB.icon('check') }), h('div', null, h('b', null, `Updated in ${o.kind === 'unity' ? 'Unity' : 'Godot'}: ${done.folder}`),
+              h('p', null, `${done.wrote} file${done.wrote === 1 ? '' : 's'} written, ${done.kept} unchanged${done.removed ? `, ${done.removed} no longer needed removed` : ''}.`),
+              h('p.hint', null, o.kind === 'unity' ? 'Switch to Unity: it reimports them by itself. Your scenes keep their links to the prefab.' : 'Switch to Godot: it reimports them by itself. Scenes that use this one keep their links.'), note.trim() ? h('p.hint', null, note.trim()) : null, bakeNote(baked, o.kind, still))));
+            go.hidden = false; go.textContent = 'Update again'; return;
           }
           prog(1, 'Saving…');
           let out; if (files.length === 1) out = files[0];
@@ -328,7 +373,7 @@
           // finished: the bar goes, a clear "completed" message stays
           body.replaceChildren(h('div.exp-done', null, h('span.ok', { html: SB.icon('check') }), h('div', null, h('b', null, 'Export completed'),
             h('p', null, `${saved} • ${(out.blob.size / 1048576).toFixed(1)} MB${files.length > 1 ? ` • ${files.length} files in a ZIP` : ''}`),
-            saved !== out.name ? h('p.hint', null, `Unzip it to get ${out.name}.`) : null, note.trim() ? h('p.hint', null, note.trim()) : null)));
+            saved !== out.name ? h('p.hint', null, `Unzip it to get ${out.name}.`) : null, note.trim() ? h('p.hint', null, note.trim()) : null, bakeNote(baked, o.kind, still))));
           go.hidden = false; go.textContent = 'Export again';
         }
         catch (e) { console.error(e); bar.hidden = true; status.textContent = e === 'cancel' ? 'Export stopped.' : 'Export failed: ' + (e && e.message ? e.message : e); go.hidden = false; go.textContent = 'Try again'; }
@@ -386,15 +431,17 @@
           })(),
           (() => { // only when a chosen screen has something this format can't show
             const T = SB.targets, want = REQ[o.kind]; if (!T || !want) return null; Sc.sync();
-            const bad = chosen().map(sc => [sc, T.problems(want, sc.objects || [])]).filter(([, pr]) => pr.length); if (!bad.length) return null;
+            const bad = chosen().map(sc => [sc, leftOut(sc, want)]).filter(([, pr]) => pr.length); if (!bad.length) return null;
             const fmt = o.kind === 'unity' ? 'Unity' : o.kind === 'godot' ? 'Godot' : o.kind === 'lottie' ? 'Lottie' : 'Blender';
             return h('p.hint.warn', null, `${bad.map(([sc, pr]) => `${sc.name} uses ${pr.slice(0, 3).join(', ')}`).join('; ')}: ${fmt} can’t show ${bad.length > 1 || bad[0][1].length > 1 ? 'these' : 'it'}, so ${bad.length > 1 || bad[0][1].length > 1 ? 'they are' : 'it is'} left out.`); })(),
+          ...bakeRows(),
           o.kind === 'lottie' ? W.row('', W.check(o.html, 'Also make a web page that plays it', v => { o.html = v; })) : null,
           MORPH_KINDS[o.kind] && hasMorph() ? W.row('Morphs', W.num(o.morphSteps ?? 3, { min: 0, max: 60, step: 1, label: 'Morph in-betweens', change: v => { o.morphSteps = Math.max(0, Math.round(+v || 0)); } }), h('span.hint', null, 'in-betweens per morph'),
             W.info(`${NAME[o.kind] || o.kind} can’t morph lines, so each morph is saved as in-between pictures that play in turn. Every morph gets this many, each shown at its own moment (even a quick morph between two frames of the export). More looks smoother but makes more pictures. One layer can have its own count: right-click it › Game engine frames….`)) : null,
           LINE_KINDS[o.kind] && hasLineMotion() ? W.row('Animated lines', W.num(o.lineFrames ?? 8, { min: 0, max: 48, step: 1, label: 'Animated line poses', change: v => { o.lineFrames = Math.max(0, Math.round(+v || 0)); } }), h('span.hint', null, 'poses per loop'),
             W.info('Lines drawn with an animated brush (boil, marching dashes, pulse, flow) become a loop of pictures that plays 12 times a second, so they keep moving in the game engine. One layer can have its own count: right-click it › Game engine frames….')) : null,
-          W.row('Frame rate', W.select(o.fps, [6, 8, 10, 12, 15, 24, 25, 30, 50, 60].map(f => [f, f + ' fps']), v => { o.fps = +v; form(); })),
+          ...((o.kind === 'unity' || o.kind === 'godot') && SB.gameLink ? [SB.gameLink.row(o, o.kind, () => form(true))].flat().filter(Boolean) : []),
+          W.row('Frame rate', W.select(o.fps, [...new Set([6, 8, 10, 12, 15, 24, 25, 30, 50, 60, p.fps, o.fps])].filter(f => f >= 1).sort((a, b) => a - b).map(f => [f, f + ' fps' + (f === p.fps ? ' (the screen’s)' : '')]), v => { o.fps = +v; form(); })),
           baked ? null : W.row('Size', W.select(o.scale, [[0.25, '25%'], [0.5, '50%'], [0.75, '75%'], [1, '100%'], [1.5, '150%'], [2, '200%']], v => { o.scale = +v; form(); })),
           baked || vec || isGif || o.ifmt === 'svg' ? null : video ? W.row('Quality', W.select(o.quality, [[0.07, 'Standard (smaller file)'], [0.14, 'High'], [0.25, 'Best']], v => o.quality = +v)) : F.lossy ? W.row('Quality', W.select(o.iq, [[0.6, 'Small file'], [0.85, 'High'], [0.95, 'Best']], v => o.iq = +v)) : null,
           o.kind === 'sheet' ? W.row('Columns', W.select(o.cols, [[0, 'Automatic'], [4, '4'], [8, '8'], [16, '16'], [1000, 'One row']], v => o.cols = +v)) : null,

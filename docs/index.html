@@ -43,8 +43,8 @@
   /* Header */
   .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px max(16px, env(safe-area-inset-left)); background: var(--bg); border-bottom: 1px solid var(--line); }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
-  .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: var(--brand); display: grid; place-items: center; }
-  .brand .logo svg { width: 18px; height: 18px; fill: none; stroke: var(--brand-ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .brand .logo { width: auto; height: 48px; display: block; }
+  .brand .doc-word { font-weight: 500; color: var(--ink-2); }
   .brand small { font-weight: 400; color: var(--ink-2); }
   .top .sp { flex: 1; }
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); text-decoration: none; font-weight: 600; font-size: .9rem; border: 0; cursor: pointer; }
@@ -149,8 +149,8 @@
 
 <header class="top">
   <a class="brand" href="#top" aria-label="Toonzi 2D documentation, top of the page">
-    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M8 5v14M16 5v14M3 10h5M3 14h5M16 10h5M16 14h5"/></svg></span>
-    <span>Toonzi 2D <small>documentation</small></span>
+    <img class="logo" src="../assets/toonzi-logo.svg" alt="Toonzi 2D" width="56" height="48">
+    <span class="doc-word">documentation</span>
   </a>
   <span class="sp"></span>
   <a class="btn" href="../index.html">Open the app</a>
@@ -174,6 +174,8 @@
       <a href="#rigs">Rigs and bones</a>
       <a href="#controls">Controllers and constraints</a>
       <a href="#physics">Physics</a>
+      <a href="#particles">Particles</a>
+      <a href="#pixelart">Pixel art</a>
       <a href="#interactive">Interactive mode</a>
       <span class="grp">Organize and share</span>
       <a href="#screens">Screens and the board</a>
@@ -183,6 +185,7 @@
       <a href="#keys">Shortcuts and your actions</a>
       <a href="#tutorials">Tutorials and the maker</a>
       <span class="grp">More</span>
+      <a href="#ai">Make it with AI</a>
       <a href="#demos">Made in Toonzi 2D</a>
       <a href="#help">Help</a>
     </nav>
@@ -206,6 +209,7 @@
     <section id="start">
       <h2><span class="num">1</span>Getting started</h2>
       <p class="lead">Toonzi 2D is a 2D animation studio that runs in your browser. Everything stays on your device.</p>
+      <p><a class="btn" href="../index.html">Open the app</a> &nbsp; <a href="#demos">Try the interactive playground</a></p>
 
       <h3>Open it</h3>
       <ul>
@@ -216,7 +220,7 @@
 
       <h3>Make something in two minutes</h3>
       <ol class="steps">
-        <li>Click the <strong>logo</strong> at the top left. This is the main menu. Choose <strong>Tutorials…</strong> and start <strong>Drawing: brush and eraser</strong>. A guide character, Pip, walks you through it.</li>
+        <li>Click the <strong>logo</strong> at the top left. This is the main menu. Choose <strong>Tutorials…</strong> and start <strong>Drawing: brush and eraser</strong>. A guide character, Toonzi, walks you through it. (The tutorials also open by themselves on your first visit.)</li>
         <li>Or draw by yourself: press <kbd>B</kbd> for the Brush and draw on the stage.</li>
         <li>Press <kbd>K</kbd> to add a keyframe, click the ruler later in time, drag your drawing somewhere else and press <kbd>K</kbd> again.</li>
         <li>Press <kbd>Home</kbd>, then <kbd>Space</kbd> to play.</li>
@@ -245,7 +249,7 @@
       </table></div>
 
       <h3>The logo menu</h3>
-      <p class="menupath">Tutorials… · New project · Open project… · Recent projects · Examples · Save project · Save as an example file… · Import files… · Record voice · Saved objects… · Export… · Project settings… · Settings…</p>
+      <p class="menupath">Tutorials… · Documentation · New project · Open project… · Recent projects · Examples · Save project · Copy a link to this animation · Import files… · Record voice · Saved objects… · Export… · Project settings… · Settings…</p>
 
       <h3>Layouts: desktop, tablet, phone</h3>
       <p>The layout fits the window. Wide: tools left, properties right, timeline below. Medium: the properties panel slides over the stage (use the panel button or <kbd>I</kbd>). Narrow: the stage is on top, the tools sit in a strip, and a dock below has <em>Timeline</em> and <em>Layer</em> tabs. Choose one yourself in <em>Settings › Appearance › Layout</em>.</p>
@@ -255,7 +259,7 @@
         <li><strong>Snapping and guides:</strong> the magnet in the top bar (or <kbd>;</kbd>). Hold <kbd>Alt</kbd> to switch it for one drag.</li>
         <li><strong>Move around:</strong> hold <kbd>Space</kbd> and drag, use the middle mouse button, or pick the Hand tool.</li>
       </ul>
-      <p>Hover over any button for a tip. The small <strong>?</strong> buttons open help for a panel.</p>
+      <p>Hover over any button for a tip. The small <strong>?</strong> buttons open help for a panel. Every right-click (or long-press) menu ends with <strong>Documentation</strong>, which opens this page at the part about what you clicked.</p>
     </section>
 
     <!-- ===================================================== -->
@@ -267,7 +271,7 @@
       <div class="grid">
         <div class="card wide"><h4>Select <kbd>V</kbd> <span class="id">select</span></h4>
           <p>Select, move, resize and rotate.</p>
-          <ul><li>Click a layer. Drag it to move; drag a handle to resize or turn it.</li><li>Drag on empty space to box-select. <kbd>Shift</kbd>+click adds to the selection.</li><li>Two or more layers get one box around all of them.</li><li><kbd>Alt</kbd>+drag makes a copy.</li><li>With <em>This frame</em> on in the drawing bar, the box changes the lines of one frame, not the layer.</li></ul></div>
+          <ul><li>Click a layer. Drag it to move; drag a handle to resize or turn it. Corners change the width and height freely; hold <kbd>Shift</kbd> on any handle to keep the ratio.</li><li>Drag on empty space to box-select. <kbd>Shift</kbd>+click adds to the selection.</li><li>Two or more layers get one box around all of them.</li><li><kbd>Alt</kbd>+drag makes a copy.</li><li>With <em>This frame</em> on in the drawing bar, the box changes the lines of one frame, not the layer.</li></ul></div>
         <div class="card"><h4>Hand <kbd>H</kbd> <span class="id">hand</span></h4>
           <p>Move around the stage. Drag to pan. The bar has <strong>Fit</strong> and <strong>100%</strong>.</p></div>
         <div class="card"><h4>Cut <kbd>C</kbd> <span class="id">cut</span></h4>
@@ -478,7 +482,7 @@
       <ol class="steps">
         <li>Select a bone, then click <strong>Paint weights</strong> in its card (or pick <strong>Weights</strong> in the rig bar).</li>
         <li>Choose a weight tool: <strong>Brush</strong> (<kbd>[</kbd> and <kbd>]</kbd> change its size), <strong>Smooth</strong> (evens weights out), <strong>Gradient</strong> (drag a line: full weight where you start, none where you end), <strong>Lasso</strong> (draw a loop: the bone takes the area, or lets it go) or <strong>Goal curve</strong>.</li>
-        <li><strong>Goal curve</strong> is the clever one: pose the rig where it looks bad, then draw how the edge should look. The weights fix themselves.</li>
+        <li><strong>Goal curve</strong> is the clever one: pose the rig where it looks bad, then draw how the edge should look. The weights fix themselves. You can still paint over its fixes afterwards (Brush Add or Remove, Gradient, Lasso): what you do later goes on top. <strong>Clear fixes</strong> (in the bar whenever there are some) removes every goal-curve fix.</li>
       </ol>
       <ul>
         <li><strong>Smooth bending:</strong> set a bone's <strong>Segments</strong> (up to 16) to make a chain of equal pieces that curves smoothly. A <em>Bend controller</em> (Controls menu) curls it with one knob.</li>
@@ -541,8 +545,48 @@
     </section>
 
     <!-- ===================================================== -->
+    <section id="particles">
+      <h2><span class="num">12</span>Particles</h2>
+      <p>A particles layer sends out many small dots, squares, stars, sparks or rings: fire, smoke, snow, rain, confetti, sparkles, bubbles, a magic trail.</p>
+      <ol class="steps">
+        <li>In the tool bar, press <strong>Particles</strong> (or right-click the stage › <strong>Add particles</strong>) and pick a look.</li>
+        <li>On the stage, drag the tip of the orange <strong>arrow</strong>: its direction is where they fly, its length is how fast. Hold <kbd>Shift</kbd> for 15° steps. The two dashed lines show the spread.</li>
+        <li>Change anything in the panel: how many (a stream per second, or bursts), how long each lives, speed, spread, gravity (less than 0 floats up), air drag, spin, where they are born.</li>
+        <li><strong>Size from / to</strong> gives each one a random size between the two; <strong>Size at the end</strong> grows or shrinks them as they age.</li>
+        <li><strong>Color</strong> and <strong>Second color</strong>: each one fades from the first to the second as it ages, or (<em>Random mix</em>) gets its own color between the two. <strong>Glow</strong> adds light where they overlap.</li>
+      </ol>
+      <ul>
+        <li><strong>Your own pictures:</strong> Shape › <em>Pictures from a layer</em>, then pick the layer (a drawing, pixel art, an image…). Every frame of it is one picture: draw a leaf, a heart or a coin, or several frames. <em>Random</em>: each particle picks one; <em>In order</em>: each one plays them over its life. The layer is hidden so only the particles show it.</li>
+        <li><strong>When it moves</strong> (Motion): <em>Carry them</em> (local position, the default) moves the particles along with the layer; <em>Leave a trail</em> (global position) lets each particle fly on from where the layer was when it was born, so a moving emitter leaves a trail (a comet, a rocket's smoke). Unity and Godot get the same setting.</li>
+        <li>They play the same every time: scrub the timeline, play backwards, export. <strong>Random seed</strong> gives another pattern.</li>
+        <li>They move with the layer: move, turn, scale or animate the layer and they come along.</li>
+        <li>Speed, direction, spread, gravity, sizes and colors can have keyframes; each particle keeps the values it was born with.</li>
+        <li><strong>Unity</strong> and <strong>Godot</strong> exports make real particle systems with the same settings (Godot: a CPUParticles2D; Unity: a Particle System set up by <code>ToonziParticles.cs</code>, whose settings you can change in the Inspector). They play in the game like on the stage, though not particle for particle. Video, GIF, web page and sprite sheet exports draw them as you see them. Lottie and Rive have no particles.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
+    <section id="pixelart">
+      <h2><span class="num">13</span>Pixel art</h2>
+      <p>Any screen can be pixel art: it is drawn at a small size and shown big with no smoothing, so everything on it (shapes, text, drawings, particles) becomes pixels on one grid, on the stage and in every export.</p>
+      <ol class="steps">
+        <li>Click an empty part of the stage. In the panel, <strong>Pixel art</strong> › turn on <strong>This screen is pixel art</strong> and pick the <strong>Size</strong> (pixels across, from 32 to 640).</li>
+        <li>Pick the <strong>Pixel brush</strong> (<kbd>Shift</kbd>+<kbd>B</kbd>). It paints squares on the grid of a Pixel art layer (made for you when you start). Set its <strong>Size</strong> in pixels.</li>
+        <li>For a size of your own, type <strong>Pixels across</strong> (8 to 1024), or <strong>Each pixel</strong>: how many screen px one pixel is (the pixel ratio, for example 8 on a 1280 wide screen = 160 pixels across).</li>
+        <li><strong>Draw</strong>, <strong>Erase</strong>, or <strong>Fill</strong> (the joined squares of one color, or an empty area). <kbd>Alt</kbd>-click picks a color. The Eraser tool erases squares too.</li>
+        <li>Animate it frame by frame like a drawing: the frame library, onion skin and Auto key all work.</li>
+      </ol>
+      <ul><li>The <strong>Fill</strong> tool (<kbd>G</kbd>) works on a pixel art screen too: it fills the joined pixels of one color as the screen shows them, so lines drawn with any tool (the Brush, the Pen, shapes) hold the color in. It paints squares on the screen's Pixel art layer.</li><li><strong>Sharp edges</strong> (on by default) makes each pixel fully on or off, with no soft edges.</li><li>The grid shows on the stage while the Pixel brush is picked and you are zoomed in enough to see it.</li>  <li>The <strong>Gradient</strong> tool paints pixel gradients: drag from where the first color starts to where the last ends. In the bar above the stage pick the kind: <strong>Normal</strong> (plain bands), <strong>Dithering</strong> (a checker pattern between bands, the classic pixel look) or <strong>Halftone</strong> (dots that grow from one color into the next; <strong>Dot size</strong>), plus <strong>Linear</strong> or <strong>Radial</strong> and the number of <strong>Steps</strong>.</li>
+        <li>The pixel gradient stays <strong>editable</strong>: its line shows on the stage. Drag its ends or the line, slide the color dots, double-click the line for another color, click a color in the bar to change it, or <strong>Reverse</strong> it. Click a gradient you made earlier to edit it again; <strong>Done</strong> lets go of it. Squares you painted over since keep your paint.</li>
+        <li><strong>To vector</strong> (in the bar) turns the gradient into vector art you can edit: <em>A vector gradient</em> (one smooth path whose gradient the Gradient tool edits) or <em>Vector shapes</em> (the same pixels as one shape per color).</li>
+        <li>The onion skin shows the frames before and after on Pixel art layers too.</li>
+        <li>In Unity and Godot exports, a pixel art screen can go <strong>frame by frame</strong> (one sharp picture a frame, no smoothing) to keep its pixel look; see <a href="#export">Exporting</a>.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
     <section id="interactive">
-      <h2><span class="num">12</span>Interactive mode</h2>
+      <h2><span class="num">14</span>Interactive mode</h2>
       <p>On a web page, people can touch your animation. Interactions are <strong>rules in plain words</strong>: <em>WHEN</em> something happens, <em>IF</em> conditions hold, <em>DO</em> some actions.</p>
       <ol class="steps">
         <li>Click the <strong>Made for</strong> chip at the top (it says <em>Video</em>) and choose <strong>Interactive</strong>. (Or <em>Settings › Made for</em>.)</li>
@@ -569,12 +613,12 @@
 
     <!-- ===================================================== -->
     <section id="screens">
-      <h2><span class="num">13</span>Screens and the board</h2>
+      <h2><span class="num">15</span>Screens and the board</h2>
       <p>A <strong>screen</strong> is a canvas with its own size, frame rate, length, background and layers. Several screens sit side by side on a <strong>board</strong>. Use them for scenes, for animations of one character (Idle, Walk, Jump) or for different sizes of the same art.</p>
       <ul>
         <li>Pick the <strong>Screens</strong> tool (<kbd>M</kbd>) and drag on empty space to draw a screen. Or use <em>Add a screen…</em> in the bar for a size or <em>From template</em>.</li>
         <li>Click a screen to work on it. Drag a screen's name to move it; double-click the name for its settings. Drag a layer onto another screen to move it there.</li>
-        <li><strong>Screen settings</strong> (or <em>Project settings</em> with one screen): name, size (Wide 16:9, Vertical 9:16, Square 1:1, Classic 4:3, Portrait 4:5, Cinema 21:9, Sprite 512, or a custom size), frame rate (12, 24, 25, 30, 60), length, and background (color, image, or a texture).</li>
+        <li><strong>Screen settings</strong> (or <em>Project settings</em> with one screen): name, size (Wide 16:9, Vertical 9:16, Square 1:1, Classic 4:3, Portrait 4:5, Cinema 21:9, Sprite 512, or a custom size), frame rate (12, 24, 25, 30, 60, or type any number from 1 to 240), length, and background (color, image, or a texture). The <strong>Frame rate</strong> box is also in the panel on the right (click an empty part of the stage: <em>This screen</em> › Frame rate).</li>
         <li><strong>Screen templates:</strong> <em>Save as screen template</em> makes a screen the original. <em>Add a screen › From template</em> makes linked copies that keep their own animation. Change the original, press <strong>Update</strong>, and the copies follow. A rig then starts from the same pose in every animation.</li>
         <li>For game engines, one screen becomes one animation.</li>
       </ul>
@@ -582,21 +626,39 @@
 
     <!-- ===================================================== -->
     <section id="export">
-      <h2><span class="num">14</span>Exporting</h2>
+      <h2><span class="num">16</span>Exporting</h2>
       <p>Open the logo menu and choose <strong>Export…</strong>. Everything is made right on your device; nothing is uploaded. Choose the screens, then <strong>Export as</strong>:</p>
       <div class="tablewrap"><table class="wide">
         <thead><tr><th>Export as</th><th>You get</th><th>Options</th></tr></thead>
         <tbody>
           <tr><td>Video</td><td>MP4, WebM, MOV or MKV, with sound. WebM and MKV can keep a transparent background.</td><td>Format, Transparent background, Frame rate, Size, Quality (Standard, High, Best)</td></tr>
+          <tr><td>GIF</td><td>An animated GIF that plays everywhere (chats, websites, a GitHub README).</td><td>Colors, Dither, Loop, Transparent background, Frame rate, Size</td></tr>
           <tr><td>Sprite sheet</td><td>All frames in one image (PNG, JPG, WebP, AVIF or SVG), with a JSON file for Phaser, PixiJS and similar.</td><td>Format, Transparent background, Columns (Automatic, 4, 8, 16, One row), JSON data file, Frame rate, Size</td></tr>
           <tr><td>Images (ZIP)</td><td>Every frame as a numbered picture, zipped.</td><td>Format (PNG, JPG, WebP, AVIF), Transparent background, Frame rate, Size, Quality</td></tr>
           <tr><td>SVG animation</td><td>An animated SVG. Each frame is kept as shapes (sharp at any size) and they show in turn, with no script. Plays in browsers, web pages and a GitHub README.</td><td>Loop, Transparent background, Frame rate, Size. A lower frame rate makes a smaller file.</td></tr>
           <tr><td>Interactive</td><td>Pick a Format:<br><strong>HTML</strong>: one web page that plays everything like Preview (rules, screens, rigs, controllers, effects, morphs).<br><strong>Rive</strong>: a <code>.riv</code> file with a state machine.<br><strong>SVG</strong>: waits on its first frame and plays when you click or point at it.</td><td>HTML: none (needs the app served over http).<br>Rive: <em>Also save a web page that plays it</em>, <em>Edit interactions</em>, Morphs.<br>SVG: <em>Starts</em> (When you click it / When you point at it), Loop, Frame rate, Size.</td></tr>
-          <tr><td>Game Engine</td><td><strong>Unity</strong>: a <code>.unitypackage</code> with sprites, a prefab of the rig (bones as GameObjects), masks, controllers and an Animator, one animation per screen (and per action). Needs Unity 2022.3 or newer; bending layers need the 2D Animation package.<br><strong>Godot</strong>: a Godot 4 folder with a scene (Sprite2D, Skeleton2D, Polygon2D), masks and an AnimationPlayer.</td><td>Format (Unity or Godot), Frame rate, Morphs, Animated lines</td></tr>
+          <tr><td>Game Engine</td><td><strong>Unity</strong>: a <code>.unitypackage</code> with sprites, a prefab of the rig (bones as GameObjects), masks, controllers, particle systems and an Animator, one animation per screen (and per action). Needs Unity 2022.3 or newer; bending layers need the 2D Animation package.<br><strong>Godot</strong>: a Godot 4 folder with a scene (Sprite2D, Skeleton2D, Polygon2D, CPUParticles2D for particles), masks and an AnimationPlayer.</td><td>Format (Unity or Godot), Frame rate, Morphs, Animated lines</td></tr>
           <tr><td>Blender (FBX)</td><td>An FBX file with planes for the layers, a skeleton for the bones, and the animation. One file per screen (and per action).</td><td>Also save the pictures as PNG files, Frame rate, Morphs</td></tr>
           <tr><td>Lottie (web)</td><td>A Lottie JSON file for lottie-web and Lottie players in apps.</td><td>Also make a web page that plays it, Transparent background, Frame rate</td></tr>
         </tbody>
       </table></div>
+      <h3>Update your game project in one click</h3>
+      <p>For <strong>Unity</strong> and <strong>Godot</strong>, set <strong>Save</strong> to <strong>Into my project</strong> (Chrome or Edge on a computer). The first time, pick your project folder: for Unity the one with the <code>Assets</code> folder, for Godot the one with <code>project.godot</code>. After that, every export writes the same files with the same names and ids, so the engine reimports them by itself and your scenes keep their links, the way Spine and Aseprite files are updated.</p>
+      <ul>
+        <li>Unity: files go to <code>Assets/&lt;project name&gt;/</code> (and shared scripts to <code>Assets/StoryboardStudio/</code>). Godot: a folder named after the project.</li>
+        <li>Files that didn't change are left alone. Files the export no longer makes (a layer you deleted) are removed, only from that folder.</li>
+        <li>Keep your own changes outside the exported files: in Unity a <strong>Prefab Variant</strong> of the exported prefab (and your own scenes), in Godot an <strong>inherited scene</strong> (Scene › New Inherited Scene). Those survive updates. The exported scene itself is rewritten.</li>
+        <li>Renaming or deleting a layer that your game uses by name breaks that link, like renaming a bone in Spine.</li>
+      </ul>
+
+      <h3>Effects in Unity, Godot and Blender</h3>
+      <p>Game engines and Blender move, turn, scale and fade layers, but they can't draw outlines, glows, shadows, blurs and similar looks. You can still use them in a <strong>Game Engine</strong> or <strong>Blender</strong> screen: they are marked <strong>yellow</strong> (“not recommended”) in the effects menu, on the effect in the panel and on the layer's row in the timeline, and the export draws them into pictures:</p>
+      <ul>
+        <li><strong>Still effects onto the sprite (keeps rigs and controllers)</strong> (Unity, Godot; on by default): an outline, shadow, glow or other look that doesn't change is drawn into the layer's picture once. The layer stays one sprite, so its bones, controllers and keyframes keep working in the engine. Off: those layers go frame by frame instead.</li>
+        <li><strong>Other effects frame by frame</strong> (on by default): effects that change over time (and, for Blender, every one) make the layer <strong>one picture a frame</strong>, with its effects, so it looks the same, but without its rig or controllers.</li>
+      </ul>
+      <p> A pixel art screen has its own check, <strong>Pixel art screens frame by frame</strong> (Unity, Godot): each frame of the whole screen becomes one sharp picture (Godot: nearest filter; Unity: Point filter, no compression, in a <code>Pixel Sprites</code> folder).</p>
+      <div class="callout warn"><b>One yellow warning.</b> When a screen uses such effects, the dialog (and the result after exporting) shows one warning: <em>You are using visual effects</em>: they can make your animation heavier and have small bugs, so check it in the engine. <strong>Show where</strong> lists every layer with them, each marked <em>(not recommended)</em> and how it goes: onto its sprite, frame by frame, or left out. For a lighter export, turn the effect off or use one the engine can do (moves, fades).</div>
 
       <h3>More than one screen</h3>
       <p>The <strong>Screen</strong> box in the dialog has a check box for each screen. For video, sheets, images and SVG you get one file per screen in a ZIP, or tick <strong>Combine them into one (as they sit on the board)</strong>. For Unity, Godot and Rive, all chosen screens go into one file, each as an animation.</p>
@@ -606,8 +668,8 @@
       <dl class="kv">
         <dt>Video</dt><dd>No limits. Every tool, effect and format works.</dd>
         <dt>Interactive</dt><dd>Interactive web page with clicks, hovers and drags. Rive skips effects and video.</dd>
-        <dt>Game Engine</dt><dd>No filters, glow, shadows, blend modes, video or sound.</dd>
-        <dt>Blender (FBX)</dt><dd>No fading, filters, masks, blend modes, video or sound.</dd>
+        <dt>Game Engine</dt><dd>No blend modes, video or sound. Glow, outlines, shadows and filters work but are marked yellow, not recommended (drawn into pictures).</dd>
+        <dt>Blender (FBX)</dt><dd>No masks, blend modes, video or sound. Fades and looks work but are marked yellow, not recommended (drawn frame by frame).</dd>
       </dl>
       <p>After an export, the dialog lists what was left out. Formats that can't morph lines (Unity, Godot, Blender, Rive) turn each morph into in-between pictures: choose how many in <strong>Morphs</strong>. Animated brush lines (boil, marching dashes, pulse, flow) become a loop of pictures in game engines.</p>
 
@@ -617,7 +679,7 @@
 
     <!-- ===================================================== -->
     <section id="settings">
-      <h2><span class="num">15</span>Settings</h2>
+      <h2><span class="num">17</span>Settings</h2>
       <p>Open <strong>Settings…</strong> from the logo menu (or the gear in the top bar). Settings are kept on this device.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Tab</th><th>What is in it</th></tr></thead>
@@ -635,7 +697,7 @@
 
     <!-- ===================================================== -->
     <section id="keys">
-      <h2><span class="num">16</span>Shortcuts and your own actions</h2>
+      <h2><span class="num">18</span>Shortcuts and your own actions</h2>
       <p>These are the defaults. Change any of them in <em>Settings › Shortcuts</em>: click a shortcut, then press the new keys (<kbd>Esc</kbd> cancels, <kbd>Backspace</kbd> clears).</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Group</th><th>Shortcuts</th></tr></thead>
@@ -664,15 +726,16 @@
 
     <!-- ===================================================== -->
     <section id="tutorials">
-      <h2><span class="num">17</span>Tutorials and the tutorial maker</h2>
-      <p>Open logo menu › <strong>Tutorials…</strong>. A guide character, <strong>Pip</strong> (or <strong>Mo</strong>), talks you through a task on a practice screen. The guide points at what to click, and notices when you did it, so you can't get lost. There are 15 tutorials in groups:</p>
+      <h2><span class="num">19</span>Tutorials and the tutorial maker</h2>
+      <p>Open logo menu › <strong>Tutorials…</strong>. A guide character, <strong>Toonzi</strong> (or <strong>Pip</strong> or <strong>Mo</strong>), talks you through a task on a practice screen. The guide points at what to click, and notices when you did it, so you can't get lost. On your first visit the tutorials open by themselves after the welcome. There are 24 tutorials in groups:</p>
       <dl class="kv">
-        <dt>Start here</dt><dd>Drawing: brush and eraser · Frame by frame · Keyframes and tweens</dd>
-        <dt>Drawing</dt><dd>Drawing: fills and shaping · Vectors: the Pen</dd>
-        <dt>Animation</dt><dd>Follow: a hand grabs a ball · Physics: drop and bounce</dd>
-        <dt>Rigs and controllers</dt><dd>Bones and rigs · Controllers: eyes that follow · Advanced rigs: weights and bending</dd>
-        <dt>Effects and video</dt><dd>Effects and transitions · Masks: a window for a layer · Video editing basics</dd>
-        <dt>Interactive and export</dt><dd>Interactive: let people play · Game engines: Unity and Godot</dd>
+        <dt>1 Basics</dt><dd>Drawing: brush and eraser · Keyframes and tweens</dd>
+        <dt>2 Effects and video</dt><dd>Effects and transitions · A logo reveal in one minute · Masks: a window for a layer · Video editing basics</dd>
+        <dt>3 Drawing</dt><dd>Drawing: fills and shaping · Vectors: the Pen</dd>
+        <dt>4 Animation</dt><dd>Auto key: a hop with a flip · Frame by frame · Storyboard: one drawing per shot</dd>
+        <dt>5 Rigs and controllers</dt><dd>Bones and rigs · Controllers: eyes that follow · Actions: more than one animation · Action strips: wave, then hop · Advanced rigs: weights and bending</dd>
+        <dt>6 Quick and powerful</dt><dd>Living lines: animated brush · Physics: drop and bounce · Follow: a hand grabs a ball · Slingshot: keys, then physics · Dynamic bones: a wobbly antenna · A swinging ball: hang physics</dd>
+        <dt>7 Interactive and export</dt><dd>Interactive: let people play · Game engines: Unity and Godot</dd>
       </dl>
 
       <h3>Make your own tutorial</h3>
@@ -688,8 +751,24 @@
     </section>
 
     <!-- ===================================================== -->
+    <section id="ai">
+      <h2><span class="num">20</span>Make animations with AI</h2>
+      <p>AI assistants (Claude, ChatGPT and others) can make an animation in Toonzi 2D for you and give you back <strong>the editor with your animation in it</strong>, so you can change it yourself and ask for more.</p>
+      <ol class="steps">
+        <li>Ask: <em>“Make an animation of a robot waving hello with Toonzi 2D (github.com/idont12/toonzi-2d).”</em> The repo has a guide for AIs, <a href="https://github.com/idont12/toonzi-2d/blob/main/AGENTS.md">AGENTS.md</a>: how to write a project, and when to use groups, rigs, controllers, pixel art or frame by frame.</li>
+        <li>You get a <strong>link</strong> that opens the editor with the animation (the whole animation is inside the link; nothing is uploaded), and/or an <strong>editor file</strong> (one page that works offline) or a <code>.json</code> project (logo › Open project…).</li>
+        <li>Change what you like. To ask for more, click the logo › <strong>Copy a link to this animation</strong> and give the link to the AI with your request. It starts from your version.</li>
+      </ol>
+      <ul>
+        <li>Opening a link again (a reload) keeps your changes. A different link replaces the project in this browser; the one you had is kept in <strong>Recent projects</strong>.</li>
+        <li>The command line <code>tools/toonzi.mjs</code> (Node 18+) checks a project, makes links and editor files, takes preview pictures and runs the app: <code>node tools/toonzi.mjs help</code>.</li>
+        <li>Links also work as <code>index.html?open=&lt;address of a .json file&gt;</code>, for projects on your own server.</li>
+      </ul>
+    </section>
+
+    <!-- ===================================================== -->
     <section id="demos">
-      <h2><span class="num">18</span>Made in Toonzi 2D</h2>
+      <h2><span class="num">21</span>Made in Toonzi 2D</h2>
       <p>These animations were made and exported by the app itself. This page can run JavaScript, so it can show <strong>interactive</strong> exports too.</p>
 
       <!-- TOONZI: interactive demos
@@ -701,6 +780,10 @@
            iframes load only when you scroll to them (loading="lazy"). Only embed files you made or trust.
            Serve this page over http(s) (GitHub Pages does). Full steps: docs/media/README.txt -->
       <div class="demos">
+        <figure class="demo wide">
+          <iframe src="media/playground.html" title="The interactive playground: Toonzi follows the mouse; buttons, switches and a slider" loading="lazy" allow="fullscreen"></iframe>
+          <figcaption><strong>The interactive playground</strong> (logo menu › Examples › Interactive playground, exported as Interactive › HTML). Move the mouse: the eyes follow it. <em>Hop</em>, <em>Dance</em> and <em>Flip</em> blend between the rig's actions, the switches show and hide layers, and the Size slider is a controller you drag. Open the example in the app to see its 26 rules.</figcaption>
+        </figure>
         <figure class="demo">
           <img src="media/bouncing-ball.svg" width="1280" height="720" loading="lazy" alt="A ball bounces and squashes on a floor.">
           <figcaption><strong>Animated SVG</strong> (Export as › SVG animation). Plays by itself, works in a README too.</figcaption>
@@ -719,7 +802,7 @@
 
     <!-- ===================================================== -->
     <section id="help">
-      <h2><span class="num">19</span>Help</h2>
+      <h2><span class="num">22</span>Help</h2>
       <details class="more"><summary>Interactive › HTML says it can't read a file</summary>
         <p>Serve the folder over http instead of opening <code>index.html</code> from disk. In the project folder run <code>python3 -m http.server 8000</code> and open <code>http://localhost:8000</code>. Browsers don't let a page opened from a file read other files, and this export packs the app's own files into one page.</p></details>
       <details class="more"><summary>Video export says the browser has no video encoder</summary>
@@ -733,7 +816,7 @@
       <details class="more"><summary>The fonts look different offline</summary>
         <p>The app loads its fonts from Google Fonts. Without a connection it uses your system fonts. Text you export as SVG becomes shapes, so it looks the same everywhere.</p></details>
       <details class="more"><summary>How do I get a GIF?</summary>
-        <p>The app has no GIF export. Export a <strong>Video</strong> (MP4) and convert it with another tool, or use an <strong>SVG animation</strong> for web pages and READMEs.</p></details>
+        <p>Logo menu › <strong>Export…</strong> › Export as <strong>GIF</strong>. Fewer colors make a smaller file; Dither smooths gradients. For a sharp, small README animation, <strong>SVG animation</strong> is often better.</p></details>
     </section>
 
   </main>

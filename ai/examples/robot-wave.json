@@ -1,0 +1,40 @@
+{
+ "app": "toonzi", "name": "Robot says hi",
+ "project": { "w": 1280, "h": 720, "fps": 24, "duration": 4, "bg": "#E8F4FF" },
+ "objects": [
+  { "type": "text", "name": "Title", "text": "Hi there!", "x": 640, "y": 110, "fontSize": 84, "color": "#24213F", "start": 0.3,
+    "effects": [ { "type": "popIn", "dur": 0.5 } ] },
+  { "type": "particles", "name": "Sparkles", "x": 640, "y": 110, "rate": 24, "life": 1.4, "ptSpeed": 90, "ptDir": -90, "ptSpread": 180, "ptGravity": 40,
+    "sizeMin": 12, "sizeMax": 26, "color": "#FFD84D", "color2": "#FF4F8B", "ptShape": "star", "area": 220, "start": 0.3 },
+  { "type": "null", "id": "look", "name": "Look", "x": 640, "y": 250, "ctype": "x", "rw": 120,
+    "tracks": { "x": [ { "t": 0, "v": 640 }, { "t": 1.2, "v": 740 }, { "t": 2.6, "v": 560 }, { "t": 4, "v": 640 } ] } },
+  { "type": "group", "id": "robot", "name": "Robot", "x": 640, "y": 470,
+    "tracks": { "y": [ { "t": 0, "v": 470 }, { "t": 1, "v": 460 }, { "t": 2, "v": 470 }, { "t": 3, "v": 460 }, { "t": 4, "v": 470 } ] },
+    "children": [
+     { "type": "draw", "name": "Face", "x": 0, "y": -190, "play": "library",
+       "bind": { "rig": "skel", "mode": "follow", "bone": "neck" },
+       "drv": [ { "ctrl": "look", "space": "local", "states": [ { "slot": "left", "p": { "x": -14 } }, { "slot": "center", "p": { "x": 0 } }, { "slot": "right", "p": { "x": 14 } } ] } ],
+       "frames": [
+        { "strokes": [ { "b": 1, "subs": [ { "p": [-40, -10, -40, -24, -24, -24, -24, -10, -24, 4, -40, 4, -40, -10], "cl": true } ], "c": "#24213F", "s": 0, "fc": "#24213F" },
+                       { "b": 1, "subs": [ { "p": [24, -10, 24, -24, 40, -24, 40, -10, 40, 4, 24, 4, 24, -10], "cl": true } ], "c": "#24213F", "s": 0, "fc": "#24213F" },
+                       { "c": "#24213F", "s": 6, "pts": [-22, 30, 0, 42, 22, 30] } ] },
+        { "strokes": [ { "c": "#24213F", "s": 6, "pts": [-42, -8, -22, -8] }, { "c": "#24213F", "s": 6, "pts": [22, -8, 42, -8] },
+                       { "c": "#24213F", "s": 6, "pts": [-22, 30, 0, 42, 22, 30] } ] } ],
+       "tracks": { "frame": [ { "t": 0, "v": 0 }, { "t": 1.6, "v": 1 }, { "t": 1.72, "v": 0 }, { "t": 3.3, "v": 1 }, { "t": 3.42, "v": 0 } ] } },
+     { "type": "shape", "name": "Head", "shape": "round", "w": 190, "h": 150, "radius": 36, "fill": "#7B5CFF", "x": 0, "y": -190,
+       "bind": { "rig": "skel", "mode": "follow", "bone": "neck" } },
+     { "type": "shape", "name": "Arm", "shape": "round", "w": 34, "h": 160, "radius": 17, "fill": "#5B3FE0", "x": 112, "y": -18,
+       "bind": { "rig": "skel", "mode": "follow", "bone": "arm" } },
+     { "type": "shape", "name": "Body", "shape": "round", "w": 220, "h": 210, "radius": 44, "fill": "#9B85FF", "x": 0, "y": -20 },
+     { "type": "rig", "id": "skel", "name": "Skeleton", "x": 0, "y": 0,
+       "bones": [
+        { "id": "spine", "name": "Spine", "x": 0, "y": 60, "len": 140, "ang": -90 },
+        { "id": "neck", "name": "Neck", "parent": "spine", "len": 60, "ang": 0 },
+        { "id": "arm", "name": "Arm", "x": 112, "y": -90, "len": 150, "ang": 90 } ],
+       "tracks": {
+        "bone:arm":  [ { "t": 0, "v": 0 }, { "t": 0.6, "v": -150, "e": "back" }, { "t": 1, "v": -120 }, { "t": 1.4, "v": -160 }, { "t": 1.8, "v": -120 }, { "t": 2.2, "v": -160 }, { "t": 2.8, "v": 0, "e": "easeOut" } ],
+        "bone:neck": [ { "t": 0, "v": 0 }, { "t": 1, "v": -6 }, { "t": 2, "v": 6 }, { "t": 3, "v": -4 }, { "t": 4, "v": 0 } ] } }
+    ] },
+  { "type": "shape", "name": "Floor", "shape": "rect", "w": 1280, "h": 120, "fill": "#C9E3FF", "x": 640, "y": 690 }
+ ]
+}

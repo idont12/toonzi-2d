@@ -3,7 +3,8 @@
                     packed together by "<name> Atlas.spriteatlas" (a Sprite Atlas over the folder)
      <name>.prefab  GameObjects for groups, layers (SpriteRenderer, sorting order = layer order),
                     masks (SpriteMask, the layers they mask show inside or outside), rigs (a GameObject per
-                    bone, segmented bones are chains), controllers (empty GameObjects) and an Animator
+                    bone, segmented bones are chains), controllers (empty GameObjects), particles (a Particle
+                    System that ToonziParticles.cs sets up from the layer's settings) and an Animator
      Animations/    one AnimationClip per chosen screen, all in <name>.controller (one state each)
      <name>.unity   a scene with the prefab and an orthographic camera framing the screen
    Layers that bend with a rig get a SpriteSkin (2D Animation package) driven by the bone GameObjects;
@@ -83,7 +84,7 @@
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 1
+    filterMode: ${o.point ? 0 : 1}
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -241,6 +242,185 @@ namespace StoryboardStudio.EditorTools
 `;
   /** A controller that drives the rig, in the Scene view and in the game: moving it poses what it drives, like in
       Toonzi 2D. It blends a grid of poses recorded with the controller at each spot of its box (or line). */
+  // particles: a Particle System set up from the layer's settings (they are in Toonzi 2D's units: pixels, seconds, degrees)
+  const PTC_CS = `// Toonzi 2D: particles, set up like the Particles layer they came from.
+// The settings are Toonzi 2D's (pixels, seconds, degrees; direction 0 = right, -90 = up) and drive this
+// object's Particle System: change them here and it updates, in the editor and in the game.
+using UnityEngine;
+
+[ExecuteAlways]
+public class ToonziParticles : MonoBehaviour
+{
+    public bool burst = false;
+    public float rate = 40f;
+    public int count = 60;
+    public float every = 2f;
+    public bool repeat = true;
+    public bool prewarm = true;
+    [Tooltip("On: each particle flies on by itself from where it was born (a trail). Off: they move with this object.")] public bool worldSpace = false;
+    public float life = 1.6f;
+    [Range(0f, 0.95f)] public float lifeVariation = 0.3f;
+    public float speed = 260f;
+    [Range(0f, 1f)] public float speedVariation = 0.3f;
+    public float direction = -90f;
+    [Range(0f, 180f)] public float spread = 25f;
+    public float gravity = 200f;
+    public float drag = 0f;
+    public float sizeMin = 8f;
+    public float sizeMax = 22f;
+    public float sizeEnd = 0.2f;
+    public Color color = Color.white;
+    public Color color2 = Color.white;
+    public bool randomColor = false;
+    public bool fade = true;
+    public bool glow = false;
+    [Tooltip("0 dots, 1 soft dots, 2 squares, 3 stars, 4 sparks, 5 rings, 6 pictures")] public int shape = 0;
+    public float spin = 0f;
+    public float area = 0f;
+    public int seed = 1;
+    public int sortingOrder = 0;
+    [Tooltip("Pictures side by side (shape 6): each particle shows one of them")] public Texture2D pictures;
+    public int pictureCount = 1;
+    [Tooltip("Off: each particle picks a picture at random. On: it plays them in order over its life")] public bool picturesInOrder = false;
+
+    const float UNIT = 100f; // pixels per Unity unit, like the sprites
+    bool dirty;
+    Material mat;
+    Texture2D tex;
+
+    void OnEnable() { Apply(); }
+    void OnValidate() { dirty = true; }
+    void Update() { if (dirty) { dirty = false; Apply(); } }
+
+    public void Apply()
+    {
+        var ps = GetComponent<ParticleSystem>();
+        if (ps == null) ps = gameObject.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        ps.useAutoRandomSeed = false;
+        ps.randomSeed = (uint)Mathf.Max(1, seed);
+
+        var main = ps.main;
+        main.duration = burst ? Mathf.Max(0.1f, every) : Mathf.Max(1f, life);
+        main.loop = !burst || repeat;
+        main.prewarm = prewarm && !burst;
+        main.playOnAwake = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(life * (1f - lifeVariation), life);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(speed * (1f - speedVariation) / UNIT, speed * (1f + speedVariation) / UNIT);
+        main.startSize = new ParticleSystem.MinMaxCurve(sizeMin / UNIT, sizeMax / UNIT);
+        bool pics = pictures != null;
+        main.startRotation = pics && spin <= 0f ? new ParticleSystem.MinMaxCurve(0f) : new ParticleSystem.MinMaxCurve(-Mathf.PI, Mathf.PI);
+        main.startColor = randomColor && !pics ? new ParticleSystem.MinMaxGradient(color, color2) : new ParticleSystem.MinMaxGradient(Color.white);
+        main.gravityModifier = gravity / UNIT / Mathf.Max(0.001f, -Physics.gravity.y); // Toonzi 2D's gravity is px/s² down
+        main.simulationSpace = worldSpace ? ParticleSystemSimulationSpace.World : ParticleSystemSimulationSpace.Local;
+        main.scalingMode = ParticleSystemScalingMode.Hierarchy;
+        main.maxParticles = 3000;
+
+        var em = ps.emission;
+        em.enabled = true;
+        if (burst)
+        {
+            em.rateOverTime = 0f;
+            short n = (short)Mathf.Clamp(count, 1, 3000);
+            em.SetBursts(new[] { new ParticleSystem.Burst(0f, n, n, repeat ? 0 : 1, Mathf.Max(0.1f, every)) });
+        }
+        else
+        {
+            em.rateOverTime = rate;
+            em.SetBursts(new ParticleSystem.Burst[0]);
+        }
+
+        // a fan in the XY plane: Unity's y points up, so Toonzi 2D's direction turns the other way
+        var sh = ps.shape;
+        sh.enabled = true;
+        sh.shapeType = ParticleSystemShapeType.Circle;
+        sh.radius = Mathf.Max(0.0001f, area / 2f / UNIT);
+        sh.radiusThickness = 1f;
+        float a = Mathf.Clamp(spread, 0.01f, 180f);
+        sh.arc = a * 2f;
+        sh.arcMode = ParticleSystemShapeMultiModeValue.Random;
+        sh.rotation = new Vector3(0f, 0f, -direction - a);
+
+        var lv = ps.limitVelocityOverLifetime;
+        lv.enabled = drag > 0f;
+        lv.drag = drag;
+        lv.limit = 100000f;
+
+        var so = ps.sizeOverLifetime;
+        so.enabled = true;
+        so.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, Mathf.Max(0f, sizeEnd)));
+
+        var co = ps.colorOverLifetime;
+        co.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(randomColor || pics ? new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) } : new[] { new GradientColorKey(color, 0f), new GradientColorKey(color2, 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.6f), new GradientAlphaKey(fade ? 0f : 1f, 1f) });
+        co.color = new ParticleSystem.MinMaxGradient(g);
+
+        var ro = ps.rotationOverLifetime;
+        ro.enabled = spin > 0f;
+        ro.z = new ParticleSystem.MinMaxCurve(-spin * Mathf.Deg2Rad, spin * Mathf.Deg2Rad);
+
+        var r = GetComponent<ParticleSystemRenderer>();
+        r.sortingOrder = sortingOrder;
+        r.renderMode = shape == 4 ? ParticleSystemRenderMode.Stretch : ParticleSystemRenderMode.Billboard;
+        if (shape == 4) { r.velocityScale = 0.04f; r.lengthScale = 2f; }
+        // pictures: a strip of frames; each particle shows one at random, or plays them in order (the curve runs 0..1 over the strip)
+        var ts = ps.textureSheetAnimation;
+        ts.enabled = pics && pictureCount > 1;
+        if (ts.enabled)
+        {
+            ts.mode = ParticleSystemAnimationMode.Grid;
+            ts.numTilesX = pictureCount;
+            ts.numTilesY = 1;
+            ts.animation = ParticleSystemAnimationType.WholeSheet;
+            ts.cycleCount = 1;
+            ts.frameOverTime = picturesInOrder ? new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 0f, 1f, 1f)) : new ParticleSystem.MinMaxCurve(0f, 0.999f);
+        }
+        if (!pics && tex == null) tex = MakeTexture(shape);
+        Shader s = glow ? (Shader.Find("Legacy Shaders/Particles/Additive") ?? Shader.Find("Mobile/Particles/Additive")) : null;
+        if (s == null) s = Shader.Find("Sprites/Default");
+        if (mat == null || mat.shader != s) { mat = new Material(s); mat.hideFlags = HideFlags.DontSave; }
+        mat.mainTexture = pics ? (Texture)pictures : tex;
+        r.sharedMaterial = mat;
+
+        if (Application.isPlaying || ps.main.playOnAwake) ps.Play();
+    }
+
+    // one white particle (the colors above tint it)
+    Texture2D MakeTexture(int kind)
+    {
+        const int S = 64;
+        var t = new Texture2D(S, S, TextureFormat.RGBA32, false);
+        t.hideFlags = HideFlags.DontSave;
+        t.wrapMode = TextureWrapMode.Clamp;
+        var px = new Color[S * S];
+        for (int y = 0; y < S; y++) for (int x = 0; x < S; x++)
+        {
+            float u = (x + 0.5f) / S * 2f - 1f, v = (y + 0.5f) / S * 2f - 1f, d = Mathf.Sqrt(u * u + v * v), al;
+            switch (kind)
+            {
+                case 1: al = Mathf.Clamp01(1f - d); break;
+                case 2: al = 1f; break;
+                case 3: al = InStar(u, v) ? 1f : 0f; break;
+                case 4: al = Mathf.Clamp01((0.5f - Mathf.Abs(u)) * 8f) * Mathf.Clamp01(1f - d * 0.6f); break;
+                case 5: al = Mathf.Clamp01((0.12f - Mathf.Abs(d - 0.86f)) * 30f); break;
+                default: al = Mathf.Clamp01((1f - d) * 30f); break;
+            }
+            px[y * S + x] = new Color(1f, 1f, 1f, al);
+        }
+        t.SetPixels(px);
+        t.Apply();
+        return t;
+    }
+    static bool InStar(float u, float v)
+    {
+        float ang = Mathf.Atan2(-v, u) + Mathf.PI / 2f, k = Mathf.Repeat(ang, 2f * Mathf.PI / 5f) / (2f * Mathf.PI / 5f);
+        float edge = Mathf.Lerp(0.98f, 0.44f, Mathf.Abs(k - 0.5f) < 0.5f ? 1f - Mathf.Abs(k * 2f - 1f) : 0f);
+        return Mathf.Sqrt(u * u + v * v) < edge;
+    }
+}
+`;
   const CTRL_CS = `// Toonzi 2D: a controller that drives the rig, in the editor and in the game.
 // Move this GameObject (drag it in the Scene view, animate it, or set its localPosition from your own
 // scripts) and what it drives follows, like in Toonzi 2D. It blends the poses recorded with the
@@ -468,6 +648,7 @@ public class StoryboardController : MonoBehaviour
         joints.filter(j => j.parent === nd.key).forEach(j => addJ(j, r)); return;
       }
       if (nd.kind === 'ctrl') { byKey.set(nd.key, mk(parent, nd.name, { nd, world: trackW(nd.key) })); return; }
+      if (nd.kind === 'particles') { byKey.set(nd.key, mk(parent, nd.name, { nd, world: trackW(nd.key), ptc: true })); return; }
       if (nd.kind === 'group') { const g = mk(parent, nd.name, { nd, world: trackW(nd.key) }); byKey.set(nd.key, g); (kids.get(nd.key) || []).forEach(c => place(c, g)); return; }
       if (nd.kind === 'layer' && nd.pics.length) byKey.set(nd.key, mk(parent, nd.name, { nd, world: nd.skin ? (c, i) => trackW(nd.key)(c, i) && nd.skin.M0 : trackW(nd.key), layer: true }));
     }
@@ -489,11 +670,13 @@ public class StoryboardController : MonoBehaviour
     const sortOrder = new Map(); [...G.order].reverse().forEach((k, i) => sortOrder.set(k, i * 2)); // back = 0
     const spriteRef = new Map(), usedFiles = new Set(); // `${key}:${f}` → guid
     const uniqueFile = (dir, nm, extn) => { let p = `${dir}/${nm}${extn}`, i = 2; while (usedFiles.has(p.toLowerCase())) p = `${dir}/${nm} ${i++}${extn}`; usedFiles.add(p.toLowerCase()); return p; };
+    let pixFolder = null;
     for (const o of objs) if (o.layer) {
       const nd = o.nd, pics = nd.skin ? [nd.skin.pic] : nd.pics;
       for (const pic of pics) {
-        const k = pic.k, h = pic.h, ppu = UNIT * k, file = uniqueFile(`${root}/Sprites`, `${fileName(o.name)}${pics.length > 1 ? ' ' + SB.engines.picName(pic) : ''}`, '.png');
-        const meta = { px: -pic.x0 / pic.w, py: (pic.y0 + pic.h) / pic.h, ppu, spriteId: (await guidOf('sprite|' + base + '|' + file)) };
+        if (nd.pixel && !pixFolder) pixFolder = await folder(root + '/Pixel Sprites'); // outside the atlas (it smooths), drawn with Point filter
+        const k = pic.k, h = pic.h, ppu = UNIT * k, file = uniqueFile(nd.pixel ? `${root}/Pixel Sprites` : `${root}/Sprites`, `${fileName(o.name)}${pics.length > 1 ? ' ' + SB.engines.picName(pic) : ''}`, '.png');
+        const meta = { point: !!nd.pixel, px: -pic.x0 / pic.w, py: (pic.y0 + pic.h) / pic.h, ppu, spriteId: (await guidOf('sprite|' + base + '|' + file)) };
         if (nd.skin) meta.rig = rigData(nd.skin, pic, o);
         const g = await asset(file, G.png(pic), gg => META.sprite(gg, meta)); spriteRef.set(`${nd.key}:${pic.f}`, g); void h;
       }
@@ -540,6 +723,7 @@ public class StoryboardController : MonoBehaviour
       for (const s of anim) {
         const v = s.get(o), Lf = v.L.map(l => l || l0);
         if (Lf.some(l => Math.abs(l.x - l0.x) > 1e-4 || Math.abs(l.y - l0.y) > 1e-4)) P.add('pos'); if (Lf.some(l => Math.abs(l.rot - l0.rot) > 0.01)) P.add('rot'); if (Lf.some(l => Math.abs(l.sx - l0.sx) > 1e-4 || Math.abs(l.sy - l0.sy) > 1e-4)) P.add('scale');
+        if (o.ptc && v.vis.some(x => !x)) P.add('active'); // a particles object turns on and off
         if (o.layer) { if (v.vis.some(x => !x)) P.add('active'); if (v.a.some((x, i) => v.vis[i] && Math.abs(x - 1) > 0.004)) P.add('alpha'); if (!o.nd.skin && o.nd.pics.length > 1 && (new Set(v.fi.filter((f, i) => v.vis[i])).size > 1 || (G.clips[series.indexOf(s)].tracks.get(o.nd.key) || {}).fev)) P.add('sprite'); }
       }
     }
@@ -609,13 +793,25 @@ public class StoryboardController : MonoBehaviour
       D(114, id, `MonoBehaviour:\n  m_ObjectHideFlags: 0\n  m_CorrespondingSourceObject: {fileID: 0}\n  m_PrefabInstance: {fileID: 0}\n  m_PrefabAsset: {fileID: 0}\n  m_GameObject: ${ref(o.go)}\n  m_Enabled: 1\n  m_EditorHideFlags: 0\n  m_Script: ${ext(11500000, ctrlScript, 3)}\n  m_Name: \n  m_EditorClassIdentifier: \n  targets: []\n  parts: []\n  poses: ''\n  renderers: []\n  sprites: []\n  looks: ''\n  columns: ${mo === 'y' ? 1 : 9}\n  rows: ${mo === 'x' ? 1 : 9}\n  halfSize: {x: ${n((c.rw ?? c.range ?? 100) / UNIT / ps)}, y: ${n((c.rh ?? c.range ?? 100) / UNIT / ps)}}\n  rest: {x: ${n(l.x)}, y: ${n(l.y)}, z: 0}\n  weight: 0\n${ctrlLook(o)}`);
       o.ctrlComp = true;
     }
+    // particles: a ToonziParticles script with the layer's settings; it makes and sets up the Particle System
+    const ptcScript = objs.some(o => o.ptc) ? await guidOf('sb-shared|' + SHARED + '/ToonziParticles.cs') : null;
+    for (const o of objs) {
+      if (!o.ptc) continue; const v = o.nd.ps, id = await fileIdOf(base + '|ptc|' + o.nd.key); comp(o, 114, id);
+      const C = c => { const [r, g, b] = U.hexRgb(c || '#ffffff'); return `{r: ${n(r / 255)}, g: ${n(g / 255)}, b: ${n(b / 255)}, a: 1}`; }, bit = x => x ? 1 : 0;
+      const shapes = ['circle', 'soft', 'square', 'star', 'spark', 'ring', 'pictures'], st = v.ptShape === 'pictures' ? SB.particles.strip(v.ptSrc) : null;
+      const picGuid = st ? await asset(`${root}/Sprites/${fileName(o.nd.name)} pictures.png`, G.png({ cv: st.cv }), gg => META.plain(gg, 'TextureImporter')) : null; // the pictures side by side
+      D(114, id, `MonoBehaviour:\n  m_ObjectHideFlags: 0\n  m_CorrespondingSourceObject: {fileID: 0}\n  m_PrefabInstance: {fileID: 0}\n  m_PrefabAsset: {fileID: 0}\n  m_GameObject: ${ref(o.go)}\n  m_Enabled: 1\n  m_EditorHideFlags: 0\n  m_Script: ${ext(11500000, ptcScript, 3)}\n  m_Name: \n  m_EditorClassIdentifier: \n`
+        + `  burst: ${bit(v.emit === 'burst')}\n  rate: ${n(v.rate)}\n  count: ${Math.round(v.count)}\n  every: ${n(v.every)}\n  repeat: ${bit(v.repeat !== false)}\n  prewarm: ${bit(v.prewarm !== false)}\n  worldSpace: ${bit(v.ptSpace === 'world')}\n  life: ${n(v.life)}\n  lifeVariation: ${n(v.lifeVar)}\n`
+        + `  speed: ${n(v.ptSpeed)}\n  speedVariation: ${n(v.speedVar)}\n  direction: ${n(v.ptDir)}\n  spread: ${n(v.ptSpread)}\n  gravity: ${n(v.ptGravity)}\n  drag: ${n(v.drag)}\n  sizeMin: ${n(v.sizeMin)}\n  sizeMax: ${n(v.sizeMax)}\n  sizeEnd: ${n(v.sizeEnd)}\n`
+        + `  color: ${C(v.color)}\n  color2: ${C(v.color2)}\n  randomColor: ${bit(v.colorMode === 'random')}\n  fade: ${bit(v.fade !== false)}\n  glow: ${bit(v.ptGlow)}\n  shape: ${st ? 6 : Math.max(0, shapes.indexOf(v.ptShape === 'pictures' ? 'circle' : v.ptShape))}\n  spin: ${n(v.spin)}\n  area: ${n(v.area)}\n  seed: ${Math.round(v.seed || 1)}\n  sortingOrder: ${(sortOrder.get(o.nd.key) || 0) + 1}\n  pictures: ${st ? ext(2800000, picGuid, 3) : '{fileID: 0}'}\n  pictureCount: ${st ? st.n : 1}\n  picturesInOrder: ${bit(v.ptPick === 'life')}\n`);
+    }
     // Animator on the root
     const anId = await fileIdOf(base + '|animator'); comp(rootObj, 95, anId);
     D(95, anId, `Animator:\n  serializedVersion: 3\n  m_ObjectHideFlags: 0\n  m_CorrespondingSourceObject: {fileID: 0}\n  m_PrefabInstance: {fileID: 0}\n  m_PrefabAsset: {fileID: 0}\n  m_GameObject: ${ref(rootObj.go)}\n  m_Enabled: 1\n  m_Avatar: {fileID: 0}\n  m_Controller: ${ext(9100000, controllerGuid, 2)}\n  m_CullingMode: 0\n  m_UpdateMode: 0\n  m_ApplyRootMotion: 0\n  m_LinearVelocityBlending: 0\n  m_WarningMessage: \n  m_HasTransformHierarchy: 1\n  m_AllowConstantClipSamplingOptimization: 1\n  m_KeepAnimatorControllerStateOnDisable: 0\n`);
     // GameObjects and Transforms
     const all = [rootObj]; (function w(o) { for (const k of o.kids) { all.push(k); w(k); } })(rootObj);
     for (const o of all) {
-      const l = o === rootObj || o.shape ? { x: 0, y: 0, rot: 0, sx: 1, sy: 1 } : L0.get(o), s0 = o.layer ? series[0].get(o) : null, active = !s0 || (s0.here && s0.vis[0]);
+      const l = o === rootObj || o.shape ? { x: 0, y: 0, rot: 0, sx: 1, sy: 1 } : L0.get(o), s0 = o.layer || o.ptc ? series[0].get(o) : null, active = !s0 || (s0.here && s0.vis[0]);
       const ang = l.rot * Math.PI / 180, qz = Math.sin(ang / 2), qw = Math.cos(ang / 2);
       D(1, o.go, `GameObject:\n  m_ObjectHideFlags: 0\n  m_CorrespondingSourceObject: {fileID: 0}\n  m_PrefabInstance: {fileID: 0}\n  m_PrefabAsset: {fileID: 0}\n  serializedVersion: 6\n  m_Component:\n  - component: ${ref(o.tr)}\n${o.comps.map(c => `  - component: ${ref(c.id)}`).join('\n')}${o.comps.length ? '\n' : ''}  m_Layer: 0\n  m_Name: ${ystr(o.name)}\n  m_TagString: Untagged\n  m_Icon: {fileID: 0}\n  m_NavMeshLayer: 0\n  m_StaticEditorFlags: 0\n  m_IsActive: ${active ? 1 : 0}\n`);
       D(4, o.tr, `Transform:\n  m_ObjectHideFlags: 0\n  m_CorrespondingSourceObject: {fileID: 0}\n  m_PrefabInstance: {fileID: 0}\n  m_PrefabAsset: {fileID: 0}\n  m_GameObject: ${ref(o.go)}\n  serializedVersion: 2\n  m_LocalRotation: {x: 0, y: 0, z: ${n(qz)}, w: ${n(qw)}}\n  m_LocalPosition: {x: ${n(l.x)}, y: ${n(l.y)}, z: 0}\n  m_LocalScale: {x: ${n(l.sx)}, y: ${n(l.sy)}, z: 1}\n  m_ConstrainProportionsScale: 0\n  m_Children:${o.kids.length ? '\n' + o.kids.map(k => `  - ${ref(k.tr)}`).join('\n') : ' []'}\n  m_Father: ${o === rootObj ? NONE : ref(o.parent.tr)}\n  m_LocalEulerAnglesHint: {x: 0, y: 0, z: ${n(l.rot)}}\n`);
@@ -680,6 +876,7 @@ public class StoryboardController : MonoBehaviour
       await shared(SHARED + '/Editor/StoryboardStudio.Editor.asmdef', RIG_ASMDEF, gg => META.plain(gg, 'AssemblyDefinitionImporter'));
     }
     if (ctrls) await shared(SHARED + '/StoryboardController.cs', CTRL_CS, META.script);
+    if (objs.some(o => o.ptc)) await shared(SHARED + '/ToonziParticles.cs', PTC_CS, META.script);
     await asset(`${root}/README.txt`, readme(title, clipGuids.map(c => c.name), objs), gg => META.plain(gg, 'TextScriptImporter'));
 
     // ---------- the package
@@ -691,7 +888,9 @@ public class StoryboardController : MonoBehaviour
     }
     const blob = await gzip(tar(entries));
     const tips = G.nodes.some(nd => nd.skin) ? ['Bending layers use Sprite Skin: the Unity project needs the 2D Animation package (Window › Package Manager).'] : [];
-    return { files: [{ name: `${U.slug(base)}.unitypackage`, blob }], warnings: [...warnings], tips };
+    // the same assets as files, for writing straight into a Unity project (js/io/gamelink.js): each with its .meta, folders too
+    const project = { own: [root], files: assets.flatMap(a => [a.data != null ? { path: a.path, data: a.data } : { path: a.path, dir: true }, { path: a.path + '.meta', data: a.meta }]) };
+    return { files: [{ name: `${U.slug(base)}.unitypackage`, blob }], warnings: [...warnings], baked: G.baked, still: G.still, tips, project };
   }
   const rankDoc = d => { const m = d.match(/^--- !u!(\d+)/), c = m ? +m[1] : 0; return c === 1 ? 0 : c === 4 ? 1 : 2; };
   const readme = (title, clips, objs) => `${title}: exported from Toonzi 2D for Unity (2022.3 or newer).

@@ -7,6 +7,7 @@
                   skinned to them with the same weights; a layer that only rides on a bone hangs on it
                   with a RemoteTransform2D, so posing the bones in Godot moves it
      controllers  Node2D (empty), animated
+     particles    CPUParticles2D with the layer's settings (and a white particle picture it tints)
      animation    one AnimationPlayer; every chosen screen is one animation in it (baked frame by frame),
                   plus RESET with the starting pose
    Godot's 2D space is the stage's: pixels, y down, so values carry over as they are.
@@ -233,7 +234,7 @@ func _draw() -> void:
       // a near-square grid; a sheet that would pass 4096 px is drawn smaller (Godot's textures stop at 16384, and big pages load slowly)
       const n = pics.length, w0 = Math.max(1, (x1 - x0) * k), h0 = Math.max(1, (y1 - y0) * k), cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * h0 / w0)) || 1)), rows = Math.ceil(n / cols);
       const fit = Math.min(1, 4096 / (cols * w0), 4096 / (rows * h0)); let kk = k * fit; const cw = Math.max(1, Math.ceil((x1 - x0) * kk)), ch = Math.max(1, Math.ceil((y1 - y0) * kk));
-      const cv = U.h('canvas', { width: cols * cw, height: rows * ch }), c = cv.getContext('2d');
+      const cv = U.h('canvas', { width: cols * cw, height: rows * ch }), c = cv.getContext('2d'); if (nd.pixel) c.imageSmoothingEnabled = false;
       pics.forEach((p, i) => c.drawImage(p.cv, (i % cols) * cw + (p.x0 - x0) * kk, Math.floor(i / cols) * ch + (p.y0 - y0) * kk, p.w * kk, p.h * kk));
       const sh = { cv, cols, rows, cw, ch, x0, y0, k: kk, index: new Map(pics.map((p, i) => [p.f, i])) }; sheets.set(nd.key, sh); return sh;
     }
@@ -262,7 +263,7 @@ func _draw() -> void:
     const rank = new Map(G.order.map((k, i) => [k, i])), kids = new Map(), byKey = G.byKey;
     const gnode = new Map(); // key → { name, type, parent (gnode), props: [], world(i, clip) }
     const root = { name: nodeName(base), type: 'Node2D', kids: [], path: '.', props: [] };
-    const front = nd => { if (nd.kind === 'layer') return rank.get(nd.key) ?? 1e9; const ks = (kids.get(nd.key) || []).map(front); return ks.length ? Math.min(...ks) : -1; };
+    const front = nd => { if (nd.kind === 'layer' || nd.kind === 'particles') return rank.get(nd.key) ?? 1e9; const ks = (kids.get(nd.key) || []).map(front); return ks.length ? Math.min(...ks) : -1; };
     for (const nd of G.nodes) { const p = nd.parent && byKey.has(nd.parent) ? nd.parent : null; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(nd); }
     for (const [p, l] of kids) kids.set(p, l); // keep
     const sortBack = l => l.slice().sort((a, b) => front(b) - front(a)); // back first
@@ -292,6 +293,7 @@ func _draw() -> void:
         for (const c of sortBack(kids.get(nd.key) || [])) if (c !== mask) place(c, inner);
         return;
       }
+      if (nd.kind === 'particles') { const g = mk(parent, nd.name, 'CPUParticles2D', { nd, world: (c, i) => tr(c) && tr(c).W[i], alpha: true }); gnode.set(nd.key, g); g.props.push(...particleProps(nd)); return; }
       if (nd.kind !== 'layer' || nd.mask || !nd.pics.length) return;
       if (nd.skin) {
         const s = nd.skin, pic = s.pic, g = mk(parent, nd.name, 'Polygon2D', { nd, world: (c, i) => tr(c) && tr(c).W[i] && g.carry(c, i), alpha: true, skinned: s });
@@ -306,7 +308,34 @@ func _draw() -> void:
       const g = mk(parent, nd.name, 'Node2D', { nd, world: (c, i) => tr(c) && tr(c).W[i], alpha: true }); gnode.set(nd.key, g);
       // one Sprite2D: its frames are cells of the layer's sheet, picked by "frame" (hframes × vframes inside its atlas region)
       const sh = sheetOf(nd, nd.pics), sp = mk(g, 'Picture', 'Sprite2D'); g.pic = sp; g.sheet = sh;
+      if (nd.pixel) sp.props.push('texture_filter = 1'); // nearest: the pixels stay sharp
       sp.props.push('centered = false', `position = Vector2(${f(sh.x0)}, ${f(sh.y0)})`, `scale = Vector2(${f(1 / sh.k)}, ${f(1 / sh.k)})`);
+    }
+    /** A particles layer as a CPUParticles2D: Godot's 2D space is the stage's (px, y down), so speeds, gravity and sizes carry over. */
+    function particleProps(nd) {
+      const v = nd.ps, n = ++resN, burst = v.emit === 'burst', life = Math.max(0.05, v.life), sp0 = v.ptShape === 'pictures' ? SB.particles.strip(v.ptSrc) : null, shape = sp0 ? 'pictures' : v.ptShape === 'pictures' ? 'circle' : v.ptShape || 'circle', TEX = sp0 ? sp0.size : 64;
+      const tex = sp0 ? 'ptex_pic_' + n : 'ptex_' + shape; if (v.ptShape === 'pictures' && !sp0) warnings.add('Particles with pictures from a layer that has nothing drawn (exported as dots)');
+      if (sp0) { const file = `sprites/${U.slug(nd.name) || 'particles'}-pictures.png`; ext.push(`[ext_resource type="Texture2D" path=${q(file)} id=${q(tex)}]`); files.push({ name: `${dir}/${file}`, data: G.png({ cv: sp0.cv }) }); }
+      else if (!ext.some(x => x.includes(`id="${tex}"`))) { const file = `sprites/particle-${shape}.png`; ext.push(`[ext_resource type="Texture2D" path=${q(file)} id=${q(tex)}]`); files.push({ name: `${dir}/${file}`, data: G.png({ cv: SB.particles.picture(shape, TEX) }) }); }
+      const col = c => { const [r, g, b] = U.hexRgb(c || '#ffffff'); return [r / 255, g / 255, b / 255]; }, C = (c, a) => col(c).map(f).concat(f(a)).join(', ');
+      const fadeA = v.fade !== false ? [1, 1, 0] : [1, 1, 1], life2 = v.colorMode !== 'random' && !sp0; if (sp0) v.color = v.color2 = '#ffffff'; // pictures keep their own colors
+      subs.push(`[sub_resource type="Gradient" id="ptc_${n}_ramp"]`, 'offsets = PackedFloat32Array(0, 0.6, 1)', `colors = PackedColorArray(${[0, 1, 2].map(i => life2 ? C(U.lerpColor(v.color, v.color2, [0, 0.6, 1][i]), fadeA[i]) : C('#ffffff', fadeA[i])).join(', ')})`, '');
+      if (!life2 && !sp0) subs.push(`[sub_resource type="Gradient" id="ptc_${n}_first"]`, 'offsets = PackedFloat32Array(0, 1)', `colors = PackedColorArray(${C(v.color, 1)}, ${C(v.color2, 1)})`, '');
+      const se = Math.max(0, v.sizeEnd ?? 1); subs.push(`[sub_resource type="Curve" id="ptc_${n}_size"]`, `max_value = ${fl(Math.max(1, se))}`, `_data = [Vector2(0, 1), 0.0, ${fl(se - 1)}, 0, 1, Vector2(1, ${fl(se)}), ${fl(se - 1)}, 0.0, 1, 0]`, 'point_count = 2', '');
+      if (v.ptGlow || sp0) subs.push(`[sub_resource type="CanvasItemMaterial" id="ptc_${n}_add"]`, ...(v.ptGlow ? ['blend_mode = 1'] : []), ...(sp0 ? ['particles_animation = true', `particles_anim_h_frames = ${sp0.n}`, 'particles_anim_v_frames = 1', 'particles_anim_loop = false'] : []), ''); // glow: added light; pictures: frames of the strip
+      const d = (v.ptDir || 0) * Math.PI / 180, sp = v.ptSpeed || 0, sv = U.clamp(v.speedVar ?? 0, 0, 1), sMin = (v.sizeMin ?? 8) / TEX, sMax = (v.sizeMax ?? 22) / TEX;
+      if (burst && v.repeat !== false && Math.abs((v.every || life) - life) > 0.05) warnings.add('Particle bursts in Godot repeat every Life seconds (Godot has no separate repeat time)');
+      return [...(v.ptGlow || sp0 ? [`material = SubResource("ptc_${n}_add")`] : []), ...(sp0 ? (v.ptPick === 'life' ? ['anim_speed_min = 1.0', 'anim_speed_max = 1.0'] : ['anim_offset_min = 0.0', 'anim_offset_max = 1.0']) : []), // random picture, or all of them in order over each one's life
+        `amount = ${Math.max(1, Math.min(3000, Math.round(burst ? v.count : v.rate * life)))}`, `lifetime = ${fl(life)}`, ...(burst ? ['explosiveness = 1.0', ...(v.repeat === false ? ['one_shot = true'] : [])] : v.prewarm !== false ? [`preprocess = ${fl(life)}`] : []),
+        `lifetime_randomness = ${fl(U.clamp(v.lifeVar ?? 0, 0, 0.95))}`, (v.ptSpace === 'world' ? 'local_coords = false' : 'local_coords = true'), `texture = ExtResource(${q(tex)})`,
+        ...(v.area > 0 ? ['emission_shape = 1', `emission_sphere_radius = ${fl(v.area / 2)}`] : []),
+        ...(shape === 'spark' ? ['particle_flag_align_y = true'] : []),
+        `direction = Vector2(${f(Math.cos(d))}, ${f(Math.sin(d))})`, `spread = ${fl(U.clamp(v.ptSpread || 0, 0, 180))}`, `gravity = Vector2(0, ${fl(v.ptGravity || 0)})`,
+        `initial_velocity_min = ${fl(sp * (1 - sv))}`, `initial_velocity_max = ${fl(sp * (1 + sv))}`,
+        ...(v.drag > 0 ? [`damping_min = ${fl(v.drag * sp * 0.5)}`, `damping_max = ${fl(v.drag * sp * 0.5)}`] : []), // Godot slows them by a fixed amount a second (Toonzi: a share of their speed)
+        ...(sp0 && !(v.spin > 0) ? [] : ['angle_min = -180.0', 'angle_max = 180.0']), ...(v.spin > 0 ? [`angular_velocity_min = ${fl(-v.spin)}`, `angular_velocity_max = ${fl(v.spin)}`] : []),
+        `scale_amount_min = ${fl(sMin)}`, `scale_amount_max = ${fl(sMax)}`, `scale_amount_curve = SubResource("ptc_${n}_size")`,
+        `color_ramp = SubResource("ptc_${n}_ramp")`, ...(!life2 && !sp0 ? [`color_initial_ramp = SubResource("ptc_${n}_first")`] : [])];
     }
     const chunk = (a, n) => { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; };
     for (const nd of sortBack(kids.get(null) || [])) place(nd, root);
@@ -458,8 +487,8 @@ func _draw() -> void:
       const sp = g.pic || g; sp.props.unshift(tex, 'region_enabled = true', `region_rect = Rect2(${sh.ax}, ${sh.ay}, ${sh.cols * sh.cw}, ${sh.rows * sh.ch})`, ...(sh.cols > 1 ? [`hframes = ${sh.cols}`] : []), ...(sh.rows > 1 ? [`vframes = ${sh.rows}`] : []));
     }
     // ---------- the file
-    const out = [`[gd_scene load_steps=${ext.length + anims.length + 3} format=3]`, ''];
-    ext.forEach(l => out.push(l)); out.push('');
+    const out = [`[gd_scene load_steps=${ext.length + anims.length + subs.filter(l => l.startsWith('[sub_resource')).length + 3} format=3]`, ''];
+    ext.forEach(l => out.push(l)); out.push(''); subs.forEach(l => out.push(l)); // particle colors, sizes, glow
     [reset, ...anims].forEach((a, k) => { out.push(`[sub_resource type="Animation" id="Animation_${k}"]`, ...a.lines, ''); });
     out.push('[sub_resource type="AnimationLibrary" id="AnimationLibrary_main"]', `_data = {\n${[reset, ...anims].map((a, k) => `${q(a.nm)}: SubResource("Animation_${k}")`).join(',\n')}\n}`, '');
     out.push(`[node name=${q(root.name)} type="Node2D"]`, '');
@@ -468,7 +497,7 @@ func _draw() -> void:
     out.push('[node name="AnimationPlayer" type="AnimationPlayer" parent="."]', `libraries = {\n"": SubResource("AnimationLibrary_main")\n}`, `autoplay = ${q(anims[0].nm)}`, '');
     files.unshift({ name: `${dir}/${dir}.tscn`, data: new TextEncoder().encode(out.join('\n')) });
     files.push({ name: `${dir}/README.txt`, data: new TextEncoder().encode(readme(base, anims.map(a => a.nm), G)) });
-    return { files, warnings: [...warnings] };
+    return { files, warnings: [...warnings], baked: G.baked, still: G.still, project: { own: [dir], files: files.map(f => ({ path: f.name, data: f.data })) } }; // project: for writing straight into a Godot project (js/io/gamelink.js)
   }
   const readme = (base, names, G) => `${base}: exported from Toonzi 2D for Godot 4.
 

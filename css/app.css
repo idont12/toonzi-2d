@@ -560,7 +560,7 @@ input.pv[type=checkbox] { width: 14px; height: 14px; accent-color: var(--brand);
 .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .cf { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 8px 0 4px; border-radius: 8px; background: var(--panel-2); border: 1px solid transparent; min-width: 0; }
 .cf:hover { border-color: var(--line); } .cf:focus-within { border-color: var(--brand); background: var(--panel); }
-.cf-l { color: var(--ink-2); font-size: 11.5px; font-weight: 600; min-width: 14px; text-align: center; cursor: ew-resize; user-select: none; touch-action: none; }
+.cf-l { color: var(--ink-2); font-size: 11.5px; font-weight: 600; min-width: 14px; text-align: center; cursor: ew-resize; user-select: none; touch-action: pan-y; /* a finger swiping up or down still scrolls the panel; sideways drags change the value */ }
 .cf input { flex: 1; min-width: 0; width: 100%; border: 0; background: none; padding: 0; font-size: 12.5px; outline: none; -moz-appearance: textfield; }
 .cf input::-webkit-inner-spin-button, .cf input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .cf-u { color: var(--ink-2); font-size: 11px; } .cf.locked { opacity: .55; }
@@ -700,6 +700,8 @@ select.mini:disabled { opacity: .7; cursor: default; }
 .rail .tool.off, button.off.tool { opacity: .38; }
 .blendrow.off { opacity: .5; }
 .fxitem.lost { border-color: var(--warn, #E5484D); }
+.fxitem.warned { border: 2px solid #FACC15; } /* works in this target only drawn into pictures: not recommended */
+.hint.bake.fx-nr { margin: 0 0 6px; font-size: 11.5px; }
 .hint.warn { color: var(--warn, #C2410C); }
 .exp select.kindsel { min-width: 220px; }
 .rl-list { display: grid; gap: 8px; } .rl-item { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
@@ -738,6 +740,9 @@ select.mini:disabled { opacity: .7; cursor: default; }
 .edit-bar svg { width: 16px; height: 16px; display: block; color: var(--brand); }
 .tl-row.bad > .tl-head { box-shadow: inset 3px 0 0 #E5484D; background: rgba(229,72,77,.08); }
 .tl-row.bad .clip { outline: 2px solid #E5484D; outline-offset: -2px; }
+.tl-row.nr > .tl-head { box-shadow: inset 3px 0 0 #EAB308; background: rgba(250,204,21,.10); }
+.tl-row.nr .clip { outline: 2px solid #FACC15; outline-offset: -2px; }
+.menu button.nr { box-shadow: inset 3px 0 0 #FACC15; }
 .issue-box { margin: 8px 14px; padding: 8px 10px; border-radius: 10px; background: rgba(229,72,77,.08); border: 1px solid rgba(229,72,77,.35); display: flex; gap: 8px; align-items: center; justify-content: space-between; } .issue-box .hint { margin: 0; }
 label.chk.off { opacity: .5; cursor: not-allowed; }
 
@@ -1227,5 +1232,49 @@ body.ts-open .toast { z-index: 930; }
 .tour-guide .tg-char > img, .tour-guide .tg-char > .tg-face, .tour-guide .tg-char > svg { filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff); }
 /* Tutorials gallery: wider on wide screens, up to 4 columns of cards beside the details */
 .sheet.wide:has(> .tg) { width: min(1360px, 100%); }
-.sheet.wide:has(> .tg) .tg { grid-template-columns: minmax(0, 1fr) 300px; }
-.sheet.wide:has(> .tg) .tg-grid { grid-template-columns: repeat(auto-fill, minmax(max(190px, calc((100% - 36px) / 4)), 1fr)); }
+@media (min-width: 701px) { /* (on phones the cards and the side stack: see the phone block below) */
+  .sheet.wide:has(> .tg) .tg { grid-template-columns: minmax(0, 1fr) 300px; }
+  .sheet.wide:has(> .tg) .tg-grid { grid-template-columns: repeat(auto-fill, minmax(max(190px, calc((100% - 36px) / 4)), 1fr)); }
+}
+
+/* ============ phones (round 63): popups that fit a tall narrow screen, a panel that scrolls, the dock modes in one dropdown ============ */
+@media (max-width: 700px) {
+  .modal { padding: 8px; }
+  .sheet { padding: 16px; border-radius: 16px; max-height: calc(100dvh - 16px); }
+  /* the last row of buttons stays in view at the bottom while the popup scrolls */
+  .sheet > .sheet-actions:last-child { position: sticky; bottom: -16px; margin: 12px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); z-index: 3; }
+  /* welcome: smaller style cards, two per row, no bar previews (the shortcuts stay) */
+  .wl-head { gap: 10px; } .wl-head h2 { font-size: 17px; } .wl-head .sub { font-size: 12.5px; margin: 2px 0 0; } .wl-logo { width: 40px; height: 40px; border-radius: 11px; } .wl-logo svg { width: 24px; height: 24px; }
+  .wl-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .wl-style { padding: 8px 9px; gap: 2px; } .wl-style small { font-size: 11px; } .wl-style b { font-size: 12.5px; }
+  .wl-big { width: 28px; height: 28px; border-radius: 8px; } .wl-big svg { width: 17px; height: 17px; }
+  .wl-preview .wl-row:has(.wl-bar) { display: none; } .wl-preview { padding: 8px 10px; }
+  .sheet .f:has(.seg) { grid-template-columns: 1fr; }
+  /* tutorials: two small cards per row; the picked one shows in a bar at the bottom with its Start button */
+  .tg { gap: 0; }
+  .tg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tg-blurb { display: none; } .tg-meta { flex-direction: column; align-items: flex-start; gap: 0; padding: 6px 8px 8px; } .tg-meta b { font-size: 12.5px; line-height: 1.25; } .tg-sub { font-size: 11px; }
+  .tg-gh { margin: 10px 0 6px; }
+  .tg-side { position: sticky; bottom: -16px; z-index: 3; flex-direction: row; align-items: center; gap: 10px; margin: 12px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -8px 20px rgba(20, 18, 40, .08); }
+  .tg-side > :not(h3):not(.sheet-actions) { display: none; } .tg-side h3 { flex: 1; min-width: 0; font-size: 14px; } .tg-side .sheet-actions { margin: 0; flex: none; }
+  .tg-groups { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .tg-groups button { flex: none; white-space: nowrap; }
+}
+.tg-toprow { display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; margin: 0 0 12px; } .tg-toprow .sub { flex: 1; min-width: 220px; margin: 0; }
+/* the phone dock: one dropdown picks what it shows (timeline and frames, the timeline, the frames, or the layer's settings) */
+.dock-tabs select.dock-mode { flex: 1; min-width: 0; height: 34px; border: 1px solid var(--line); background-color: var(--panel); border-radius: 9px; padding: 0 30px 0 10px; font: inherit; font-weight: 600; font-size: 13px; color: var(--ink); }
+.dock-tabs .dock-mode-ic { width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); display: grid; place-items: center; color: var(--ink-2); flex: none; cursor: pointer; padding: 0; }
+.dock-tabs .dock-mode-ic svg { width: 18px; height: 18px; } .dock-tabs .dock-mode-ic.on { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+.app[data-layout="phone"][data-tab="tl"] .framesbar { display: none; }
+.app[data-layout="phone"][data-tab="frames"] .tl { display: none; }
+.app[data-layout="phone"][data-tab="frames"] .framesbar { flex: 1; height: auto; border-bottom: 0; align-items: flex-start; padding-top: 10px; flex-wrap: wrap; overflow-y: auto; align-content: flex-start; }
+.app[data-layout="phone"][data-tab="frames"] .th { width: 84px; height: 56px; }
+/* pull the dock up or down: a bigger handle for a finger */
+.app[data-layout="phone"] .dock-grip { height: 18px; margin-top: -6px; }
+.app[data-layout="phone"] .dock-grip::after { content: ""; position: absolute; left: 50%; top: 7px; width: 44px; height: 5px; margin-left: -22px; border-radius: 3px; background: var(--line); }
+/* export: what goes frame by frame (works, but heavier) */
+.hint.bake { color: #854D0E; background: #FEF3C7; border: 1px solid #FCD34D; border-radius: 8px; padding: 6px 9px; margin: 4px 0; line-height: 1.4; }
+.fx-warn .fx-where { margin-top: 5px; }
+.fx-warn .fx-where summary { cursor: pointer; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; width: max-content; }
+.fx-warn .fx-where ul { margin: 5px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; }
+.fx-warn .fx-where li { margin: 2px 0; } .fx-warn .fx-where .nr { font-weight: 600; } .fx-warn .fx-where small { opacity: .8; }
+.dark .hint.bake, [data-theme="dark"] .hint.bake { color: #FDE68A; background: rgba(250, 204, 21, 0.12); border-color: rgba(250, 204, 21, 0.4); }

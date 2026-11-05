@@ -63,6 +63,7 @@
   async function build(screens, opt = {}) {
     const ia0 = opt.ix || (opt.interact && opt.interact.states ? opt.interact : null), follows = ia0 ? (ia0.follow || []) : [];
     const G = await E.collect(screens, Object.assign({}, opt, { poses: follows.length > 0 })), fps = G.fps, warnings = new Set(G.warnings), base = opt.base || 'animation';
+    if (G.nodes.some(nd => nd.kind === 'particles')) warnings.add('Particles (Rive has none: export a video, a GIF or a web page to keep them)');
     if (opt.prog) opt.prog(0.75, 'Building the Rive file…');
     if (G.nodes.some(nd => nd.mask)) warnings.add('Masks');
     const objs = [], add = (t, p) => { objs.push({ t, p }); return objs.length - 1; };

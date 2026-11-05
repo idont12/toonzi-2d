@@ -119,7 +119,7 @@
     if (B.goals) {
       B.goals = B.goals.filter(g => Array.isArray(g) && g.length >= 4 && nums(g, 3) && g[2] > 0 && g[3] && typeof g[3] === 'object').map(g => {
         const w = ids.map(id => Number.isFinite(g[3][id]) ? g[3][id] : 0), t = tidy(w, Object.assign({}, lv, { maxInf: 99, minW: Math.min(lv.minW, 0.02) })); if (!t) return null;
-        const obj = {}; ids.forEach((id, i) => { if (t[i] > 1e-4) obj[id] = U.r3(t[i]); }); return [g[0], g[1], g[2], obj];
+        const obj = {}; ids.forEach((id, i) => { if (t[i] > 1e-4) obj[id] = U.r3(t[i]); }); return g[4] != null ? [g[0], g[1], g[2], obj, g[4]] : [g[0], g[1], g[2], obj];
       }).filter(Boolean);
       if (!B.goals.length) delete B.goals;
     }
@@ -299,7 +299,7 @@
         jobs.push({ i, tgt });
       }
       if (!jobs.length) break;
-      const fresh = jobs.map(j => [U.r1(pts[j.i][0]), U.r1(pts[j.i][1]), U.r1(r), asObj(j.tgt)]);
+      const fat = R.nextAt(), fresh = jobs.map(j => [U.r1(pts[j.i][0]), U.r1(pts[j.i][1]), U.r1(r), asObj(j.tgt), fat]);
       B.goals = (B.goals || []).filter(g => !jobs.some(j => Math.hypot(g[0] - pts[j.i][0], g[1] - pts[j.i][1]) < r * 0.5)).concat(fresh); R.wChanged();
       /* neighbouring fixes blend into each other: bring each spot back to its own answer */
       for (let round = 0; round < 3; round++) jobs.forEach((j, gi) => {

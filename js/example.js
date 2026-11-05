@@ -380,4 +380,6 @@
       SB.toast('A 34 second trailer, built with the app’s own tools. Press Space to play. Double-click a shot in the timeline to open it.');
     },
   };
+  /** The mascot's drawing and the palette, for other built-in examples (js/playground.js). */
+  SB.example.art = { MASCOT, sub, ell, bodyPath, pupilPath, leafPath, grad, C: { INK, BRAND, ORANGE, CREAM, LAV, SUN, PEACH, VIOLET, DEEP, WHITE } };
 })(window.SB);

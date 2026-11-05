@@ -414,7 +414,7 @@
     const cur = RT.cur; let v, ok;
     switch (c.type) {
       case 'vr': v = RT.vars[c.name || 'score'] || 0; { const b = c.value ?? 0, o = c.op || '>'; ok = o === '>' ? v > b : o === '<' ? v < b : o === '>=' ? v >= b : o === '<=' ? v <= b : o === '!==' ? v !== b : v === b; } return [ok, `${c.name || 'score'} is ${v}`];
-      case 'shown': { const o = objByKey(c.layer); if (!o) return [false, 'the layer is gone']; ok = !tree.hidden(o) && !(o._ix && o._ix.visible === 0) && TR.transform(o, tree.localTime(o)).opacity > 0.01 && tree.inRange(o); return [c.not ? !ok : ok, ok ? 'it is shown' : 'it is hidden']; }
+      case 'shown': { const o = objByKey(c.layer); if (!o) return [false, 'the layer is gone']; ok = (!tree.hidden(o) || (o._ix && o._ix.visible === 1)) && !(o._ix && o._ix.visible === 0) && TR.transform(o, tree.localTime(o)).opacity > 0.01 && tree.inRange(o); return [c.not ? !ok : ok, ok ? 'it is shown' : 'it is hidden']; }
       case 'frame': { const o = objByKey(c.layer); if (!o || !o.frames) return [false, 'the drawing is gone']; v = SB.frames.index(o, tree.localTime(o)) + 1; ok = v === (c.value ?? 1); return [c.not ? !ok : ok, `it shows frame ${v}`]; }
       case 'chance': ok = Math.random() * 100 < (c.value ?? 50); return [ok, ok ? 'the dice said yes' : 'the dice said no'];
       case 'count': v = r && RT.status[r.id] ? RT.status[r.id].n || 0 : 0; ok = (c.op || '<') === '<' ? v < (c.value ?? 1) : c.op === '>' ? v > (c.value ?? 1) : v === (c.value ?? 1); return [ok, `it ran ${v}×`];
@@ -485,7 +485,7 @@
         o.effects.push(e); RT.fx.push({ o, e, t0: t, cat: d.cat }); return `${d.label} on ${o.name}`;
       }
       case 'vr': { const k = a.name || 'score', v0 = RT.vars[k] || 0; RT.vars[k] = a.op === 'add' ? v0 + (a.value ?? 1) : a.op === 'flip' ? (v0 ? 0 : 1) : (a.value ?? 0); SB.invalidate('ixpanel'); return `${k} = ${RT.vars[k]}`; }
-      case 'vis': { const o = objByKey(a.layer); if (!o) return null; const shown = !(o._ix && o._ix.visible === 0) && !o.hidden, on = a.mode === 'hide' ? 0 : a.mode === 'toggle' ? (shown ? 0 : 1) : 1; o._ix = Object.assign({}, o._ix, { visible: on }); if (on && o.hidden) o._ix.unhide = 1; return `${on ? 'showed' : 'hid'} ${o.name}`; }
+      case 'vis': { const o = objByKey(a.layer); if (!o) return null; const x = o._ix || {}, shown = x.visible === 1 ? true : x.visible === 0 ? false : !o.hidden, on = a.mode === 'hide' ? 0 : a.mode === 'toggle' ? (shown ? 0 : 1) : 1; o._ix = Object.assign({}, o._ix, { visible: on }); if (on && o.hidden) o._ix.unhide = 1; return `${on ? 'showed' : 'hid'} ${o.name}`; }
       case 'frame': { const o = objByKey(a.layer); if (!o || !o.frames || o.frames.length < 2) return null; const n = o.frames.length, cur = SB.frames.index(o, tree.localTime(o)); const i = a.to === 'next' ? (cur + 1) % n : a.to === 'prev' ? (cur - 1 + n) % n : a.to === 'random' ? Math.floor(Math.random() * n) : U.clamp((a.value ?? 1) - 1, 0, n - 1); o._ixFrame = i; return `${o.name} shows frame ${i + 1}`; }
       case 'url': { if (!a.href || !/^https?:|^mailto:/i.test(a.href)) return null; try { if (a.tab === false) location.href = a.href; else window.open(a.href, '_blank', 'noopener'); } catch (e) { return null; } return `opened ${a.href}`; }
       case 'set': {

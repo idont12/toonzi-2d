@@ -33,10 +33,21 @@
       a.classList.toggle('focus', !!S.focus); a.dataset.ftl = S.focusTl || 'seq'; a.dataset.labels = S.labels ? '1' : '0';
       SB.view.fit();
     },
-    toggleInspector(force) { const a = app(); if (L.current === 'phone' && !S.focus) { L.tab(a.dataset.tab === 'props' && force !== true ? 'timeline' : 'props'); return; } a.classList.toggle('insp-open', force ?? !a.classList.contains('insp-open')); if (S.focus) { S.focusInsp = a.classList.contains('insp-open'); SB.invalidate('inspector', 'transport'); requestAnimationFrame(() => SB.view.fit && SB.view.fit()); } }, // in Big stage the panel opens beside the stage
+    toggleInspector(force) { const a = app(); if (L.current === 'phone' && !S.focus) { L.tab(a.dataset.tab === 'props' && force !== true ? S.phoneTl || 'timeline' : 'props'); return; } a.classList.toggle('insp-open', force ?? !a.classList.contains('insp-open')); if (S.focus) { S.focusInsp = a.classList.contains('insp-open'); SB.invalidate('inspector', 'transport'); requestAnimationFrame(() => SB.view.fit && SB.view.fit()); } }, // in Big stage the panel opens beside the stage
     /** Big stage shows either the timeline ('seq') or the drawing frames ('frames'). */
     focusTimeline(v) { S.focusTl = v; app().dataset.ftl = v; SB.invalidate('transport', 'frames', 'timeline'); },
-    tab(t) { app().dataset.tab = t; SB.invalidate('tabs', 'timeline', 'inspector'); },
+    /** Phone dock: 'timeline' (timeline and frames), 'tl' (the timeline), 'frames' (the drawing frames) or 'props' (the layer's settings).
+        The settings get room: the dock grows to about half the screen while they show, and goes back after. */
+    tab(t) {
+      const a = app(), was = a.dataset.tab; a.dataset.tab = t; if (t !== 'props') S.phoneTl = t;
+      if (L.current === 'phone' && !S.focus && (t === 'props') !== (was === 'props')) {
+        const cur = U.$('#dock').getBoundingClientRect().height, want = Math.round(innerHeight * 0.55);
+        if (t === 'props' && cur < want) { L._dockBack = cur; a.style.setProperty('--dock-h', want + 'px'); }
+        else if (t !== 'props' && L._dockBack) { a.style.setProperty('--dock-h', L._dockBack + 'px'); L._dockBack = 0; }
+        requestAnimationFrame(() => SB.view.fit());
+      }
+      SB.invalidate('tabs', 'timeline', 'inspector', 'frames');
+    },
     /** Big stage: hide the panels, keep a small timeline of the selected layers with the play controls. */
     focus(v = !S.focus) { if (!v && SB.stageModes) SB.stageModes.setPreview(false); S.focus = v; app().classList.toggle('insp-open', !!(v && S.focusInsp)); L.apply(); SB.toast(v ? 'Big stage. The timeline shows only the layers you select. Press F to bring the panels back.' : 'Panels are back.'); SB.invalidate(); },
   };
@@ -73,6 +84,7 @@
     { icon: 'draw', label: 'Drawing', tip: 'New drawing layer', run: () => SB.add.drawing() },
     { icon: 'text', label: 'Text', tip: 'Add text (T)', run: () => SB.add.text() },
     { icon: 'shape', label: 'Shape', tip: 'Add a shape', run: b => SB.add.shapeMenu(b) },
+    { icon: 'particles', label: 'Particles', tip: 'Add particles: fire, smoke, snow, confetti, sparkles…', run: b => SB.add.particlesMenu(b) },
     { icon: 'import', label: 'Import', tip: 'Import files or record your voice', run: b => SB.add.importMenu(b) },
   ];
   /** The tool bar is customizable, with layouts like the timeline bar's: a layout gives { order: [ids], group: { childId: headId } }
@@ -81,11 +93,11 @@
       Tool groups work like Illustrator: one button shows one tool of its group; right-click or press and hold it to pick another
       tool of the group, which then shows in the bar (S.railActive). */
   const RAIL_PRESETS = {
-    studio: { label: 'Toonzi 2D (default)', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:text', 'add:shape', 'add:import'], group: { 'tool:points': 'tool:pen', 'tool:fillbrush': 'tool:brush', 'tool:gradient': 'tool:fill', 'tool:width': 'tool:smooth', 'tool:pull': 'tool:smooth' } },
+    studio: { label: 'Toonzi 2D (default)', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:pixel', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:text', 'add:shape', 'add:particles', 'add:import'], group: { 'tool:points': 'tool:pen', 'tool:fillbrush': 'tool:brush', 'tool:gradient': 'tool:fill', 'tool:width': 'tool:smooth', 'tool:pull': 'tool:smooth' } },
     flash: { label: 'Adobe Animate (Flash)', order: ['tool:select', 'tool:points', 'tool:pen', 'tool:brush', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:eraser', 'tool:bone', 'tool:hand', 'sep', 'add:text', 'add:shape', 'add:import'], group: {} },
     photoshop: { label: 'Photoshop', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:smooth', 'tool:pull', 'tool:pen', 'tool:points', 'tool:hand', 'sep', 'add:text', 'add:shape', 'add:import'], group: { 'tool:points': 'tool:pen', 'tool:smooth': 'tool:brush', 'tool:pull': 'tool:brush' } },
     opentoonz: { label: 'OpenToonz', order: ['tool:select', 'tool:brush', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:eraser', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:cut', 'tool:bone', 'tool:hand', 'sep', 'add:draw', 'add:text'], group: {} },
-    all: { label: 'Every tool', order: ['tool:select', 'tool:points', 'tool:brush', 'tool:pen', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:text', 'add:shape', 'add:import'], group: {} },
+    all: { label: 'Every tool', order: ['tool:select', 'tool:points', 'tool:brush', 'tool:pen', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:pixel', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:text', 'add:shape', 'add:particles', 'add:import'], group: {} },
     simple: { label: 'Simple', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:hand', 'sep', 'add:text', 'add:shape'], group: {} },
   };
   const railCustom = id => (S.railCustom || []).find(c => 'c:' + c.id === id);
@@ -106,7 +118,7 @@
     return { order, hidden, group };
   }
   const DEFAULT_GROUPS = { 'tool:points': 'tool:pen' };
-  const NEW_TOOLS = { 'tool:fillbrush': 'tool:fill', 'tool:gradient': 'tool:fillbrush' }; // new tool → the tool it goes after
+  const NEW_TOOLS = { 'tool:fillbrush': 'tool:fill', 'tool:gradient': 'tool:fillbrush', 'tool:pixel': 'tool:fillbrush', 'add:particles': 'add:shape' }; // new tool → the tool it goes after
   const groups = () => railCfg().group;
   function railItems() {
     const all = new Map(), cfg = railCfg();
@@ -449,7 +461,10 @@
   // ---------- phone dock tabs
   SB.panel('tabs', () => {
     const a = app(), cur = a.dataset.tab || 'timeline', o = tree.sel();
-    U.$('#dockTabs').replaceChildren(...[['timeline', 'Timeline'], ['props', o ? 'Layer: ' + o.name : 'Project']].map(([k, v]) => h('button' + (cur === k ? '.on' : ''), { type: 'button', role: 'tab', 'aria-selected': String(cur === k), onclick: () => L.tab(k) }, v)));
+    const modes = [['timeline', 'Timeline and frames'], ['tl', 'Timeline'], ['frames', 'Drawing frames'], ['props', o ? 'Settings: ' + o.name : 'Project settings']];
+    const sel = h('select.dock-mode', { 'aria-label': 'What the panel shows', onchange: () => L.tab(sel.value) }, modes.map(([k, v]) => h('option', { value: k, selected: cur === k }, v)));
+    const btn = h('button.dock-mode-ic' + (cur === 'props' ? '.on' : ''), { type: 'button', title: cur === 'props' ? 'Back to the timeline' : 'Settings of the selected layer', 'aria-label': cur === 'props' ? 'Back to the timeline' : 'Settings', html: SB.icon(cur === 'props' ? 'rows' : 'panel'), onclick: () => L.toggleInspector() });
+    U.$('#dockTabs').replaceChildren(sel, btn);
   });
   SB.on('select', () => SB.invalidate('tabs', 'transport'));
 
@@ -469,7 +484,7 @@
       const a = app(), h0 = U.$('#dock').getBoundingClientRect().height, y0 = e.clientY, big = !!S.focus, key = big ? '--mini-h' : '--dock-h'; g.setPointerCapture(e.pointerId);
       const mv = ev => { const v = U.clamp(h0 - (ev.clientY - y0), big ? 80 : 120, innerHeight * 0.7); a.style.setProperty(key, v + 'px'); SB.view.fit(); };
       const up = () => { g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); const v = parseInt(getComputedStyle(a).getPropertyValue(key)); if (big) S.miniH = v; else S.dockH = Object.assign(S.dockH || {}, { [L.current]: v }); SB.prefs.save(); };
-      g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up);
+      g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up, { once: true }); L._dockBack = 0;
     });
   }
 

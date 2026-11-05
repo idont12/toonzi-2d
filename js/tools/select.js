@@ -36,7 +36,7 @@
     const k0 = TR.keyed(o, lt), full = c => c.space !== 'local' && tree.find(c.target) && TR.value(o, 'cn:' + c.id + ':amt', lt) >= 0.999;
     const cons = (o.cons || []).filter(full).map(c => ({ c, ox: c.ox || 0, oy: c.oy || 0, off: c.offset || 0, k: c.k || 1 }));
     if (cons.length && !o._consHint) { o._consHint = 1; const t = tree.find(cons[0].c.target); SB.toast(`This changes ${o.name}'s offset from ${t ? t.name : 'its target'}.`); }
-    const d = SB.tool.drag = { kind: 'xf', mode, o, P0: P, tr0: k0, cons, PInv, aw, Winv: W.inverse(), pl0: PInv.transformPoint(U.pt(P.x, P.y)), d0: Math.max(1, Math.hypot(P.x - aw.x, P.y - aw.y)), a0: Math.atan2(P.y - aw.y, P.x - aw.x), acc: 0, moved: false };
+    const d = SB.tool.drag = { kind: 'xf', mode, o, P0: P, tr0: k0, cons, PInv, aw, Winv: W.inverse(), al: { x: tr.ax, y: tr.ay }, pl0: PInv.transformPoint(U.pt(P.x, P.y)), d0: Math.max(1, Math.hypot(P.x - aw.x, P.y - aw.y)), a0: Math.atan2(P.y - aw.y, P.x - aw.x), acc: 0, moved: false };
     d.lastA = d.a0;
     if (mode === 'move' && !S.recording) {
       const moving = new Set(tree.selected().map(x => x.id).concat(o.id)), bx = scene.box(o);
@@ -72,7 +72,12 @@
     const { o, tr0 } = d; d.moved = true; let vals;
     if (d.mode === 'move') { const ctl = o.type === 'null'; P = ctl ? SB.tool.straight(d.P0, P, e) : snapMove(d, SB.tool.straight(d.P0, P, e), e); const pl = d.PInv.transformPoint(U.pt(P.x, P.y)); vals = { x: U.r1(tr0.x + pl.x - d.pl0.x), y: U.r1(tr0.y + pl.y - d.pl0.y) };
       if (ctl) { S.guides = null; const q = !e.altKey && S.snap && ctrlSnap(o, vals); d.ctrlSnap = q || null; if (q) vals = q; } } // a controller's knob snaps only to its own points
-    else if (d.mode === 'scale') vals = { scale: U.r3(U.clamp(tr0.scale * Math.hypot(P.x - d.aw.x, P.y - d.aw.y) / d.d0, 0.02, 50)) };
+    else if (d.mode === 'scale') { // a corner: width and height change freely; Shift keeps the ratio
+      // Shift: the ratio the layer had when the drag began (width and height go back to it, then grow together)
+      if (e.shiftKey) vals = { scale: U.r3(U.clamp(tr0.scale * Math.hypot(P.x - d.aw.x, P.y - d.aw.y) / d.d0, 0.02, 50)), scx: tr0.scx ?? 1, scy: tr0.scy ?? 1 };
+      else { const l = d.Winv.transformPoint(U.pt(P.x, P.y)), l0 = d.l0 || (d.l0 = d.Winv.transformPoint(U.pt(d.P0.x, d.P0.y))), dx0 = l0.x - d.al.x, dy0 = l0.y - d.al.y;
+        const fx = Math.abs(dx0) < 1 ? 1 : (l.x - d.al.x) / dx0, fy = Math.abs(dy0) < 1 ? 1 : (l.y - d.al.y) / dy0;
+        vals = { scale: tr0.scale, scx: U.r3(U.clamp((tr0.scx ?? 1) * fx, 0.02, 50)), scy: U.r3(U.clamp((tr0.scy ?? 1) * fy, 0.02, 50)) }; } }
     else if (d.mode === 'rotate') { const a = Math.atan2(P.y - d.aw.y, P.x - d.aw.x); let da = a - d.lastA; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; d.acc += da; d.lastA = a; let r = tr0.rot + d.acc * 180 / Math.PI; if (e.shiftKey) r = Math.round(r / 15) * 15; vals = { rot: U.r1(r) }; }
     else if (d.mode === 'origin') {
       let l = d.Winv.transformPoint(U.pt(P.x, P.y)); const b = scene.bounds(o), k = SB.view.k(), Wf = d.Winv.inverse();
@@ -83,7 +88,8 @@
       const alt = e.altKey, full = horiz ? b.x1 - b.x0 : b.y1 - b.y0; // Alt: both sides move, the center stays
       const nw = alt ? 2 * Math.abs(horiz ? l.x - (b.x0 + b.x1) / 2 : l.y - (b.y0 + b.y1) / 2) : sd.side === 'r' ? l.x - b.x0 : sd.side === 'l' ? b.x1 - l.x : sd.side === 'b' ? l.y - b.y0 : b.y1 - l.y;
       const f = Math.max(0.02, nw / Math.max(1e-6, full));
-      if (sd.useWH) TR.set(o, horiz ? 'w' : 'h', U.r1(Math.max(2, (horiz ? sd.w0 : sd.h0) * f))); else TR.set(o, horiz ? 'scx' : 'scy', U.r3((horiz ? sd.sx0 : sd.sy0) * f));
+      if (e.shiftKey) { TR.setMany(o, { scale: U.r3(U.clamp(tr0.scale * f, 0.02, 50)), scx: sd.sx0, scy: sd.sy0 }); if (sd.useWH) TR.setMany(o, { w: sd.w0, h: sd.h0 }); } // Shift: the ratio stays, the whole layer grows from this side
+      else if ((Math.abs(TR.keyed(o, tree.localTime(o)).scale - tr0.scale) > 1e-6 && TR.set(o, 'scale', tr0.scale), sd.useWH)) TR.set(o, horiz ? 'w' : 'h', U.r1(Math.max(2, (horiz ? sd.w0 : sd.h0) * f))); else TR.set(o, horiz ? 'scx' : 'scy', U.r3((horiz ? sd.sx0 : sd.sy0) * f));
       const b1 = scene.bounds(o), my = (b1.y0 + b1.y1) / 2, mx = (b1.x0 + b1.x1) / 2;
       const F1 = X.world(o).transformPoint(alt ? U.pt(mx, my) : U.pt(sd.side === 'r' ? b1.x0 : sd.side === 'l' ? b1.x1 : mx, sd.side === 'b' ? b1.y0 : sd.side === 't' ? b1.y1 : my)), F0 = alt ? sd.C0 : sd.F0;
       const a = d.PInv.transformPoint(U.pt(F1.x, F1.y)), c = d.PInv.transformPoint(U.pt(F0.x, F0.y)), cur = TR.keyed(o, tree.localTime(o));
@@ -97,6 +103,7 @@
       if ((c.type === 'copyRot' || c.type === 'lookat') && 'rot' in vals) { c.offset = U.r1(q.off + vals.rot - tr0.rot); delete vals.rot; }
       if (c.type === 'copyScale' && 'scale' in vals) { c.k = U.r3(q.k * vals.scale / (tr0.scale || 1)); delete vals.scale; }
     }
+    if (d.mode === 'scale') { const cur = TR.keyed(o, tree.localTime(o)); for (const id of ['scale', 'scx', 'scy']) if (id in vals && Math.abs((cur[id] ?? 1) - vals[id]) < 1e-6) delete vals[id]; } // sizes that didn't change: no keys for them
     TR.setMany(o, vals); SB.bump(); if (o.rec) delete o.rec;
     if (d.others) for (const x of d.others) { const pl = x.PInv.transformPoint(U.pt(P.x, P.y)); TR.setMany(x.o, { x: U.r1(x.tr0.x + pl.x - x.pl0.x), y: U.r1(x.tr0.y + pl.y - x.pl0.y) }); }
   }
@@ -172,7 +179,7 @@
       const pathBar = !S.pivotMode && SB.motionPath.bar(o); if (pathBar) return [...pathBar, h('span.vsep'), pivot];
       if (o && !S.pivotMode && o.isMask) return [...SB.bars.mask(o), h('span.vsep'), ...(SB.bars[o.type] ? SB.bars[o.type](o).slice(1) : []), pivot];
       if (o && !S.pivotMode && SB.bars[o.type]) return [...SB.bars[o.type](o), h('span.vsep'), SB.types.get(o.type).render === false ? null : pivot];
-      return [h('span.lbl', null, S.pivotMode ? 'Drag the pink cross to move the pivot.' : o ? (o.type === 'group' ? 'Double-click to work inside the group. Ctrl-click picks a layer inside. Alt-drag drags a copy.' : 'Drag to move (Alt-drag: a copy). Corners resize, sides stretch (Alt: from the center), the round handle rotates.') : 'Click a layer to select it. Drag on empty space to box-select.'), pivot];
+      return [h('span.lbl', null, S.pivotMode ? 'Drag the pink cross to move the pivot.' : o ? (o.type === 'group' ? 'Double-click to work inside the group. Ctrl-click picks a layer inside. Alt-drag drags a copy.' : 'Drag to move (Alt-drag: a copy). Corners resize freely, sides stretch (Shift: keep the ratio; Alt: from the center), the round handle rotates.') : 'Click a layer to select it. Drag on empty space to box-select.'), pivot];
     },
   });
   /** pre: functions (P, e) => true when they took the click (rig joints, controller knobs, throw handles). */

@@ -228,7 +228,7 @@
       const sopt = Object.assign({ boil: vec ? st.boil : null, prog: st.prog, dash: st.dash, map }, lineMotion(o, v, lt)); // T, amt: animated brushes
       if (map && !vec) meshWarp(t, v, fr, st, map, Mk, fi, def, lt);
       else if (fade) { const a0 = t.globalAlpha; t.globalAlpha = a0 * (1 - fade.u); SB.strokes.draw(t, fade.prev, sopt); t.globalAlpha = a0 * fade.u; SB.strokes.draw(t, fr.strokes, sopt); t.globalAlpha = a0; }
-      else { if (def.draw) def.draw.call(def, t, v, fr, st, sopt); SB.strokes.draw(t, fr.strokes, sopt); }
+      else { if (def.draw) def.draw.call(def, t, v, fr, st, sopt, lt); SB.strokes.draw(t, fr.strokes, sopt); } // lt: the layer's own time (particles)
       t.restore();
     }
     if (iso && st.shatter && st.shatter.u > 0 && SB.breakFx) shatter(t, st, v, lt, fi, Mo);

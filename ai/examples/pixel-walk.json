@@ -1,0 +1,15 @@
+{
+ "app": "toonzi", "name": "Pixel walk",
+ "project": { "w": 1280, "h": 720, "fps": 12, "duration": 4, "bg": "#1B1530", "pixel": { "on": true, "w": 160, "hard": true } },
+ "objects": [
+  { "type": "pixels", "name": "Hero", "cs": 8, "scale": 3, "x": 160, "y": 456, "fps": 6, "play": "loop",
+    "tracks": { "x": [ { "t": 0, "v": 160, "e": "linear" }, { "t": 4, "v": 1120 } ] },
+    "frames": [
+     { "px": { "1,0": "#FFD84D", "2,0": "#FFD84D", "0,1": "#FFD84D", "1,1": "#24213F", "2,1": "#FFD84D", "3,1": "#24213F", "0,2": "#FFD84D", "1,2": "#FFD84D", "2,2": "#FFD84D", "3,2": "#FFD84D",
+               "1,3": "#FF4F8B", "2,3": "#FF4F8B", "0,4": "#FF4F8B", "1,4": "#FF4F8B", "2,4": "#FF4F8B", "3,4": "#FF4F8B", "0,5": "#5B3FE0", "3,5": "#5B3FE0" } },
+     { "px": { "1,0": "#FFD84D", "2,0": "#FFD84D", "0,1": "#FFD84D", "1,1": "#24213F", "2,1": "#FFD84D", "3,1": "#24213F", "0,2": "#FFD84D", "1,2": "#FFD84D", "2,2": "#FFD84D", "3,2": "#FFD84D",
+               "1,3": "#FF4F8B", "2,3": "#FF4F8B", "0,4": "#FF4F8B", "1,4": "#FF4F8B", "2,4": "#FF4F8B", "3,4": "#FF4F8B", "1,5": "#5B3FE0", "2,5": "#5B3FE0" } } ] },
+  { "type": "shape", "name": "Ground", "shape": "rect", "w": 1280, "h": 120, "fill": "#3B2E6E", "x": 640, "y": 660 },
+  { "type": "shape", "name": "Moon", "shape": "ellipse", "w": 120, "h": 120, "fill": "#FFE9A8", "x": 1050, "y": 150 }
+ ]
+}

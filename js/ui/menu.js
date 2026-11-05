@@ -1,5 +1,5 @@
 /* Context menus (with submenus), popovers and dialogs.
-   Menu items: { label, icon, kbd, run, disabled, sub: [items] } | '-' | { head: 'Title' } */
+   Menu items: { label, icon, kbd, run, disabled, cls (an extra class), sub: [items] } | '-' | { head: 'Title' } */
 'use strict';
 (function (SB) {
   const U = SB.util, h = U.h;
@@ -13,7 +13,7 @@
     list.forEach((it, i) => {
       if (it === '-') return m.appendChild(h('hr'));
       if (it.head) return m.appendChild(h('div.mh', null, it.head));
-      const b = h('button', { type: 'button', role: 'menuitem', disabled: !!it.disabled, html: `<span class="mi">${it.icon ? SB.icon(it.icon) : ''}<span>${U.esc(it.label)}</span></span>${it.sub ? '<kbd>›</kbd>' : it.kbd ? `<kbd>${U.esc(it.kbd)}</kbd>` : ''}` });
+      const b = h('button' + (it.cls ? '.' + it.cls : ''), { type: 'button', role: 'menuitem', disabled: !!it.disabled, html: `<span class="mi">${it.icon ? SB.icon(it.icon) : ''}<span>${U.esc(it.label)}</span></span>${it.sub ? '<kbd>›</kbd>' : it.kbd ? `<kbd>${U.esc(it.kbd)}</kbd>` : ''}` });
       b.onclick = () => { if (it.sub) return open(0, 0, it.sub, level + 1, b); const path = SB.macros && it.run ? SB.macros.pathOf(b) : null; close(); if (path && SB.macros.rec) SB.macros.note({ m: path }); if (it.run) it.run(); if (path) reveal(path[0]); };
       b.onpointerenter = e => { if (e.pointerType !== 'mouse') return; if (it.sub && !it.disabled) open(0, 0, it.sub, level + 1, b); else { for (let l = level + 1; l < levels.length; l++) levels[l].hidden = true; m.querySelectorAll('.sub-open').forEach(x => x.classList.remove('sub-open')); } };
       m.appendChild(b);

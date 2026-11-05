@@ -8,7 +8,8 @@
               turn or fade
      blender  Blender (FBX): textured planes and a skeleton; effects only when they move, scale or turn
    What a target can't carry stays visible but greyed out (menus, the inspector, tools), with the reason
-   in its tooltip. Switch any time: the chip in the top bar, Settings, or Project settings. */
+   in its tooltip. Game Engine and Blender projects can still use every effect: what the engine can't make is drawn into
+   the pictures when exporting (onto the sprite, or frame by frame), so those effects are marked yellow, "not recommended". Switch any time: the chip in the top bar, Settings, or Project settings. */
 'use strict';
 (function (SB) {
   const S = SB.state;
@@ -18,8 +19,8 @@
     video: { label: 'Video', short: 'Video', icon: 'video', info: 'No limits: every tool, effect and format works.' },
     web: { label: 'Interactive', short: 'Interactive', icon: 'target', info: 'Interactive web page with clicks, hovers and drags. Rive skips effects and video.' },
     lottie: { label: 'Web animation (Lottie)', short: 'Lottie', icon: 'web', info: 'No filters, glow, shadows, erasers, video or sound.', hidden: true }, // not offered: Interactive web covers it (kept for the Lottie export's checks)
-    game: { label: 'Game Engine', short: 'Game Engine', icon: 'game', info: 'No filters, glow, shadows, blend modes, video or sound.' },
-    blender: { label: 'Blender (FBX)', short: 'Blender (FBX)', icon: 'cube', info: 'No fading, filters, masks, blend modes, video or sound.' },
+    game: { label: 'Game Engine', short: 'Game Engine', icon: 'game', info: 'No blend modes, video or sound. Looks like glow, outlines and shadows work but are not recommended (drawn into pictures, heavier).' },
+    blender: { label: 'Blender (FBX)', short: 'Blender (FBX)', icon: 'cube', info: 'No masks, blend modes, video or sound. Fades and looks like glow and outlines work but are not recommended (drawn frame by frame).' },
   };
   const OLD = { fbx: 'game', lottie: 'web' }; // projects made before the game target existed; Lottie projects are web projects now
   const CHOICES = () => Object.keys(LIST).filter(k => !LIST[k].hidden);
@@ -36,6 +37,13 @@
       if (d.designed) { const tr = (S.doc.transitions || []).find(x => 'tr:' + x.id === d.id); return !!tr && !(tr.shapes && tr.shapes.length) && !(tr.layer && tr.layer.keys || []).some(k => (k.blur || 0) > 0 || (!fade && k.op != null && k.op < 1)); }
       return false;
     },
+    /** Effect d works in target t only drawn into pictures (game engines, Blender): allowed, but marked "not recommended". */
+    fxWarn: (t, d) => (t === 'game' || t === 'blender') && !!d && !T.fxOk(t, d),
+    /** Can effect d be used at all in target t (natively, or drawn into pictures)? */
+    fxUsable: (t, d) => T.fxOk(t, d) || T.fxWarn(t, d),
+    NOT_REC: 'not recommended',
+    /** Effects of layer o that only work drawn into pictures in t: their names. */
+    warns(o, t = T.get()) { return (o.effects || []).filter(e => { const d = SB.effects.get(e.type); return d && e.on !== false && T.fxWarn(t, d); }).map(e => SB.effects.get(e.type).label); },
     /** Other features: 'video', 'audio', 'mask', 'maskOut', 'blend', 'eraser'. */
     allows(f, t = T.get()) {
       if (t === 'video' || t === 'web') return true;
@@ -60,7 +68,7 @@
       if ((o.type === 'video' || o.type === 'audio') && !T.allows(o.type, t)) out.push(o.type === 'video' ? 'video' : 'sound');
       if (o.blend && o.blend !== 'normal' && !T.allows('blend', t)) out.push('blend mode');
       if (o.isMask && !T.allows(o.isMask === 'out' ? 'maskOut' : 'mask', t)) out.push(o.isMask === 'out' ? 'outside mask' : 'mask');
-      for (const e of o.effects || []) { const d = SB.effects.get(e.type); if (d && e.on !== false && !T.fxOk(t, d)) out.push(d.label); }
+      for (const e of o.effects || []) { const d = SB.effects.get(e.type); if (d && e.on !== false && !T.fxUsable(t, d)) out.push(d.label); }
       if (!T.allows('eraser', t) && (o.frames || []).some(f => (f.strokes || []).some(st => st.er))) out.push('eraser strokes');
       return out;
     },
@@ -73,7 +81,7 @@
       if ((o.type === 'video' || o.type === 'audio') && !T.allows(o.type, t)) return 'delete';
       if (o.blend && !T.allows('blend', t)) delete o.blend;
       if (o.isMask && !T.allows(o.isMask === 'out' ? 'maskOut' : 'mask', t)) { delete o.isMask; delete o.maskVisible; }
-      o.effects = (o.effects || []).filter(e => { const d = SB.effects.get(e.type); const ok = !d || T.fxOk(t, d); if (!ok) SB.tracks.drop(o, 'fx:' + e.id + ':'); return ok; });
+      o.effects = (o.effects || []).filter(e => { const d = SB.effects.get(e.type); const ok = !d || T.fxUsable(t, d); if (!ok) SB.tracks.drop(o, 'fx:' + e.id + ':'); return ok; });
       if (!T.allows('eraser', t)) (o.frames || []).forEach(f => { if (f.strokes) f.strokes = f.strokes.filter(st => !st.er); });
       return 'fixed';
     },

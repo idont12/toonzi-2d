@@ -12,7 +12,7 @@
   let depth = 0; // guards against loops (A follows B follows A)
 
   const TRANSFORM = ['x', 'y', 'scale', 'scx', 'scy', 'rot', 'opacity', 'ax', 'ay'];
-  const COLOR = new Set(['color', 'fill', 'stroke', 'bg', 'outlineColor']);
+  const COLOR = new Set(['color', 'color2', 'fill', 'stroke', 'bg', 'outlineColor']);
   const PERCENT = new Set(['scale', 'scx', 'scy', 'opacity', 'volume', 'phys:bounce', 'speed', 'lnSp', 'lnAmt']);
   const STEPPED = new Set(['showAt']); // numbers that jump from key to key (a held video frame)
   const MULTIPLY = new Set(['scale', 'scx', 'scy', 'w', 'h', 'fontSize', 'strokeW']);

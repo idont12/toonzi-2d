@@ -1,11 +1,6 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
-    <img src="assets/logo.svg" alt="Toonzi, the Toonzi 2D mascot" width="120">
-  </picture>
+  <img src="assets/toonzi-logo.svg" alt="Toonzi 2D" width="300">
 </p>
-
-<h1 align="center">Toonzi 2D</h1>
 
 <p align="center">
   <b>Everyone can animate.</b><br>
@@ -16,20 +11,23 @@
 <p align="center">
   <a href="https://idont12.github.io/toonzi-2d/"><img src="docs/media/btn-open.svg" alt="Open Toonzi 2D" height="56"></a>
   &nbsp;
-  <a href="https://idont12.github.io/toonzi-2d/docs"><img src="docs/media/btn-docs.svg" alt="Read the docs" height="56"></a>
+  <a href="https://idont12.github.io/toonzi-2d/docs/"><img src="docs/media/btn-docs.svg" alt="Read the docs" height="56"></a>
 </p>
 
-<!-- TOONZI: hero animation. An animated SVG made in Toonzi 2D (Export > SVG animation).
-     Replace docs/media/hero.svg with your own file; how: docs/media/README.txt -->
+<!-- TOONZI: the banner. A recording of the interactive playground (made in Toonzi 2D: logo menu > Examples >
+     Interactive playground, exported as Interactive > HTML to docs/media/playground.html). A README can't run a web
+     page, so the picture links to the live one, where you can really click. -->
 <p align="center">
-  <img src="docs/media/hero.svg" alt="Toonzi 2D: Draw, Rig, Animate, Export. A ball bounces, a star spins." width="720">
+  <a href="https://idont12.github.io/toonzi-2d/docs/media/playground.html"><img src="docs/media/playground.gif" alt="The Toonzi 2D playground: the mascot's eyes follow the mouse, buttons make it hop, dance and flip, switches turn on party colors, orbiting stars and a wavy title, and a slider changes its size." width="760"></a>
+  <br>
+  <a href="https://idont12.github.io/toonzi-2d/docs/media/playground.html"><b>▶ Play with it live</b></a> · move the mouse, press the buttons, flip the switches, drag the slider
 </p>
 
 <table align="center">
   <tr>
-    <td align="center" width="170">✏️<br><b>Draw</b><br><sub>Brushes, vectors, fills</sub></td>
+    <td align="center" width="170">✏️<br><b>Draw</b><br><sub>Brushes, vectors, pixel art</sub></td>
     <td align="center" width="170">🎬<br><b>Animate</b><br><sub>Frame by frame or keyframes</sub></td>
-    <td align="center" width="170">🦴<br><b>Rig</b><br><sub>Bones, controllers, physics</sub></td>
+    <td align="center" width="170">🦴<br><b>Rig</b><br><sub>Bones, controllers, physics, particles</sub></td>
     <td align="center" width="170">🚀<br><b>Share</b><br><sub>Video, GIF, web, Unity, Godot</sub></td>
   </tr>
 </table>
@@ -40,10 +38,15 @@
 2. **Pick a tutorial.** Toonzi, the little guide, shows you where to click. The tutorials open by themselves the first time; later, click the logo › Tutorials…
 3. **Make something and export it** as a video, a GIF or a web page.
 
+### 🤖 Or ask an AI to make it
+
+Tell Claude, ChatGPT or any AI assistant: *"Make an animation of … with Toonzi 2D (github.com/idont12/toonzi-2d)"*. The repo has a guide for AIs ([AGENTS.md](AGENTS.md)), so it writes the animation and sends you back **a link that opens the editor with your animation in it**. Change anything you like, then click the logo › **Copy a link to this animation** and give the link back to the AI to ask for more.
+
 <p align="center">
   <a href="https://idont12.github.io/toonzi-2d/">Open the app</a> ·
-  <a href="https://idont12.github.io/toonzi-2d/docs">Documentation</a> ·
+  <a href="https://idont12.github.io/toonzi-2d/docs/">Documentation</a> ·
   <a href="tutorials/README.md">Tutorials</a> ·
+  <a href="AGENTS.md">For AI assistants</a> ·
   <a href="#for-developers">For developers</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="LICENSE">AGPL-3.0 license</a>
@@ -61,6 +64,7 @@ Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw fram
 
 - Freehand brushes (with a brush editor, stabilizer, pressure and mirror drawing), eraser, fill bucket, fill brush, gradients, and the Smooth, Width and Pull tools to reshape lines.
 - Vector drawing with the Pen and the Points tool: curves, handles, shapes, text.
+- **Pixel art:** make any screen pixel art (pick how many pixels across) and everything on it turns into pixels on one grid; the Pixel brush paints, erases and fills squares, frame by frame.
 - Import SVG, PSD, Illustrator/PDF, images, video and audio. Record your voice.
 
 **Animate**
@@ -75,6 +79,7 @@ Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw fram
 - **Controllers:** record how a layer looks at a few spots of a knob, then move the knob. Design your own controllers.
 - **Constraints:** Follow, Move toward, Look at, Copy position, rotation or scale.
 - **Physics:** bodies that fall and bounce, surfaces to land on, things that hang from a bone.
+- **Particles:** fire, smoke, snow, rain, confetti, sparkles, bubbles. Aim them with an arrow on the stage; random sizes between a min and a max, two colors, gravity, spin, glow. They export to Unity and Godot as real particle systems.
 
 **Look**
 
@@ -83,7 +88,7 @@ Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw fram
 
 **Interactive**
 
-- Rules in plain words (WHEN something happens, IF conditions hold, DO actions) with a live Preview, exported as an interactive web page or a Rive file.
+- Rules in plain words (WHEN something happens, IF conditions hold, DO actions) with a live Preview, exported as an interactive web page or a Rive file. The **Interactive playground** example (the banner above) shows them off: eyes that follow the mouse, buttons that blend between rig actions, switches, a slider and hover effects.
 
 **Export** (logo menu at the top left › Export…, all done on your device)
 
@@ -93,7 +98,7 @@ Toonzi 2D is a complete 2D animation tool written in plain JavaScript. Draw fram
 | GIF | An animated GIF (looping, optionally with a transparent background) |
 | Sprite sheet | One image (PNG, JPG, WebP, AVIF or SVG) plus a JSON file for Phaser, PixiJS and similar |
 | Images (ZIP) | Every frame as PNG, JPG, WebP or AVIF |
-| SVG animation | An animated SVG that plays by itself (this is what the hero above is) |
+| SVG animation | An animated SVG that plays by itself |
 | Interactive | HTML (a web page that plays everything), Rive (.riv with a state machine), or SVG (click or hover to play) |
 | Game Engine | Unity (.unitypackage) or Godot 4 (project folder), with bones, masks and one animation per screen or rig action |
 | Blender (FBX) | Planes, a skeleton and the animation, one file per screen or rig action |
@@ -131,13 +136,13 @@ Your work is autosaved in the browser. Use **Save project** (Ctrl+S) to get a `.
 
 ### Documentation
 
-Online at **https://idont12.github.io/toonzi-2d/docs**, and in the repository as [`docs/index.html`](docs/index.html). It explains every tool and feature with short steps for beginners: the toolbar, timeline, layers, masks, effects, rigs, controllers, physics, interactive mode, every export format, settings and shortcuts. It is one self-contained page that works offline.
+Online at **https://idont12.github.io/toonzi-2d/docs/**, and in the repository as [`docs/index.html`](docs/index.html). It explains every tool and feature with short steps for beginners: the toolbar, timeline, layers, masks, effects, rigs, controllers, physics, interactive mode, every export format, settings and shortcuts. It is one self-contained page that works offline.
 
 #### Run the docs on GitHub Pages
 1. Push the repository to GitHub.
 2. Go to **Settings › Pages**. Under **Build and deployment**, choose **Deploy from a branch**, select your main branch and the **/ (root)** folder, and save.
 3. After a minute the app runs at `https://<your-name>.github.io/<repo>/` and the docs at `https://<your-name>.github.io/<repo>/docs/`. Because the site comes from a web server, **Interactive › HTML** export works there too.
-4. This repository's site: the app at https://idont12.github.io/toonzi-2d/ and the docs at https://idont12.github.io/toonzi-2d/docs
+4. This repository's site: the app at https://idont12.github.io/toonzi-2d/ and the docs at https://idont12.github.io/toonzi-2d/docs/
 
 Choose **root**, not the `/docs` folder: the docs link to the app and to the examples next to it. The empty `.nojekyll` file tells Pages to serve the files as they are.
 
@@ -147,7 +152,9 @@ A GitHub README cannot run JavaScript, but it can show an **animated SVG** in an
 
 1. Make an animation in the app. Open the logo menu › **Export…**, set **Export as** to **SVG animation**, keep **Loop** on, and export.
 2. Save the file in [`docs/media/`](docs/media/README.txt) as `hero.svg` (or another name).
-3. In this README, each slot is marked with a comment like `<!-- TOONZI: hero animation -->` followed by an `<img src="docs/media/hero.svg">`. Change the file name there to use a new file.
+3. In this README, each slot is marked with a comment like `<!-- TOONZI: the banner -->` followed by an `<img>`. Change the file name there to use a new file.
+
+The banner at the top is a GIF recording of the **interactive playground** (logo menu › **Examples** › **Interactive playground**), and it links to the live page, `docs/media/playground.html` (that example exported as **Interactive › HTML**). Open the example in the app and press **Interactions › Preview** to see its rules.
 
 The docs page **can** run JavaScript, so it can show interactive exports. Export **Interactive › HTML**, save it in `docs/media/`, and add it to the marked section of `docs/index.html` (`<!-- TOONZI: interactive demos -->`) as an `<iframe>`. Full steps, and every export menu name, are in [`docs/media/README.txt`](docs/media/README.txt).
 
@@ -161,18 +168,22 @@ css/app.css           all styles; colors and sizes are tokens at the top
 vendor/               mediabunny (video writer), polygon-clipping (shape math)
 js/core/              helpers, state + undo, layer tree, keyframes, matrices, icons
 js/render/            bezier paths, brush strokes, fill bucket, scene renderer
-js/model/             frames, object types, editing commands, screens, targets, templates
+js/model/             frames, object types (drawings, shapes, text, media, particles), editing commands, screens, targets, templates
 js/effects/           effect engine and the effect library
 js/rig/               bones, physics, controllers + constraints, saved objects, actions
-js/tools/             select, brush/eraser/fill, pen/points, cut, mirror, motion path
+js/tools/             select (and the group box), brush/eraser/fill, pixel art, pen/points, cut, mirror, motion path
 js/ui/                stage, board, timeline, inspector, menus, shortcuts, settings, interactions
 js/io/                import (SVG, PSD, PDF, media), export (all formats), project files
 js/tours/             the tutorial player and the tutorial maker
-js/example.js         the built-in example project
+js/example.js         the built-in trailer (logo menu › Examples)
+js/playground.js      the interactive playground example (the README banner)
 js/app.js             start-up
 examples/             example projects and objects (listed in examples/index.js)
 tutorials/            tutorial files, guide characters, config.js (see tutorials/README.md)
 docs/                 the documentation page and the animations shown in it
+AGENTS.md, CLAUDE.md  the guide for AI assistants (project format, rules, hand-back links); llms.txt points to it
+ai/examples/          complete JSON projects an AI (or you) can start from
+tools/toonzi.mjs      command line: check a project, make an editor link or a one-file editor, preview, serve
 CHANGELOG.md          the long development history, round by round
 ```
 

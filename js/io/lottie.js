@@ -83,6 +83,11 @@
   function picture(info, warn) {
     const { o, v, fi } = info;
     if (o.type === 'image') { const m = SB.media.get((o.frames[fi] || {}).mediaId || o.mediaId); if (!m || !m.el) return null; const cv = U.h('canvas', { width: m.el.naturalWidth || m.w, height: m.el.naturalHeight || m.h }); cv.getContext('2d').drawImage(m.el, 0, 0); return { key: m.id, cv, w: cv.width, h: cv.height, place: vv => new DOMMatrix().translateSelf(-vv.w / 2, -vv.h / 2).scaleSelf(vv.w / cv.width, vv.h / cv.height) }; }
+    if (o.type === 'pixels') { // pixel art: a picture of its squares (sharp, no smoothing)
+      const b = SB.scene.bounds(v, info.lt, fi); if (!b) return null; const k = Math.max(1, Math.min(4, 4 / (o.cs || 1))), cv = U.h('canvas', { width: Math.max(1, Math.ceil((b.x1 - b.x0) * k)), height: Math.max(1, Math.ceil((b.y1 - b.y0) * k)) }), c = cv.getContext('2d');
+      c.setTransform(k, 0, 0, k, -b.x0 * k, -b.y0 * k); SB.types.get('pixels').draw(c, v, o.frames[fi] || {}, null, {});
+      return { key: 'px:' + o.id + ':' + fi, cv, w: cv.width, h: cv.height, place: () => new DOMMatrix().translateSelf(b.x0, b.y0).scaleSelf(1 / k, 1 / k) };
+    }
     if (o.type === 'text') {
       const b = SB.scene.bounds(v, info.lt, fi); if (!b) return null; if (o.effects && o.effects.some(e => e.type === 'typewriter')) warn.add('Typewriter text (shown complete)');
       const k = 2, cv = U.h('canvas', { width: Math.max(1, Math.ceil((b.x1 - b.x0) * k)), height: Math.max(1, Math.ceil((b.y1 - b.y0) * k)) }), c = cv.getContext('2d'); c.setTransform(k, 0, 0, k, -b.x0 * k, -b.y0 * k);
@@ -105,7 +110,8 @@
           if (fades) { (nd.fade = nd.fade || [])[i] = c; if (info.visible) { const keep = info.fi; info.fadeOnly = true; for (const f of [c.a, c.b]) if (f !== keep) { info.fi = f; (nd.geo[f] = nd.geo[f] || [])[i] = vectorItems(info, warn); } info.fi = keep; } }
         }
         if (o.type === 'draw' || o.type === 'shape') { if (info.visible) (nd.geo[info.fi] = nd.geo[info.fi] || [])[i] = vectorItems(info, warn); }
-        else if (o.type === 'image' || o.type === 'text') { if (info.visible || !Object.keys(nd.pics).length) { const p = nd.pics[info.fi] || (nd.pics[info.fi] = picture(info, warn)); if (p) nd.picAt[i] = p.place(info.v); } if (o.bind && o.bind.mode === 'deform') warn.add('Pictures bending with bones (they follow without bending)'); }
+        else if (o.type === 'particles') warn.add('Particles (Lottie has none: export a video, a GIF or a web page to keep them)');
+        else if (o.type === 'image' || o.type === 'text' || o.type === 'pixels') { if (info.visible || !Object.keys(nd.pics).length) { const p = nd.pics[info.fi] || (nd.pics[info.fi] = picture(info, warn)); if (p) nd.picAt[i] = p.place(info.v); } if (o.bind && o.bind.mode === 'deform') warn.add('Pictures bending with bones (they follow without bending)'); }
         else if (o.type === 'video') warn.add('Video layers');
         if (i === 0) {
           (o.effects || []).forEach(e => { if (e.on !== false && unsupportedFx(e)) warn.add(`The ${SB.effects.get(e.type).label} effect`); });

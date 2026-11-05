@@ -1,7 +1,12 @@
 /* Project files and autosave.
    - Autosave keeps the project and its media in this browser (IndexedDB), so a refresh loses nothing.
    - Save / Open use a single .json file that includes the media.
-   - Files from the previous version of the app are upgraded on open (see migrate). */
+   - Files from the previous version of the app are upgraded on open (see migrate).
+   - Opening from a link (made by an AI or by tools/toonzi.mjs, see AGENTS.md):
+       index.html?open=<url of a project .json>       fetched and opened
+       index.html#project=<base64url of deflate-raw>  the project inside the link itself (nothing is uploaded)
+       window.TOONZI_OPEN = { …project… }              set by a self-contained editor page (tools/toonzi.mjs editor)
+     A hand-written project may leave things out: prepare() fills ids, defaults, eases and attachments to bones. */
 'use strict';
 (function (SB) {
   const U = SB.util, S = SB.state, tree = SB.tree, G = SB.paths;
@@ -38,6 +43,45 @@
     return [o];
   }
   const migrateList = (list, out) => (list || []).flatMap(o => migrate(o, out));
+
+  // ---------- hand-written projects (AI, scripts): fill what was left out
+  const LINK_KEY = 'toonzi-link';
+  /** Make a written project complete: every layer gets an id, its type's defaults, a length (to the end of the
+      screen), effects get ids, keyframes get eases. Values that are there are kept. */
+  function prepare(d) {
+    if (!d || typeof d !== 'object') throw new Error('No project in the link.');
+    if (!d.app && (d.objects || d.screens)) d.app = 'storyboard-studio'; if (d.app === 'toonzi' || d.app === 'toonzi-2d') d.app = 'storyboard-studio';
+    const keep = S.project, keyEase = id => { const t = SB.tracks.type(id); return t === 'bool' || t === 'int' || id === 'frame' ? 'hold' : 'smooth'; };
+    const fill = (list, P, end) => (list || []).map(o => {
+      if (!o || !o.type || !SB.types.get(o.type)) return null; const st = +o.start || 0;
+      const out = Object.assign(tree.make(o.type, { x: P.w / 2, y: P.h / 2 }), { start: st, dur: Math.max(0.05, end - st) }, o);
+      if (!o.id) out.id = U.uid();
+      out.tracks = {}; for (const k in o.tracks || {}) { const arr = Array.isArray(o.tracks[k]) ? o.tracks[k] : []; out.tracks[k] = arr.filter(q => q && q.v !== undefined).map(q => Object.assign({}, q, { t: U.r3(+q.t || 0), e: q.e || keyEase(k) })).sort((a, b) => a.t - b.t); if (!out.tracks[k].length) delete out.tracks[k]; }
+      out.effects = (o.effects || []).filter(e => e && SB.effects.get(e.type)).map(e => Object.assign(SB.fx.make(e.type), e, { id: e.id || U.uid() }));
+      if (o.frames) out.frames = o.frames.map(f => Object.assign({ strokes: [] }, f));
+      if (o.type === 'group') out.children = fill(o.children, P, out.seq ? out.dur : st + out.dur);
+      if (o.type === 'null') { if (o.rx == null) out.rx = out.x; if (o.ry == null) out.ry = out.y; }
+      const SL = { top: [0, -1], left: [-1, 0], center: [0, 0], right: [1, 0], bottom: [0, 1] };
+      if (o.drv) out.drv = o.drv.map(L => Object.assign({ id: U.uid(), amt: 1, space: 'local' }, L, { states: (L.states || []).map(st => Object.assign({}, SL[st.slot] ? { u: SL[st.slot][0], v: SL[st.slot][1] } : {}, st, { p: st.p || {} })) }));
+      if (o.cons) out.cons = o.cons.map(c => Object.assign({ id: U.uid(), amt: 1 }, c));
+      if (o.type === 'rig') out.bones = (o.bones || []).map((b, i) => Object.assign({ id: 'b' + i, name: 'Bone ' + (i + 1), parent: null, len: 80, ang: 0 }, b));
+      return out;
+    }).filter(Boolean);
+    try {
+      S.project = Object.assign(SB.defaultProject(), d.name ? { name: d.name } : {}, d.project || {}); const P = S.project; d.project = P; d.name = P.name;
+      d.objects = fill(d.objects, P, P.duration);
+      if (d.screens) d.screens = d.screens.map((sc, i) => { const sp = Object.assign(SB.defaultProject(), sc.proj || (i === 0 ? P : {})); S.project = sp; const out = Object.assign({ id: 'scr' + U.uid(), name: 'Screen ' + (i + 1), x: i * (sp.w + 200), y: 0 }, sc); if (sc.objects) out.objects = fill(sc.objects, sp, sp.duration); if (sc.proj) out.proj = sp; return out; });
+    } finally { S.project = keep; }
+    d.v = d.v || 6; return d;
+  }
+  /** After opening: attach layers to bones where the file says so but left out how (bind without inv). */
+  function attachAll() {
+    if (!SB.rig || !SB.rig.bindTo) return; const one = () => { const t0 = S.time; S.time = 0; try { for (const o of tree.all()) { const B = o.bind; if (!B || B.inv) continue; const r = tree.find(B.rig); delete o.bind; if (!r) continue; SB.rig.bindTo(o, r, B.bone, B.mode === 'deform' ? 'deform' : 'follow'); if (o.bind && B.soft) o.bind.soft = B.soft; } } finally { S.time = t0; } };
+    for (const s of S.screens || []) SB.screens.with(s, one);
+  }
+  const fromB64 = t => { const b = atob(t.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((t.length + 3) % 4)), a = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; };
+  async function inflate(t) { const bytes = fromB64(t); if (typeof DecompressionStream !== 'function') throw new Error('This browser can’t open packed links. Try Chrome, Edge, Firefox or Safari 16.4+.'); return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text(); }
+  const sigOf = txt => { let a = 2166136261; for (let i = 0; i < txt.length; i++) a = Math.imul(a ^ txt.charCodeAt(i), 16777619); return (a >>> 0).toString(36) + txt.length; };
 
   let saveT = 0;
   const P = SB.project = {
@@ -114,7 +158,36 @@
       if (!d || d.app !== 'storyboard-studio') throw new Error('This is not a Storyboard project.');
       await P.reset(true); SB.toast('Opening…');
       for (const m of d.media || []) { try { await SB.media.add(U.dataURLToBlob(m.data), m.name, m.kind, m.id); } catch (e) { console.warn(e); } }
-      P.load(d.project, d.objects, d.screens, d.active, d.doc); SB.resetHistory(); SB.view.reset(); SB.invalidate(); P.autosave(); SB.toast(`Opened ${label || S.project.name}.`);
+      P.load(d.project, d.objects, d.screens, d.active, d.doc); attachAll(); SB.resetHistory(); SB.view.reset(); SB.invalidate(); P.autosave(); SB.toast(`Opened ${label || S.project.name}.`);
+    },
+    prepare,
+    /** Open the project a link carries (see the top of this file). Returns true when it opened one. The same link
+        again (a reload) keeps your changes; the project you had is kept in Recent projects. */
+    async openLink() {
+      const q = new URLSearchParams(location.search), hs = new URLSearchParams(location.hash.slice(1)); let txt = null, from = '';
+      try {
+        if (window.TOONZI_OPEN) { txt = typeof window.TOONZI_OPEN === 'string' ? window.TOONZI_OPEN : JSON.stringify(window.TOONZI_OPEN); from = 'page'; }
+        else if (hs.get('project')) { txt = await inflate(hs.get('project')); from = 'hash'; }
+        else if (hs.get('json')) { txt = hs.get('json'); from = 'hash'; }
+        else if (q.get('open')) { const r = await fetch(q.get('open')); if (!r.ok) throw new Error(`The link’s project file didn’t load (${r.status}).`); txt = await r.text(); from = 'url'; }
+      } catch (e) { SB.toast(e.message || "Couldn't open the animation from the link."); return false; }
+      if (!txt) return false;
+      const sig = sigOf(txt); let last = null; try { last = await DB.get('kv', LINK_KEY); } catch (e) { /* no storage */ }
+      const clean = () => { if (from === 'hash' || from === 'url') { const u = new URL(location.href); u.hash = ''; u.searchParams.delete('open'); try { history.replaceState(null, '', u.pathname + u.search); } catch (e) {} } };
+      if (last === sig && S.objects.length) { clean(); return true; } // opened before: the autosave has your changes
+      try {
+        const d = prepare(JSON.parse(txt));
+        if (S.objects.length) { try { await P.remember(S.project.name, new Blob([JSON.stringify(await P.pack())], { type: 'application/json' })); } catch (e) { /* keep going */ } }
+        await P.openData(d, d.name || (d.project && d.project.name)); SB.resetHistory(); SB.invalidate(); P.autosave();
+        try { await DB.put('kv', LINK_KEY, sig); } catch (e) {}
+        clean(); SB.linkOpened = true; return true;
+      } catch (e) { console.warn(e); SB.toast('The animation in the link has a problem: ' + (e.message || e)); return false; }
+    },
+    /** A link that opens this project in the editor (the project packed into the link; pictures and sounds included). */
+    async link(base) {
+      const d = await P.pack(), bytes = new Uint8Array(await new Response(new Blob([JSON.stringify(d)]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+      let b = ''; for (let i = 0; i < bytes.length; i += 0x8000) b += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      return (base || location.href.split('#')[0].split('?')[0]) + '#project=' + btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     },
     async reset(quiet) {
       if (S.recording) SB.record.stop(); SB.time.pause(); SB.textEdit.end();

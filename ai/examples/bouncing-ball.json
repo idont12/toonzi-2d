@@ -1,0 +1,14 @@
+{
+ "app": "toonzi", "name": "Bouncing ball",
+ "project": { "w": 1280, "h": 720, "fps": 24, "duration": 2, "bg": "#F4F1FF" },
+ "objects": [
+  { "type": "shape", "name": "Ball", "shape": "ellipse", "w": 140, "h": 140, "fill": "#FF4F8B", "x": 640, "y": 200, "ay": 70,
+    "tracks": {
+     "y":   [ { "t": 0, "v": 200, "e": "easeIn" }, { "t": 0.5, "v": 590, "e": "easeOut" }, { "t": 1, "v": 200, "e": "easeIn" }, { "t": 1.5, "v": 590, "e": "easeOut" }, { "t": 2, "v": 200 } ],
+     "scy": [ { "t": 0, "v": 1 }, { "t": 0.44, "v": 1.12 }, { "t": 0.5, "v": 0.72, "e": "easeOut" }, { "t": 0.62, "v": 1 }, { "t": 1.44, "v": 1.12 }, { "t": 1.5, "v": 0.72, "e": "easeOut" }, { "t": 1.62, "v": 1 } ],
+     "scx": [ { "t": 0, "v": 1 }, { "t": 0.5, "v": 1.25, "e": "easeOut" }, { "t": 0.62, "v": 1 }, { "t": 1.5, "v": 1.25, "e": "easeOut" }, { "t": 1.62, "v": 1 } ] } },
+  { "type": "shape", "name": "Shadow", "shape": "ellipse", "w": 160, "h": 26, "fill": "#14122A", "x": 640, "y": 604, "opacity": 0.18,
+    "tracks": { "scale": [ { "t": 0, "v": 0.45, "e": "easeIn" }, { "t": 0.5, "v": 1, "e": "easeOut" }, { "t": 1, "v": 0.45, "e": "easeIn" }, { "t": 1.5, "v": 1, "e": "easeOut" }, { "t": 2, "v": 0.45 } ] } },
+  { "type": "shape", "name": "Floor", "shape": "rect", "w": 1280, "h": 80, "fill": "#D9D2F7", "x": 640, "y": 640 }
+ ]
+}
