@@ -306,14 +306,14 @@
     return [...new Set(out)];
   }
   /** Every layer of these screens using effects the format can't make itself, and how each goes:
-      [{ screen, name, fx: [labels], how: 'sprite' (drawn onto its sprite once) | 'frames' (frame by frame) | 'out' (left out) }]. */
+      [{ screen, name, id, fx: [labels], fxs: [{ id, label }], how: 'sprite' (drawn onto its sprite once) | 'frames' (frame by frame) | 'out' (left out) }]. */
   function fxPlaces(screens, opt, t = 'game') {
     const out = [];
     for (const s of screens) {
       if (opt.pixelFrames && s.proj && s.proj.pixel && s.proj.pixel.on) continue; // the whole screen goes as pictures
       (function w(list, inBaked) { for (const o of list || []) {
         const bad = !o.isMask && o.type !== 'particles' ? fxBad(o, t) : [], still = bad.length && opt.stillFx && fxStill(o, t), frames = !still && bad.length && opt.bakeFx;
-        if (bad.length && !inBaked) out.push({ screen: s.name, name: o.name, fx: bad, how: still ? 'sprite' : frames ? 'frames' : 'out' });
+        if (bad.length && !inBaked) out.push({ screen: s.name, name: o.name, id: o.id, fx: bad, fxs: (o.effects || []).filter(e => { const d = SB.effects.get(e.type); return e.on !== false && d && SB.targets && !SB.targets.fxOk(t, d); }).map(e => ({ id: e.id, label: SB.effects.get(e.type).label })), how: still ? 'sprite' : frames ? 'frames' : 'out' });
         if (o.children) w(o.children, inBaked || !!frames); } })(s.objects, false);
     }
     return out;

@@ -10,6 +10,13 @@
   const wrapEl = () => U.$('#stageWrap');
   /** A small tag before a screen's title: TEMPLATE on an original (with a dot when its copies are behind), FROM … on a copy. Returns its width. */
   function tagFor(c, s, x, y, d) {
+    let g = 0; if (s.group) { // its group (Screen › Group: one prefab or scene in Unity and Godot)
+      const text = '◆ ' + s.group.toUpperCase(); c.save(); c.font = `700 ${9.5 * d}px Lexend, system-ui, sans-serif`; const w = c.measureText(text).width + 12 * d, hh = 15 * d;
+      c.fillStyle = '#0F9D8A'; c.beginPath(); c.roundRect ? c.roundRect(x, y - hh + 1 * d, w, hh, 4 * d) : c.rect(x, y - hh + 1 * d, w, hh); c.fill();
+      c.fillStyle = '#fff'; c.textBaseline = 'middle'; c.fillText(text, x + 6 * d, y - hh / 2 + 1.5 * d); c.restore(); g = w + 6 * d; x += g; }
+    return g + tmplTag(c, s, x, y, d);
+  }
+  function tmplTag(c, s, x, y, d) {
     const T = SB.templates, m = T && T.of(s); if (!s.tmpl && !m) return 0;
     const text = s.tmpl ? (T.stale(s) ? 'TEMPLATE • changed' : 'TEMPLATE') : 'FROM ' + m.tmpl.name.toUpperCase();
     c.save(); c.font = `700 ${9.5 * d}px Lexend, system-ui, sans-serif`; const w = c.measureText(text).width + 12 * d, hh = 15 * d;
@@ -158,7 +165,7 @@
   SB.on('select', () => { dropTo = null; if (!quietSel) S.screenSel = null; });
   // ---------- a selected screen (click its name): Delete asks to delete it
   let quietSel = false;
-  function selectScreen(s) { quietSel = true; try { tree.select([]); } finally { quietSel = false; } S.screenSel = s.id; SB.dirty(); }
+  function selectScreen(s) { quietSel = true; try { tree.select([]); } finally { quietSel = false; } S.screenSel = s.id; SB.dirty(); SB.invalidate('ctxbar'); }
   SB.overlays.extra.push(O => {
     if (!S.screenSel || S.screenSel !== S.scr) return; const c = O.c, d = O.dpr, [x0, y0] = O.P(0, 0), [x1, y1] = O.P(S.project.w, S.project.h);
     c.save(); c.strokeStyle = '#5B3DF5'; c.lineWidth = 2.5 * d; c.strokeRect(x0 - 2 * d, y0 - 2 * d, x1 - x0 + 4 * d, y1 - y0 + 4 * d); c.restore();
@@ -185,12 +192,31 @@
         h('span.vsep'), W.select('', [['', 'Add a screen…'], ...Sc.SIZES, ...(SB.templates ? SB.templates.list().map(m => ['tmpl:' + m.id, 'From template: ' + m.tmpl.name]) : [])], v => { if (!v) return; const s = v.startsWith('tmpl:') ? SB.templates.addFrom(Sc.find(v.slice(5))) : Sc.add(v); focus(s, true); fitAll(); SB.commit(); }, 'Add a screen'),
         SB.templates && act.tmpl && SB.templates.stale(act) ? W.btn('Update copies', () => SB.templates.push(act), { cls: 'sm primary', icon: 'library', title: 'Send the changes of this template to every screen made from it' }) : null,
         SB.templates ? (act.tmpl ? W.btn('Template', () => SB.templates.unmake(act), { cls: 'sm on', icon: 'library', title: 'This screen is a template. Click to stop' }) : act.from || act.editOf ? null : W.btn('Save as template', () => SB.templates.make(act), { cls: 'sm ghost', icon: 'library', title: 'New screens can start from this one; changes here reach them all' })) : null,
-        W.btn('Fit all', fitAll, { cls: 'sm ghost', icon: 'fit' }), W.btn('Settings', () => SB.settings.open('project'), { cls: 'sm ghost', icon: 'gear', title: 'Size, length and background of this screen' }),
+        h('span.vsep'), ...sizeBg(act), groupSel(act),
+        W.btn('Fit all', fitAll, { cls: 'sm ghost', icon: 'fit' }), W.btn('Settings', () => SB.settings.open('project'), { cls: 'sm ghost', icon: 'gear', title: 'Everything about this screen: size, frame rate, length, background image' }),
         Sc.many() ? W.btn('Duplicate', () => { const c = Sc.duplicate(act); focus(c, true); fitAll(); SB.commit(); }, { cls: 'sm ghost', icon: 'copy' }) : null,
         Sc.many() ? W.btn('Delete', () => remove(act), { cls: 'sm ghost', icon: 'trash' }) : null,
         h('span.lbl', null, 'Drag on empty space to draw a screen.')];
     },
   });
+  /** Its group: screens of one group (a character, an enemy…) export to Unity / Godot as one prefab or scene with its own animations. */
+  function groupSel(s) {
+    const names = Sc.groupNames(), set = v => { if (v) s.group = v; else delete s.group; SB.commit(); SB.invalidate(); SB.toast(v ? `${s.name} is in the group ${v}: in Unity and Godot, ${v} gets its own ${'prefab or scene'} with its animations.` : `${s.name} is in no group.`); };
+    return W.select(s.group || '', [['', 'No group'], ...names.map(n => [n, '◆ ' + n]), ['+new', 'New group…']], async v => {
+      if (v !== '+new') return set(v);
+      const n = await SB.dialog.prompt('New group', 'A name for a character or object (Hero, Enemy…). Its screens export to Unity and Godot as one prefab or scene, each screen one of its animations.', ''); if (n && n.trim()) set(n.trim().slice(0, 40)); else SB.invalidate('ctxbar');
+    }, 'Group (Unity and Godot: one prefab or scene each)');
+  }
+  /** The size and background of screen s (the active one), right in the bar. */
+  function sizeBg(s) {
+    const p = S.project, key = p.w + 'x' + p.h, list = Sc.SIZES.filter(([k]) => k !== 'same'), known = list.some(([k]) => k === key);
+    const size = (w, hh) => { w = U.clamp(Math.round(w / 2) * 2, 64, 4096); hh = U.clamp(Math.round(hh / 2) * 2, 64, 4096); if (w === p.w && hh === p.h) return; p.w = w; p.h = hh; SB.commit(); SB.view.fit(); SB.invalidate(); };
+    return [
+      W.select(known ? key : '', [...(known ? [] : [['', `Custom ${p.w}×${p.h}`]]), ...list], v => { if (!v) return; const [w, hh] = v.split('x').map(Number); size(w, hh); }, `Size of ${s ? s.name : 'the screen'}`),
+      Object.assign(W.num(p.w, { min: 64, max: 4096, step: 2, label: 'Width', change: v => size(+v, p.h) }), { className: 'sz-num' }), h('span.lbl', null, '×'), Object.assign(W.num(p.h, { min: 64, max: 4096, step: 2, label: 'Height', change: v => size(p.w, +v) }), { className: 'sz-num' }),
+      W.colorBtn(p.bg || '#FFFFFF', { label: 'Background color', input: v => { p.bg = v; SB.dirty(); }, change: () => { SB.commit(); SB.invalidate('ctxbar'); } }),
+    ];
+  }
   async function remove(s) {
     if (S.screens.length < 2) return SB.toast('A project needs at least one screen.');
     const refs = SB.ix ? SB.ix.refsTo(s.id) : [], used = refs.length ? ` ${refs.length} interaction rule${refs.length > 1 ? 's use' : ' uses'} it (${refs.slice(0, 3).map(r => r.name).join(', ')}${refs.length > 3 ? '…' : ''}): ${refs.length > 1 ? 'they' : 'it'} will show what is missing, so you can fix or delete ${refs.length > 1 ? 'them' : 'it'}.` : '';
@@ -205,5 +231,5 @@
     if (!S.screens || S.screens.length < 2 || !NEW_DRAW.has(S.tool) || S.pen) return; const a = Sc.active(), P = SB.view.toProj(e);
     if (P.x >= 0 && P.y >= 0 && P.x <= S.project.w && P.y <= S.project.h) return; const s = Sc.at(P.x + a.x, P.y + a.y, a); if (s) focus(s, true);
   }
-  SB.board = { drawOn, focus, fitAll, down, dropOnScreen, remove, selectScreen, screenSelected: () => !!S.screenSel && S.screenSel === S.scr, hover(objs) { dropTo = targetFor(objs); } };
+  SB.board = { sizeBg, drawOn, focus, fitAll, down, dropOnScreen, remove, selectScreen, screenSelected: () => !!S.screenSel && S.screenSel === S.scr, hover(objs) { dropTo = targetFor(objs); } };
 })(window.SB);

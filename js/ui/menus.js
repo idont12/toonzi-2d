@@ -77,6 +77,7 @@
       '-',
       o.type === 'text' && { label: 'Edit text', kbd: 'Enter', run: () => SB.textEdit.start(o) },
       o.type === 'shape' && { label: 'Convert to editable path', run: () => ops.shapeToPath(o) },
+      o.type === 'pixels' && SB.pixel && SB.pixel.toVector && { label: 'Convert to vector drawing', run: () => SB.pixel.toVector(o) },
       o.type === 'video' && !many && !(o.soundSplit && tree.find(o.soundSplit)) && { label: 'Split sound into its own layer', icon: 'audio', run: () => ops.splitSound(o) },
       (o.type === 'video' || o.type === 'audio') && !many && tree.inRange(o) && { label: SB.mediaOps.heldAt(o) ? 'Play on from here' : o.type === 'video' ? 'Hold this frame' : 'Pause here', icon: SB.mediaOps.heldAt(o) ? 'play' : 'pause', run: () => SB.mediaOps.holdHere(o, !SB.mediaOps.heldAt(o)) },
       o.type === 'group' && { label: 'Ungroup', kbd: K('ungroup'), run: () => ops.ungroup(o) },
@@ -204,8 +205,8 @@
       SB.menu.open(r.left, r.bottom + 4, [SB.tours ? { label: 'Tutorials…', icon: 'tour', run: () => SB.tours.open() } : null, SB.docs ? { label: 'Documentation', icon: 'book', run: () => SB.docs.open() } : null, SB.tours ? '-' : null, { label: 'New project', run: () => SB.project.newProject() }, { label: 'Open project…', kbd: K('open'), run: () => SB.project.openPicker() }, { label: 'Recent projects', sub: recentItems() }, SB.examples ? { label: 'Examples', sub: SB.examples.projects().map(e => ({ label: e.name, run: () => SB.examples.openProject(e) })) } : null,
         { label: 'Save project', kbd: K('save'), run: () => SB.project.save() },
         { label: 'Copy a link to this animation', run: async () => { try { const l = await SB.project.link(); await navigator.clipboard.writeText(l); SB.toast(l.length > 60000 ? `Link copied (${Math.round(l.length / 1000)} kB: long, so some chat apps may cut it; Save project makes a file instead).` : 'Link copied: it opens the editor with this animation (give it to an AI to change it, see AGENTS.md).'); } catch (e) { SB.toast('Couldn’t copy the link: ' + (e.message || e)); } } }, '-',
-        { label: 'Import files…', run: () => SB.io.pick('image/*,.svg,video/*,audio/*,.psd,.ai,.pdf', true, f => SB.io.importFiles(f)) }, { label: 'Record voice', disabled: SB.targets && !SB.targets.allows('audio'), run: () => SB.voice.start() }, { label: 'Saved objects…', icon: 'library', run: () => SB.rigLib.open() }, '-',
-        { label: 'Export…', run: () => SB.exporter.open() }, { label: SB.screens.many() ? 'Screen settings…' : 'Project settings…', run: () => SB.settings.screen() }, { label: 'Settings…', run: () => SB.settings.open() }]);
+        { label: 'Import files…', run: () => SB.io.pick('image/*,.svg,video/*,audio/*,.psd,.ai,.pdf', true, f => SB.io.importFiles(f)) }, { label: 'Saved objects…', icon: 'library', run: () => SB.rigLib.open() }, '-',
+        { label: 'Export…', run: () => SB.exporter.open() }, { label: 'Settings…', run: () => SB.settings.open() }], 0, null, { cls: 'small' }); // the logo menu: a bit smaller (record voice: the tool bar; screen settings: the panel, or right-click the stage)
     },
   };
 })(window.SB);

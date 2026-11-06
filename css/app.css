@@ -743,6 +743,11 @@ select.mini:disabled { opacity: .7; cursor: default; }
 .tl-row.nr > .tl-head { box-shadow: inset 3px 0 0 #EAB308; background: rgba(250,204,21,.10); }
 .tl-row.nr .clip { outline: 2px solid #FACC15; outline-offset: -2px; }
 .menu button.nr { box-shadow: inset 3px 0 0 #FACC15; }
+.menu.small { transform: scale(.9); transform-origin: 0 0; } /* the logo menu, 10% smaller */
+.gfbox { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; width: 100%; } .gf-pre { opacity: .7; font-size: 12.5px; }
+.gfbox .gf-in { flex: 1; min-width: 120px; height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: inherit; font: inherit; }
+.gf-path { flex-basis: 100%; margin: 0; }
+#ctxbar input.sz-num { width: 72px; min-width: 72px; } /* the screen's width and height in the Screens bar */
 .issue-box { margin: 8px 14px; padding: 8px 10px; border-radius: 10px; background: rgba(229,72,77,.08); border: 1px solid rgba(229,72,77,.35); display: flex; gap: 8px; align-items: center; justify-content: space-between; } .issue-box .hint { margin: 0; }
 label.chk.off { opacity: .5; cursor: not-allowed; }
 
@@ -1276,5 +1281,6 @@ body.ts-open .toast { z-index: 930; }
 .fx-warn .fx-where { margin-top: 5px; }
 .fx-warn .fx-where summary { cursor: pointer; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; width: max-content; }
 .fx-warn .fx-where ul { margin: 5px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; }
-.fx-warn .fx-where li { margin: 2px 0; } .fx-warn .fx-where .nr { font-weight: 600; } .fx-warn .fx-where small { opacity: .8; }
+.fx-warn .fx-where li { margin: 2px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; } .fx-warn .fx-where li.off > span:first-child { text-decoration: line-through; opacity: .7; }
+.fx-warn .fx-acts { margin-left: auto; display: inline-flex; gap: 2px; } .fx-warn .fx-acts .btn { padding: 1px 6px; min-height: 0; font-size: 12px; } .fx-warn .fx-where .nr { font-weight: 600; } .fx-warn .fx-where small { opacity: .8; }
 .dark .hint.bake, [data-theme="dark"] .hint.bake { color: #FDE68A; background: rgba(250, 204, 21, 0.12); border-color: rgba(250, 204, 21, 0.4); }

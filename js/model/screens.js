@@ -22,7 +22,16 @@
     find: id => (S.screens || []).find(s => s.id === id),
 
     /** What history and files store: every screen, with the active one marked. */
-    meta() { if (!S.screens) return null; Sc.sync(); const ex = s => Object.assign(s.tmpl ? { tmpl: s.tmpl } : {}, s.from ? { from: s.from } : {}, s.editOf ? { editOf: s.editOf, back: s.back } : {}); return S.screens.map(s => s.id === S.scr ? Object.assign({ id: s.id, name: s.name, x: s.x, y: s.y, active: true }, ex(s)) : Object.assign({ id: s.id, name: s.name, x: s.x, y: s.y, proj: s.proj, objects: s.objects }, ex(s))); },
+    meta() { if (!S.screens) return null; Sc.sync(); const ex = s => Object.assign(s.tmpl ? { tmpl: s.tmpl } : {}, s.from ? { from: s.from } : {}, s.editOf ? { editOf: s.editOf, back: s.back } : {}, s.group ? { group: s.group } : {}); return S.screens.map(s => s.id === S.scr ? Object.assign({ id: s.id, name: s.name, x: s.x, y: s.y, active: true }, ex(s)) : Object.assign({ id: s.id, name: s.name, x: s.x, y: s.y, proj: s.proj, objects: s.objects }, ex(s))); },
+    /** Screen groups (s.group: a character, an enemy…): each exports to Unity / Godot as its own prefab or scene with its own
+        animations. [{ name, screens }] in board order, screens without a group in one named `rest`; null when none has a group. */
+    groupsOf(list, rest) {
+      if (!list || !list.some(s => s.group)) return null; const by = new Map();
+      for (const s of list) { const k = s.group || rest || 'Animation'; if (!by.has(k)) by.set(k, []); by.get(k).push(s); }
+      return [...by].map(([name, screens]) => ({ name, screens }));
+    },
+    /** The group names used in this project. */
+    groupNames() { return S.screens ? [...new Set(S.screens.map(s => s.group).filter(Boolean))] : []; },
     /** Rebuild the screens from meta(). The active one takes the current S.project / S.objects. */
     restore(list, migrate) {
       Sc.ver++;

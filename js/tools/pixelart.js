@@ -144,6 +144,7 @@
         W.popSlider('Size', brush(), { min: 1, max: 32, unit: ' px', title: 'Brush size in pixels of the grid', input: v => { S.pxSize = v; SB.dirty(); } }),
         W.seg(S.pxMode || 'draw', [['draw', 'Draw', 'Paint squares'], ['erase', 'Erase', 'Remove squares'], ['fill', 'Fill', 'Fill the joined squares of one color (or an empty area)']], v => { S.pxMode = v; SB.invalidate('ctxbar'); }),
         h('span.vsep'), W.check(PX.on(), 'Pixel art screen', v => PX.set({ on: v })), PX.on() ? sizeSelect() : null,
+        ok(tree.sel()) ? W.btn('To vector', () => PX.toVector(tree.sel()), { cls: 'sm ghost', icon: 'pen', title: 'Turn this Pixel art layer into a vector drawing you can edit (one shape per color, every frame)' }) : null,
         W.info(['Paints squares on the screen\'s pixel grid, on a Pixel art layer (made for you when you start). Frame by frame works like a drawing.', 'Pixel art screen: everything on this screen, shapes, text and drawings too, turns into pixels of this size, on the stage and in exports.', 'Alt-click picks a color. The Eraser tool erases squares too.'], 'Pixel brush')];
     },
   });
@@ -253,6 +254,21 @@
     tree.select([d.id]); SB.commit(); SB.invalidate();
     SB.toast(how === 'grad' ? 'Now a vector path with a gradient: drag its ends or color dots with the Gradient tool to change it.' : 'Now vector shapes, one per color: edit them with the Path tool or recolor them.');
   }
+
+  /** A whole Pixel art layer becomes a vector drawing: every frame, one filled path per color (the same squares,
+      as shapes you can edit). It keeps its place, id, keys, timing and effects, so rigs and controllers still find it. */
+  PX.toVector = o => {
+    if (!o || o.type !== 'pixels') return null; const cs = o.cs || 1;
+    const frames = (o.frames && o.frames.length ? o.frames : [{ px: {} }]).map(fr => {
+      const by = new Map(); for (const k in fr.px || {}) { const c = fr.px[k]; if (!c) continue; if (!by.has(c)) by.set(c, []); by.get(c).push(k); }
+      const strokes = [...by].map(([c, ks]) => ({ b: 1, subs: outlineOf(ks).map(L => SB.paths.poly(L.map(v => v * cs), true)), c: '#24213F', s: 0, fc: c })).filter(st => st.subs.length);
+      const f = Object.assign(U.deep(fr), { strokes }); delete f.px; delete f.pg; return f;
+    });
+    const d = Object.assign(U.deep(o), { type: 'draw', frames }); delete d.cs;
+    const l = tree.listOf(o); l.splice(l.indexOf(o), 1, d); tree.reindex(); tree.select([d.id]); if (S.pxGradSel && S.pxGradSel.oid === d.id) S.pxGradSel = null; SB.commit(); SB.invalidate();
+    SB.toast(frames.length > 1 ? `Now a vector drawing with ${frames.length} frames: one shape per color. Double-click a shape to move its points.` : 'Now a vector drawing: one shape per color. Double-click a shape to move its points.');
+    return d;
+  };
 
   const gr = SB.tools.get('gradient');
   const pxGrad = () => { const s = tree.sel(); return ok(s) || (PX.on() && !(s && ['shape', 'draw', 'text'].includes(s.type))); };

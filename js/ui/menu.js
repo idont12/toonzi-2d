@@ -6,16 +6,16 @@
   const levels = [];
   const clean = items => { const out = []; items.filter(Boolean).forEach(it => { if (typeof it === "object" && it.sub) { it.sub = clean(it.sub); if (!it.sub.length) return; } if (it === '-' && (!out.length || out[out.length - 1] === '-')) return; out.push(it); }); while (out[out.length - 1] === '-') out.pop(); return out; };
   function el(level) { if (!levels[level]) { const m = h('div.menu', { role: 'menu', hidden: true }); document.body.appendChild(m); levels[level] = m; } return levels[level]; }
-  function open(x, y, items, level = 0, anchor) {
-    const m = el(level), list = clean(items);
+  function open(x, y, items, level = 0, anchor, opt) {
+    const m = el(level), list = clean(items); m.className = 'menu' + (opt && opt.cls ? ' ' + opt.cls : ''); // opt.cls: a class for it and its submenus (small: the logo menu)
     for (let l = level + 1; l < levels.length; l++) levels[l].hidden = true;
     m.innerHTML = ''; m._items = list;
     list.forEach((it, i) => {
       if (it === '-') return m.appendChild(h('hr'));
       if (it.head) return m.appendChild(h('div.mh', null, it.head));
       const b = h('button' + (it.cls ? '.' + it.cls : ''), { type: 'button', role: 'menuitem', disabled: !!it.disabled, html: `<span class="mi">${it.icon ? SB.icon(it.icon) : ''}<span>${U.esc(it.label)}</span></span>${it.sub ? '<kbd>›</kbd>' : it.kbd ? `<kbd>${U.esc(it.kbd)}</kbd>` : ''}` });
-      b.onclick = () => { if (it.sub) return open(0, 0, it.sub, level + 1, b); const path = SB.macros && it.run ? SB.macros.pathOf(b) : null; close(); if (path && SB.macros.rec) SB.macros.note({ m: path }); if (it.run) it.run(); if (path) reveal(path[0]); };
-      b.onpointerenter = e => { if (e.pointerType !== 'mouse') return; if (it.sub && !it.disabled) open(0, 0, it.sub, level + 1, b); else { for (let l = level + 1; l < levels.length; l++) levels[l].hidden = true; m.querySelectorAll('.sub-open').forEach(x => x.classList.remove('sub-open')); } };
+      b.onclick = () => { if (it.sub) return open(0, 0, it.sub, level + 1, b, opt); const path = SB.macros && it.run ? SB.macros.pathOf(b) : null; close(); if (path && SB.macros.rec) SB.macros.note({ m: path }); if (it.run) it.run(); if (path) reveal(path[0]); };
+      b.onpointerenter = e => { if (e.pointerType !== 'mouse') return; if (it.sub && !it.disabled) open(0, 0, it.sub, level + 1, b, opt); else { for (let l = level + 1; l < levels.length; l++) levels[l].hidden = true; m.querySelectorAll('.sub-open').forEach(x => x.classList.remove('sub-open')); } };
       m.appendChild(b);
     });
     m.hidden = false; const r = m.getBoundingClientRect(), vw = innerWidth, vh = innerHeight;

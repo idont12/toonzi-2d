@@ -267,24 +267,32 @@
   /** The one yellow warning about visual effects a game engine or Blender can't make itself, with a "Show where" list.
       items: [{ label: 'Screen › Layer: Outline', how: 'sprite' | 'frames' | 'out' }] */
   const HOW = { sprite: 'drawn onto its sprite', frames: 'frame by frame', out: 'left out' };
-  function fxWarnBox(items, who) {
-    if (!items.length) return null; const n = items.length;
-    return h('div.hint.bake.fx-warn', null, h('b', null, '⚠ You are using visual effects. '),
-      `${who} can’t make them itself, so they are drawn into pictures. That can make your animation heavier and can have small bugs (an edge cut off, a shadow turning with the layer), so be aware and check it in ${who}.`,
-      h('details.fx-where', null, h('summary', null, `Show where (${n} layer${n > 1 ? 's' : ''})`),
-        h('ul', null, items.map(it => h('li', null, h('span', null, it.label), h('span.nr', null, ` (${SB.targets ? SB.targets.NOT_REC : 'not recommended'})`), h('small', null, ` · ${HOW[it.how] || it.how}`))))));
+  /** items may carry act: { off, hide(), del() } (in the export dialog): a button to leave that effect out of this
+      export (the layer keeps it) and one to delete it from the layer. */
+  function fxWarnBox(items, who, open) {
+    if (!items.length) return null; const n = items.length, on = items.filter(it => it.how !== 'hidden').length;
+    const li = it => h('li' + (it.how === 'hidden' ? '.off' : ''), null, h('span', null, it.label), it.how === 'hidden' ? null : h('span.nr', null, ` (${SB.targets ? SB.targets.NOT_REC : 'not recommended'})`), h('small', null, ` · ${it.how === 'hidden' ? 'hidden from this export' : HOW[it.how] || it.how}`),
+      it.act ? h('span.fx-acts', null,
+        W.btn(it.how === 'hidden' ? 'Show' : 'Hide', it.act.hide, { cls: 'sm ghost', icon: it.how === 'hidden' ? 'eye' : 'eyeOff', title: it.how === 'hidden' ? 'Put this effect back in the export' : `Leave this effect out of the export (the layer keeps it in the editor)` }),
+        W.btn('', it.act.del, { cls: 'sm ghost icon', icon: 'trash', title: 'Delete this effect from the layer' })) : null);
+    return h('div.hint.bake.fx-warn', null, on ? h('b', null, '⚠ You are using visual effects. ') : h('b', null, 'Visual effects hidden from this export. '),
+      on ? `${who} can’t make them itself, so they are drawn into pictures. That can make your animation heavier and can have small bugs (an edge cut off, a shadow turning with the layer), so be aware and check it in ${who}.` : `The layers keep them in the editor.`,
+      h('details.fx-where', open ? { open: true } : null, h('summary', null, `Show where (${n} effect${n > 1 ? 's' : ''})`), h('ul', null, items.map(li))));
   }
   /** After exporting: the pixel art note, and the one visual effects warning (what went onto sprites and frame by frame). */
   const bakeNote = (list, kind, still) => { const l = [...(list || [])], who = NAME[kind] || kind, px = l.filter(x => / \(pixel art screen\)$/.test(x)), fx = l.filter(x => !px.includes(x)), st = [...(still || [])]; if (!l.length && !st.length) return null;
     const items = fx.map(x => ({ label: x.replace(/ \((.*)\)$/, ': $1'), how: 'frames' })).concat(st.map(x => ({ label: x.replace(/ \((.*)\)$/, ': $1'), how: 'sprite' })));
+    if (!items.length && !px.length) return null;
     return h('div', null, px.length ? h('p.hint.bake', null, h('b', null, 'Frame by frame: '), `${px.map(x => x.replace(/ \(pixel art screen\)$/, '')).join(', ')} (pixel art): one sharp picture a frame, so it keeps its pixel look.`) : null, fxWarnBox(items, who)); };
   const engineNote = (who, w) => w.length ? `Left out (${who} can’t show them): ${w.join(', ')}.` : '';
   async function unity(job, o, prog) {
-    const r = await SB.unity.build(job.screens, { fps: o.fps, base: o.base, title: S.project.name, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, bakeFx: o.bakeFx !== false, stillFx: o.stillFx !== false, pixelFrames: o.pixelFrames !== false, prog });
+    const groups = Sc.groupsOf(job.screens, S.project.name || 'Animation'); // screen groups: one prefab each
+    const r = await SB.unity[groups ? 'buildGroups' : 'build'](groups || job.screens, { fps: o.fps, base: o.base, title: S.project.name, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, bakeFx: o.bakeFx !== false, stillFx: o.stillFx !== false, pixelFrames: o.pixelFrames !== false, folder: SB.gameLink ? SB.gameLink.folder('unity') : '', prog });
     return { files: r.files, project: r.project, baked: r.baked, still: r.still, note: [engineNote('Unity', r.warnings), ...(r.tips || [])].filter(Boolean).join(' ') };
   }
   async function godot(job, o, prog) {
-    const r = await SB.godot.build(job.screens, { fps: o.fps, base: o.base, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, bakeFx: o.bakeFx !== false, stillFx: o.stillFx !== false, pixelFrames: o.pixelFrames !== false, prog });
+    const groups = Sc.groupsOf(job.screens, S.project.name || 'Animation'); // screen groups: one scene (and AnimationPlayer) each
+    const r = await SB.godot[groups ? 'buildGroups' : 'build'](groups || job.screens, { fps: o.fps, base: o.base, morphSteps: o.morphSteps, lineFrames: o.lineFrames ?? 8, bakeFx: o.bakeFx !== false, stillFx: o.stillFx !== false, pixelFrames: o.pixelFrames !== false, folder: SB.gameLink ? SB.gameLink.folder('godot') : '', prog });
     return { files: r.files.map(f => ({ name: f.name, blob: new Blob([f.data]) })), project: r.project, baked: r.baked, still: r.still, zip: true, note: engineNote('Godot', r.warnings) };
   }
   async function rive(job, o, prog) {
@@ -334,13 +342,24 @@
         if (!BAKE_KINDS[o.kind] || !SB.engines) return []; Sc.sync(); const scr = chosen(), t = o.kind === 'blender' ? 'blender' : 'game', who = NAME[o.kind], stillOk = !!STILL_KINDS[o.kind];
         const pix = PIXEL_KINDS[o.kind] && scr.some(sc => sc.proj && sc.proj.pixel && sc.proj.pixel.on), fx = scr.some(sc => SB.tree.all(sc.objects || []).some(x => SB.engines.fxBad(x, t).length));
         const opt = { bakeFx: o.bakeFx !== false, stillFx: stillOk && o.stillFx !== false, pixelFrames: !!pix && o.pixelFrames !== false };
-        const list = SB.engines.bakeList(scr, opt, t), places = SB.engines.fxPlaces(scr, opt, t);
+        const restore = offApply(scr); let list, places; try { list = SB.engines.bakeList(scr, opt, t); places = SB.engines.fxPlaces(scr, opt, t); } finally { restore(); }
+        const pre = sc => scr.length > 1 ? sc + ' › ' : '', items = [];
+        for (const x of places) for (const f of x.fxs) items.push({ label: `${pre(x.screen)}${x.name}: ${f.label}`, how: x.how, act: fxAct(scr, x.id + ':' + f.id) });
+        for (const k of o.fxOff || []) { const f = fxIn(scr, k); if (f) items.push({ label: `${pre(f.sc.name)}${f.o.name}: ${(SB.effects.get(f.e.type) || { label: f.e.type }).label}`, how: 'hidden', act: fxAct(scr, k) }); }
         return [
           pix ? W.row('Pixel art', W.check(o.pixelFrames !== false, 'Pixel art screens frame by frame', v => { o.pixelFrames = v; form(true); }), W.info(`A pixel art screen goes as one sharp picture a frame (no smoothing), so it keeps its pixel look in ${who}. Off: its layers go one by one, smooth, like any screen.`)) : null,
           fx && stillOk ? W.row('Effects', W.check(opt.stillFx, 'Still effects onto the sprite (keeps rigs and controllers)', v => { o.stillFx = v; form(true); }), W.info(`An outline, shadow, glow or other look that doesn’t change is drawn into the layer’s picture once. The layer stays one sprite in ${who}, so its bones, controllers and keyframes keep working. Off: those layers go frame by frame instead, without their rig or controllers.`)) : null,
           fx ? W.row(stillOk ? '' : 'Effects', W.check(o.bakeFx !== false, stillOk ? 'Other effects frame by frame' : `Effects ${who} can’t do: frame by frame`, v => { o.bakeFx = v; form(true); }), W.info(`Effects that change over time${stillOk ? ' (or all of them, when the box above is off)' : ''} become a picture a frame for those layers, so they look the same. Off: they are left out.`)) : null,
-          ...bakeLines(list, who), fxWarnBox(places.map(x => ({ label: `${scr.length > 1 ? x.screen + ' › ' : ''}${x.name}: ${x.fx.join(', ')}`, how: x.how })), who)];
+          ...bakeLines(list, who), fxWarnBox(items, who, whereOpen)];
       };
+      /** Effects hidden from this export (o.fxOff: 'layerId:effectId'): the layers keep them, the export leaves them out. */
+      let whereOpen = false;
+      const fxIn = (scr, key) => { const [oid, eid] = key.split(':'); for (const sc of scr) { const x = SB.tree.all(sc.objects || []).find(y => y.id === oid), e = x && (x.effects || []).find(y => y.id === eid); if (e) return { sc, o: x, e }; } return null; };
+      const offApply = scr => { const back = []; for (const k of o.fxOff || []) { const f = fxIn(scr, k); if (f && f.e.on !== false) { back.push([f.e, f.e.on]); f.e.on = false; } } return () => back.forEach(([e, v]) => { if (v === undefined) delete e.on; else e.on = v; }); };
+      const fxAct = (scr, key) => ({
+        hide: () => { const L = o.fxOff = (o.fxOff || []).slice(), i = L.indexOf(key); if (i >= 0) L.splice(i, 1); else L.push(key); whereOpen = true; form(true); },
+        del: () => { const f = fxIn(scr, key); if (!f) return; SB.fx.remove(f.o, f.e.id); o.fxOff = (o.fxOff || []).filter(k => k !== key); SB.commit(); SB.toast(`Deleted ${(SB.effects.get(f.e.type) || { label: 'the effect' }).label} from ${f.o.name}. Undo brings it back.`); whereOpen = true; form(true); },
+      });
       const bakeLines = (list, who) => { const px = list.filter(x => / \(pixel art screen\)$/.test(x));
         return [px.length ? h('p.hint.bake', null, h('b', null, 'Frame by frame: '), `${px.map(x => x.replace(/ \(pixel art screen\)$/, '')).join(', ')} (pixel art). Each frame goes as one sharp picture, so it keeps its pixel look. Its layers can’t be moved one by one in ${who}.`) : null];
       };
@@ -355,7 +374,8 @@
         try {
           for (let j = 0; j < list.length; j++) {
             const job = list[j], name = Sc.many() && !job.engine ? `${proj}-${U.slug(job.name)}` : proj, sub = (f, msg) => prog((j + f) / list.length, (sep ? `${job.name}: ` : '') + (msg || ''));
-            const r = await RUN[o.kind](job, Object.assign({}, o, { base: name, transparent: o.kind === 'video' ? o.trV : o.trI }), sub);
+            const back = BAKE_KINDS[o.kind] ? offApply(job.screens || (job.screen ? [job.screen] : [])) : null; let r; // effects hidden from this export stay out of it
+            try { r = await RUN[o.kind](job, Object.assign({}, o, { base: name, transparent: o.kind === 'video' ? o.trV : o.trI }), sub); } finally { if (back) back(); }
             r.files.forEach(f => { f.name = f.name || `${name}.${f.ext}`; if (sep || r.zip) f.name = (sep && r.zip ? U.slug(job.name) + '/' : '') + f.name; files.push(f); });
             if (r.note && !note.includes(r.note)) note += r.note + ' '; (r.baked || []).forEach(b => baked.add(b)); (r.still || []).forEach(b => still.add(b));
             if (linked && r.project) done = await SB.gameLink.write(o.kind, linked, r.project.files, r.project.own, sub);
@@ -406,7 +426,8 @@
         }
         if (!video && o.ifmt === 'avif' && !caps.avif) o.ifmt = 'webp';
         const alphaOk = baked ? true : video ? !!(F.alpha && caps.alpha && caps.webcodecs) : !!F.alpha, list = jobs(), j0 = list[0];
-        const dims = engine ? `${chosen().length} screen${chosen().length > 1 ? 's' : ''} → ${chosen().length} animation${chosen().length > 1 ? 's' : ''} (${chosen().map(s => s.name).join(', ')})` : `${Math.round(j0.w * o.scale)} × ${Math.round(j0.h * o.scale)} px, ${Math.max(1, Math.round(j0.duration * o.fps))} frames${list.length > 1 ? ` (first of ${list.length} files)` : ''}`;
+        const sgr = engine && (o.kind === 'unity' || o.kind === 'godot') ? Sc.groupsOf(chosen(), S.project.name || 'Animation') : null;
+        const dims = sgr ? `${sgr.length} group${sgr.length > 1 ? 's' : ''}, each its own ${o.kind === 'unity' ? 'prefab with its own Animator' : 'scene with its own AnimationPlayer'}: ${sgr.map(g => `${g.name} (${g.screens.map(s => s.name).join(', ')})`).join('; ')}` : engine ? `${chosen().length} screen${chosen().length > 1 ? 's' : ''} → ${chosen().length} animation${chosen().length > 1 ? 's' : ''} (${chosen().map(s => s.name).join(', ')})` : `${Math.round(j0.w * o.scale)} × ${Math.round(j0.h * o.scale)} px, ${Math.max(1, Math.round(j0.duration * o.fps))} frames${list.length > 1 ? ` (first of ${list.length} files)` : ''}`;
         const fmtOpts = baked || vec ? [] : video ? Object.entries(VIDEO).map(([k, v]) => [k, v.label, v.info]) : Object.entries(IMAGE).map(([k, v]) => [k, v.label, k === 'avif' && !caps.avif ? 'This browser can’t encode AVIF' : v.info]).concat(o.kind === 'sheet' ? [['svg', 'SVG', 'Vector: every frame as shapes, sharp at any size']] : []);
         const fmtSeg = seg(video ? o.vfmt : o.ifmt, fmtOpts, v => { if (video) o.vfmt = v; else { if (v === 'avif' && !caps.avif) return SB.toast('This browser can’t encode AVIF. Try WebP, it is small and keeps transparency too.'); o.ifmt = v; } form(); });
         if (!video && !caps.avif) { const b = fmtSeg.children[fmtOpts.findIndex(f => f[0] === 'avif')]; if (b) b.disabled = true; }

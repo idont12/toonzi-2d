@@ -249,7 +249,8 @@
       </table></div>
 
       <h3>The logo menu</h3>
-      <p class="menupath">Tutorials… · Documentation · New project · Open project… · Recent projects · Examples · Save project · Copy a link to this animation · Import files… · Record voice · Saved objects… · Export… · Project settings… · Settings…</p>
+      <p class="menupath">Tutorials… · Documentation · New project · Open project… · Recent projects · Examples · Save project · Copy a link to this animation · Import files… · Saved objects… · Export… · Settings…</p>
+      <p><em>Record voice</em> is in the tool bar under the stage; the screen's size, frame rate and background are in the panel on the right (<em>This screen</em>), in the Screens bar, or right-click the stage › <em>Screen settings…</em>.</p>
 
       <h3>Layouts: desktop, tablet, phone</h3>
       <p>The layout fits the window. Wide: tools left, properties right, timeline below. Medium: the properties panel slides over the stage (use the panel button or <kbd>I</kbd>). Narrow: the stage is on top, the tools sit in a strip, and a dock below has <em>Timeline</em> and <em>Layer</em> tabs. Choose one yourself in <em>Settings › Appearance › Layout</em>.</p>
@@ -568,6 +569,7 @@
     <!-- ===================================================== -->
     <section id="pixelart">
       <h2><span class="num">13</span>Pixel art</h2>
+      <p>New to it? Logo menu › <strong>Tutorials…</strong> › <strong>Pixel art</strong> walks you through a little pixel scene with a gradient sky (5 minutes).</p>
       <p>Any screen can be pixel art: it is drawn at a small size and shown big with no smoothing, so everything on it (shapes, text, drawings, particles) becomes pixels on one grid, on the stage and in every export.</p>
       <ol class="steps">
         <li>Click an empty part of the stage. In the panel, <strong>Pixel art</strong> › turn on <strong>This screen is pixel art</strong> and pick the <strong>Size</strong> (pixels across, from 32 to 640).</li>
@@ -578,6 +580,7 @@
       </ol>
       <ul><li>The <strong>Fill</strong> tool (<kbd>G</kbd>) works on a pixel art screen too: it fills the joined pixels of one color as the screen shows them, so lines drawn with any tool (the Brush, the Pen, shapes) hold the color in. It paints squares on the screen's Pixel art layer.</li><li><strong>Sharp edges</strong> (on by default) makes each pixel fully on or off, with no soft edges.</li><li>The grid shows on the stage while the Pixel brush is picked and you are zoomed in enough to see it.</li>  <li>The <strong>Gradient</strong> tool paints pixel gradients: drag from where the first color starts to where the last ends. In the bar above the stage pick the kind: <strong>Normal</strong> (plain bands), <strong>Dithering</strong> (a checker pattern between bands, the classic pixel look) or <strong>Halftone</strong> (dots that grow from one color into the next; <strong>Dot size</strong>), plus <strong>Linear</strong> or <strong>Radial</strong> and the number of <strong>Steps</strong>.</li>
         <li>The pixel gradient stays <strong>editable</strong>: its line shows on the stage. Drag its ends or the line, slide the color dots, double-click the line for another color, click a color in the bar to change it, or <strong>Reverse</strong> it. Click a gradient you made earlier to edit it again; <strong>Done</strong> lets go of it. Squares you painted over since keep your paint.</li>
+        <li>A whole Pixel art layer can become vector art too: right-click it › <strong>Convert to vector drawing</strong> (or <strong>To vector</strong> in the Pixel brush bar). Every frame becomes editable shapes, one per color, exactly where the squares were; its keys, timing and effects stay.</li>
         <li><strong>To vector</strong> (in the bar) turns the gradient into vector art you can edit: <em>A vector gradient</em> (one smooth path whose gradient the Gradient tool edits) or <em>Vector shapes</em> (the same pixels as one shape per color).</li>
         <li>The onion skin shows the frames before and after on Pixel art layers too.</li>
         <li>In Unity and Godot exports, a pixel art screen can go <strong>frame by frame</strong> (one sharp picture a frame, no smoothing) to keep its pixel look; see <a href="#export">Exporting</a>.</li>
@@ -618,9 +621,10 @@
       <ul>
         <li>Pick the <strong>Screens</strong> tool (<kbd>M</kbd>) and drag on empty space to draw a screen. Or use <em>Add a screen…</em> in the bar for a size or <em>From template</em>.</li>
         <li>Click a screen to work on it. Drag a screen's name to move it; double-click the name for its settings. Drag a layer onto another screen to move it there.</li>
+        <li>Click a screen's name (or use the Screens tool) and the bar at the top shows the screens, with this screen's <strong>size</strong> (a list of sizes, or type the width and height), <strong>background color</strong> and <strong>Group</strong>, plus Duplicate, Delete and Settings.</li>
         <li><strong>Screen settings</strong> (or <em>Project settings</em> with one screen): name, size (Wide 16:9, Vertical 9:16, Square 1:1, Classic 4:3, Portrait 4:5, Cinema 21:9, Sprite 512, or a custom size), frame rate (12, 24, 25, 30, 60, or type any number from 1 to 240), length, and background (color, image, or a texture). The <strong>Frame rate</strong> box is also in the panel on the right (click an empty part of the stage: <em>This screen</em> › Frame rate).</li>
         <li><strong>Screen templates:</strong> <em>Save as screen template</em> makes a screen the original. <em>Add a screen › From template</em> makes linked copies that keep their own animation. Change the original, press <strong>Update</strong>, and the copies follow. A rig then starts from the same pose in every animation.</li>
-        <li>For game engines, one screen becomes one animation.</li>
+        <li>For game engines, one screen becomes one animation. Screens with the same <strong>Group</strong> (a character, an enemy) become one prefab or scene; see <a href="#export">Groups</a>.</li>
       </ul>
     </section>
 
@@ -646,11 +650,15 @@
       <p>For <strong>Unity</strong> and <strong>Godot</strong>, set <strong>Save</strong> to <strong>Into my project</strong> (Chrome or Edge on a computer). The first time, pick your project folder: for Unity the one with the <code>Assets</code> folder, for Godot the one with <code>project.godot</code>. After that, every export writes the same files with the same names and ids, so the engine reimports them by itself and your scenes keep their links, the way Spine and Aseprite files are updated.</p>
       <ul>
         <li>Unity: files go to <code>Assets/&lt;project name&gt;/</code> (and shared scripts to <code>Assets/StoryboardStudio/</code>). Godot: a folder named after the project.</li>
+        <li><strong>Folder</strong>: put the export deeper in the project, like <code>Art/Characters</code> (Unity: inside <code>Assets</code>; Godot: inside the project). Missing folders are made for you, and it is kept with the project, so the next export goes to the same place. The Unity package uses it too.</li>
+        <li>Unity: when you export again, the <strong>Animator Controller</strong> that is already there is <strong>updated, not replaced</strong>: your parameters, transitions, layers and extra states stay; only the states of new animations are added and those of animations you removed go (with the transitions into them). Godot: keep your AnimationTree and its parameters in an inherited scene (Scene › New Inherited Scene), and they survive updates.</li>
         <li>Files that didn't change are left alone. Files the export no longer makes (a layer you deleted) are removed, only from that folder.</li>
         <li>Keep your own changes outside the exported files: in Unity a <strong>Prefab Variant</strong> of the exported prefab (and your own scenes), in Godot an <strong>inherited scene</strong> (Scene › New Inherited Scene). Those survive updates. The exported scene itself is rewritten.</li>
         <li>Renaming or deleting a layer that your game uses by name breaks that link, like renaming a bone in Spine.</li>
       </ul>
 
+      <h3>Groups: several characters in one export</h3>
+      <p>One project can hold the animations of every character in your game: the hero, an enemy, a door… Give each screen a <strong>Group</strong> (Screens tool, or click a screen's name: the bar at the top has <strong>Group</strong> › <em>New group…</em>). Every screen stays its own animation (and every action of a rig too); in Unity and Godot each group becomes <strong>its own prefab or scene</strong> with its own Animator or AnimationPlayer, all in one export and one folder (<code>&lt;project&gt;/&lt;group&gt;/</code>). Screens without a group share one named after the project. The board shows each screen's group as a green tag, and the export dialog lists the groups.</p>
       <h3>Effects in Unity, Godot and Blender</h3>
       <p>Game engines and Blender move, turn, scale and fade layers, but they can't draw outlines, glows, shadows, blurs and similar looks. You can still use them in a <strong>Game Engine</strong> or <strong>Blender</strong> screen: they are marked <strong>yellow</strong> (“not recommended”) in the effects menu, on the effect in the panel and on the layer's row in the timeline, and the export draws them into pictures:</p>
       <ul>
@@ -658,7 +666,7 @@
         <li><strong>Other effects frame by frame</strong> (on by default): effects that change over time (and, for Blender, every one) make the layer <strong>one picture a frame</strong>, with its effects, so it looks the same, but without its rig or controllers.</li>
       </ul>
       <p> A pixel art screen has its own check, <strong>Pixel art screens frame by frame</strong> (Unity, Godot): each frame of the whole screen becomes one sharp picture (Godot: nearest filter; Unity: Point filter, no compression, in a <code>Pixel Sprites</code> folder).</p>
-      <div class="callout warn"><b>One yellow warning.</b> When a screen uses such effects, the dialog (and the result after exporting) shows one warning: <em>You are using visual effects</em>: they can make your animation heavier and have small bugs, so check it in the engine. <strong>Show where</strong> lists every layer with them, each marked <em>(not recommended)</em> and how it goes: onto its sprite, frame by frame, or left out. For a lighter export, turn the effect off or use one the engine can do (moves, fades).</div>
+      <div class="callout warn"><b>One yellow warning.</b> When a screen uses such effects, the dialog (and the result after exporting) shows one warning: <em>You are using visual effects</em>: they can make your animation heavier and have small bugs, so check it in the engine. <strong>Show where</strong> lists every effect, each marked <em>(not recommended)</em> and how it goes: onto its sprite, frame by frame, or left out. Each has <strong>Hide</strong> (leave it out of this export only; the layer keeps it in the editor, <strong>Show</strong> puts it back) and a trash button (delete it from the layer). For a lighter export, turn the effect off or use one the engine can do (moves, fades).</div>
 
       <h3>More than one screen</h3>
       <p>The <strong>Screen</strong> box in the dialog has a check box for each screen. For video, sheets, images and SVG you get one file per screen in a ZIP, or tick <strong>Combine them into one (as they sit on the board)</strong>. For Unity, Godot and Rive, all chosen screens go into one file, each as an animation.</p>
@@ -731,7 +739,7 @@
       <dl class="kv">
         <dt>1 Basics</dt><dd>Drawing: brush and eraser · Keyframes and tweens</dd>
         <dt>2 Effects and video</dt><dd>Effects and transitions · A logo reveal in one minute · Masks: a window for a layer · Video editing basics</dd>
-        <dt>3 Drawing</dt><dd>Drawing: fills and shaping · Vectors: the Pen</dd>
+        <dt>3 Drawing</dt><dd>Drawing: fills and shaping · Vectors: the Pen · Pixel art</dd>
         <dt>4 Animation</dt><dd>Auto key: a hop with a flip · Frame by frame · Storyboard: one drawing per shot</dd>
         <dt>5 Rigs and controllers</dt><dd>Bones and rigs · Controllers: eyes that follow · Actions: more than one animation · Action strips: wave, then hop · Advanced rigs: weights and bending</dd>
         <dt>6 Quick and powerful</dt><dd>Living lines: animated brush · Physics: drop and bounce · Follow: a hand grabs a ball · Slingshot: keys, then physics · Dynamic bones: a wobbly antenna · A swinging ball: hang physics</dd>
@@ -763,6 +771,12 @@
         <li>Opening a link again (a reload) keeps your changes. A different link replaces the project in this browser; the one you had is kept in <strong>Recent projects</strong>.</li>
         <li>The command line <code>tools/toonzi.mjs</code> (Node 18+) checks a project, makes links and editor files, takes preview pictures and runs the app: <code>node tools/toonzi.mjs help</code>.</li>
         <li>Links also work as <code>index.html?open=&lt;address of a .json file&gt;</code>, for projects on your own server.</li>
+      </ul>
+      <h3>Right in the chat (no long links)</h3>
+      <p>In a chat that shows pages, like Claude's artifacts, the AI can put <strong>the editor itself in the chat</strong> with your animation. You change it right there, and the AI sees your changes the next time you ask it for something (it reads the animation the page saved), or it updates the animation in the open page for you.</p>
+      <ul>
+        <li>Elsewhere, the AI can give you a <strong>host page</strong>: the editor in a frame with <strong>Copy for AI</strong> (copy your version and paste it in the chat) and <strong>Save .json</strong>. It remembers your changes in this browser.</li>
+        <li>Your own sites and tools can do the same: the editor talks to the page around it with messages (open an animation, hear every change). The details are in <a href="https://github.com/idont12/toonzi-2d/blob/main/AGENTS.md">AGENTS.md</a>.</li>
       </ul>
     </section>
 

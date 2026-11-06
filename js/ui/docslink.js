@@ -27,9 +27,9 @@
   const wrap = name => { const f = SB.menus[name]; if (f) SB.menus[name] = function (e, ...rest) { if (e && e.target) mark = { at: now(), target: e.target }; return f.call(this, e, ...rest); }; };
   wrap('stage'); wrap('timeline');
   const open0 = SB.menu.open;
-  SB.menu.open = (x, y, items, level = 0, anchor) => {
+  SB.menu.open = (x, y, items, level = 0, anchor, opt) => {
     if (!level && mark && now() - mark.at < 600 && Array.isArray(items) && items.some(Boolean) && !items.some(it => it && it.label === 'Documentation')) items = items.concat(['-', item(sectionFor(mark.target))]); // the selection is up to date by now
-    if (!level) mark = null; return open0(x, y, items, level, anchor);
+    if (!level) mark = null; return open0(x, y, items, level, anchor, opt);
   };
   SB.docs = { open, sectionFor, url: URL0 };
 })(window.SB);

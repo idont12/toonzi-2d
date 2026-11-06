@@ -497,7 +497,8 @@ func _draw() -> void:
     out.push('[node name="AnimationPlayer" type="AnimationPlayer" parent="."]', `libraries = {\n"": SubResource("AnimationLibrary_main")\n}`, `autoplay = ${q(anims[0].nm)}`, '');
     files.unshift({ name: `${dir}/${dir}.tscn`, data: new TextEncoder().encode(out.join('\n')) });
     files.push({ name: `${dir}/README.txt`, data: new TextEncoder().encode(readme(base, anims.map(a => a.nm), G)) });
-    return { files, warnings: [...warnings], baked: G.baked, still: G.still, project: { own: [dir], files: files.map(f => ({ path: f.name, data: f.data })) } }; // project: for writing straight into a Godot project (js/io/gamelink.js)
+    const sub = String(opt.folder || '').split('/').filter(Boolean).map(x => x.replace(/[^\w .-]+/g, '-')).join('/'), at = sub ? sub + '/' : ''; // opt.folder: a sub folder of the project (scenes use paths next to them, so it can sit anywhere)
+    return { files, warnings: [...warnings], baked: G.baked, still: G.still, project: { own: [at + dir], files: files.map(f => ({ path: at + f.name, data: f.data })) } }; // project: for writing straight into a Godot project (js/io/gamelink.js)
   }
   const readme = (base, names, G) => `${base}: exported from Toonzi 2D for Godot 4.
 
@@ -505,5 +506,18 @@ Copy the folder "${U.slug(base)}" into your Godot project and open ${U.slug(base
 Animations (AnimationPlayer): ${names.join(', ')}. RESET holds the starting pose.
 ${G.nodes.some(n => n.kind === 'rig') ? 'Bones are Skeleton2D / Bone2D. Bending layers are Polygon2D skinned to them; layers that ride on a bone are moved by a RemoteTransform2D on that bone.\n' : ''}${G.nodes.some(n => n.kind === 'ctrl') ? 'Controllers are empty Node2D nodes. The ones that drive something have a script: move them (drag them in the editor,\nanimate them, or set their position from code, also in the game) and the rig follows, like in Toonzi 2D. Their box shows in the editor only.\n' : ''}Play an animation from a script: $AnimationPlayer.play("${names[0]}")
 `;
-  SB.godot = { build };
+  /** Groups of screens (Screen › Group: a character, an enemy…), each its own scene with its own AnimationPlayer, all in
+      one folder: <folder>/<project>/<group>/<group>.tscn. */
+  async function buildGroups(groups, opt) {
+    const proj = U.slug(opt.base || 'animation'), sub = String(opt.folder || '').split('/').filter(Boolean).map(x => x.replace(/[^\w .-]+/g, '-')).join('/'), at = sub ? sub + '/' : '';
+    const files = [], warnings = new Set(), baked = [], still = [], used = new Set();
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i]; let name = g.name || 'Group'; while (used.has(U.slug(name))) name += ' 2'; used.add(U.slug(name));
+      const r = await build(g.screens, Object.assign({}, opt, { base: name, folder: '', prog: opt.prog ? (f, m) => opt.prog((i + Math.min(1, f)) / groups.length, `${name}: ${m || ''}`) : null }));
+      r.files.forEach(f => files.push({ name: `${proj}/${f.name}`, data: f.data }));
+      r.warnings.forEach(w => warnings.add(`${name}: ${w}`)); baked.push(...r.baked.map(b => `${name} › ${b}`)); still.push(...(r.still || []).map(b => `${name} › ${b}`));
+    }
+    return { files, warnings: [...warnings], baked, still, project: { own: [at + proj], files: files.map(f => ({ path: at + f.name, data: f.data })) } };
+  }
+  SB.godot = { build, buildGroups };
 })(window.SB);

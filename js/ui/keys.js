@@ -77,7 +77,7 @@
     if (S.poseLink) return SB.controls.cancelSlot();
     if (S.recording) return SB.record.stop();
     if (S.selKeys.size) { S.selKeys.clear(); return SB.invalidate('timeline'); }
-    if (S.screenSel) { S.screenSel = null; return SB.dirty(); }
+    if (S.screenSel) { S.screenSel = null; SB.invalidate('ctxbar'); return SB.dirty(); }
     if (S.tool !== 'select') return SB.tool.set('select');
     const o = sel(); if (o) { const p = tree.parentOf(o); tree.select(p && p.id !== S.ctx ? [p.id] : []); return; }
     if (S.ctx) return tree.exit();

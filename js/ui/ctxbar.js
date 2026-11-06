@@ -24,6 +24,7 @@
     if (!inner) setup(); const bar = U.$('#ctxbar'), t = SB.tool.cur();
     let items = [];
     if (SB.voice.rec) items = [h('span.lbl', { html: '<b>Recording your voice.</b> Use headphones so the soundtrack is not recorded.' }), W.btn('Stop', () => SB.voice.stop(), { cls: 'sm primary' })];
+    else if (SB.board && SB.board.screenSelected() && t.id !== 'screen' && !tree.sel()) items = [].concat(SB.tools.get('screen').bar()).flat(3); // a screen picked (its name clicked): the Screens bar, with its size and background
     else if (t.bar) items = [].concat(t.bar()).flat(3);
     items = items.filter(Boolean).map(it => it.matches && it.matches('span.lbl') && !it.querySelector('b') && it.textContent.trim().length > 24 ? Object.assign(W.info(it.textContent.trim(), it.textContent.trim()), { className: 'info-btn bar-help' }) : it); // a tool's long description: a "?" that shows it on hover (and on click)
     bar.classList.toggle('rec', !!(S.recording || SB.voice.rec)); bar.classList.toggle('none', !items.length);

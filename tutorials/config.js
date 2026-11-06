@@ -27,6 +27,7 @@ window.SB_TUTORIALS = {
     'lessons/keyframes.js',
     'lessons/drawing-fills.js',
     'lessons/vectors.js',
+    'lessons/pixel-art.js',
     'lessons/quick-hop.js',
     'lessons/frame-by-frame.js',
     'lessons/storyboard.js',
@@ -52,7 +53,7 @@ window.SB_TUTORIALS = {
   /* A learning path, simplest first: a tutorial only uses what the ones before it taught (or teaches it itself). */
   order: ['drawing', 'keyframes',
     'effects', 'logo-reveal', 'masking', 'video-basics',
-    'drawing-fills', 'vectors',
+    'drawing-fills', 'vectors', 'pixel-art',
     'quick-hop', 'frame-by-frame', 'storyboard',
     'basic-rig', 'basic-controls', 'actions', 'action-strips', 'advanced-rig',
     'living-lines', 'physics', 'follow-object', 'slingshot', 'wobbly-antenna', 'wrecking-ball',

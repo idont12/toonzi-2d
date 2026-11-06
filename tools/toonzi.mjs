@@ -4,10 +4,15 @@
 
      node tools/toonzi.mjs check   my.json                 is the file a project the editor can open? (errors and tips)
      node tools/toonzi.mjs link    my.json [--base URL]    a link that opens it in the editor (the project is inside the link)
-     node tools/toonzi.mjs editor  my.json [out.html]      one self-contained editor page with the project in it (works offline)
+     node tools/toonzi.mjs editor  my.json [out.html]      one self-contained editor page with the project in it (works offline;
+                                                           published as a Claude artifact with the db capability, it syncs with Claude)
+     node tools/toonzi.mjs host    my.json [out.html] [--base URL] [--inline]
+                                                           a page with the editor in a frame: it sends the animation in (no long link)
+                                                           and hears every change (js/io/bridge.js); --inline puts the editor inside
      node tools/toonzi.mjs preview my.json [out.png] [--at 0,0.5,1] [--width 360]
                                                            pictures of the animation at those seconds, side by side
-     node tools/toonzi.mjs unlink  "<link>" [out.json]      the project inside a link (one the user copied: logo › Copy a link to this animation)
+     node tools/toonzi.mjs unlink  "<link>" [out.json]      the project inside a link (one the user copied: logo › Copy a link to this animation),
+                                                           a packed "z:…" from the artifact database, or a saved toonzi/state document (.json)
      node tools/toonzi.mjs serve   [port]                  run the editor from this folder (http://localhost:8080)
 
    The default link base is the public editor: https://idont12.github.io/toonzi-2d/ (a copy of the app: --base its address). */
@@ -102,6 +107,50 @@ function editorPage(txt) {
   return html.replace('</head>', `<base href="${BASE}">\n</head>`); // pictures and tutorials the page asks for later come from the public copy
 }
 
+/** A page that holds the editor in an <iframe> and talks to it (js/io/bridge.js): it opens the animation in it,
+    keeps the latest version the person made (in this browser), and copies it for an AI or saves it as a file. */
+function hostPage(txt, base, inline) {
+  const d = JSON.parse(txt), name = String(d.name || (d.project && d.project.name) || 'Animation').replace(/[<>&"]/g, ''), key = 'toonzi-host:' + name;
+  const src = inline ? '' : ` src="${base.replace(/#.*$/, '').replace(/\?.*$/, '')}?embed"`;
+  const srcdoc = inline ? ` srcdoc="${editorPage(txt).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"` : '';
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${name} · Toonzi 2D</title>
+<style>
+:root { --bg: #F6F4FF; --ink: #24213F; --mute: #6B6790; --line: #E2DEF5; --acc: #5B3DF5; --card: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #16142A; --ink: #EEEAFF; --mute: #A9A4C8; --line: #2E2A4D; --card: #1F1C38; } }
+* { box-sizing: border-box; } html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+body { display: flex; flex-direction: column; }
+header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+header b { font-size: 15px; } #st { color: var(--mute); flex: 1; min-width: 140px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button.pri { background: var(--acc); border-color: var(--acc); color: #fff; } button:hover { filter: brightness(1.05); }
+iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+</style></head><body>
+<header><b>${name}</b><span id="st">Opening the editor…</span>
+<button class="pri" id="copy" title="Copy the animation as it is now, to paste into your chat with the AI">Copy for AI</button>
+<button id="save">Save .json</button><button id="reset" title="Go back to the animation as it was sent">Start over</button></header>
+<iframe id="ed"${src}${srcdoc} allow="clipboard-read; clipboard-write; microphone; fullscreen" title="Toonzi 2D editor"></iframe>
+<script>
+const START = ${JSON.stringify(d).replace(/</g, '\\u003c')}, KEY = ${JSON.stringify(key)};
+const ed = document.getElementById('ed'), st = document.getElementById('st');
+let latest = START, edits = 0;
+try { const s = localStorage.getItem(KEY); if (s) latest = JSON.parse(s); } catch (e) {}
+const send = (type, data) => ed.contentWindow.postMessage(Object.assign({ toonzi: 1, type }, data || {}), '*');
+const when = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+addEventListener('message', e => {
+  if (e.source !== ed.contentWindow) return; const m = e.data; if (!m || m.toonzi !== 1) return;
+  if (m.type === 'ready') { send('open', { project: latest, quiet: true }); st.textContent = latest === START ? 'Ready: change anything in the editor.' : 'Ready: your last changes are back.'; }
+  else if (m.type === 'changed') { latest = m.project; edits++; try { localStorage.setItem(KEY, JSON.stringify(latest)); } catch (er) {} st.textContent = 'Changed at ' + when() + ' (' + edits + ' change' + (edits > 1 ? 's' : '') + ' here). Copy for AI to send it back.'; }
+  else if (m.type === 'error') st.textContent = 'The editor said: ' + m.message;
+});
+document.getElementById('copy').onclick = async () => { const t = JSON.stringify(latest); try { await navigator.clipboard.writeText(t); st.textContent = 'Copied (' + Math.round(t.length / 1024) + ' kB): paste it into the chat with the AI.'; } catch (e) { st.textContent = 'Couldn’t copy: use Save .json and send the file.'; } };
+document.getElementById('save').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(latest, null, 1)], { type: 'application/json' })); a.download = (latest.name || 'animation').replace(/[^\\w-]+/g, '-') + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+document.getElementById('reset').onclick = () => { if (!confirm('Go back to the animation as it was sent? Your changes here are lost.')) return; latest = START; edits = 0; try { localStorage.removeItem(KEY); } catch (e) {} send('open', { project: START }); st.textContent = 'Back to the animation as it was sent.'; };
+</script></body></html>
+`;
+}
+
 function serve(port) {
   const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.mp4': 'video/mp4' };
   const srv = http.createServer((req, res) => {
@@ -133,7 +182,11 @@ async function preview(txt, out, at, width) {
 const usage = () => console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('*/')[0].replace('/*', '').replace(/^#!.*\n/, ''));
 if (!cmd || cmd === 'help' || cmd === '--help') usage();
 else if (cmd === 'unlink') {
-  const l = plain[0] || die('Which link? node tools/toonzi.mjs unlink "https://…#project=…" out.json'), m = /[#&]project=([A-Za-z0-9_-]+)/.exec(l), j = /[#&]json=([^&]+)/.exec(l);
+  let l = plain[0] || die('Which link? node tools/toonzi.mjs unlink "https://…#project=…" out.json');
+  if (fs.existsSync(l) && !/\.json$/i.test(l)) l = fs.readFileSync(l, 'utf8').trim(); // a link or a packed z in a text file
+  if (fs.existsSync(l) && /\.json$/i.test(l)) { const d = JSON.parse(fs.readFileSync(l, 'utf8')), doc = d.data || d; l = doc.json ? '#json=' + encodeURIComponent(doc.json) : doc.z ? '#project=' + doc.z : doc.project ? '#json=' + encodeURIComponent(JSON.stringify(doc.project)) : l; } // a toonzi/state document saved from the artifact database
+  else if (/^z:/.test(l) || /^[A-Za-z0-9_-]{40,}$/.test(l)) l = '#project=' + l.replace(/^z:/, '');
+  const m = /[#&]project=([A-Za-z0-9_-]+)/.exec(l), j = /[#&]json=([^&]+)/.exec(l);
   if (!m && !j) die('That link has no project in it (#project=…). A link with ?open= points to a file: download that file instead.');
   const txt = m ? zlib.inflateRawSync(Buffer.from(m[1], 'base64url')).toString('utf8') : decodeURIComponent(j[1]), out = plain[1] || 'animation.json';
   fs.writeFileSync(out, JSON.stringify(JSON.parse(txt), null, 1)); console.log(out);
@@ -149,6 +202,7 @@ else {
   if (r.errors.length) die(r.errors.map(e => '✗ ' + e).join('\n') + '\nFix these first (node tools/toonzi.mjs check).');
   if (cmd === 'link') { const l = linkOf(txt, flag('base', BASE)); console.log(l); if (l.length > 60000) console.error(`(The link is ${Math.round(l.length / 1000)} kB: fine for browsers, but chat apps may cut it. Use "editor" for a file instead.)`); }
   else if (cmd === 'editor') { const out = plain[1] || plain[0].replace(/\.json$/i, '') + '-editor.html'; fs.writeFileSync(out, editorPage(txt)); console.log(`${out} (${(fs.statSync(out).size / 1048576).toFixed(1)} MB): open it in a browser to edit the animation.`); }
+  else if (cmd === 'host') { const out = plain[1] || plain[0].replace(/\.json$/i, '') + '-host.html'; fs.writeFileSync(out, hostPage(txt, flag('base', BASE), args.includes('--inline'))); console.log(`${out}: a page with the editor in a frame${args.includes('--inline') ? ' (inside the page)' : ` (from ${flag('base', BASE)})`}; it hears every change (Copy for AI).`); }
   else if (cmd === 'preview') { const out = plain[1] || plain[0].replace(/\.json$/i, '') + '-preview.png', P = Object.assign({ duration: 10 }, d.project || {}); const at = (flag('at') || [0, 0.25, 0.5, 0.75, 1].map(u => +(u * Math.max(0, P.duration - 0.01)).toFixed(2)).join(',')).split(',').map(Number); await preview(txt, out, at, +flag('width', 360)); console.log(out); }
-  else die(`Unknown command "${cmd}". Try: check, link, editor, preview, serve.`);
+  else die(`Unknown command "${cmd}". Try: check, link, editor, host, preview, unlink, serve.`);
 }

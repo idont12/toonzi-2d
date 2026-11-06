@@ -617,7 +617,8 @@ public class StoryboardController : MonoBehaviour
     const G = await E.collect(screens, opt), fps = G.fps, base = opt.base || 'animation', title = fileName(opt.title || base), warnings = new Set(G.warnings);
     if (opt.prog) opt.prog(0.75, 'Building the Unity package…');
     const W0 = G.w, H0 = G.h, UNIT = 100; // 100 px = 1 unit
-    const root = 'Assets/' + title, assets = []; // { path, data (Uint8Array|string), meta }
+    const sub = String(opt.folder || '').split('/').filter(Boolean).map(fileName).join('/'); // opt.folder: a sub folder of Assets (Art/Characters); Unity makes missing parents itself
+    const root = opt.root || 'Assets/' + (sub ? sub + '/' : '') + title, assets = []; // { path, data (Uint8Array|string), meta } (opt.root: a group's folder, see buildGroups)
     const asset = async (path, data, metaFn) => { const g = await guidOf(base + '|' + path); assets.push({ path, data, meta: metaFn(g), guid: g }); return g; };
     const folder = async path => asset(path, null, META.folder);
     // shared helper scripts live in one place (Assets/StoryboardStudio) with fixed GUIDs, so importing several exports never duplicates them
@@ -880,16 +881,12 @@ public class StoryboardController : MonoBehaviour
     await asset(`${root}/README.txt`, readme(title, clipGuids.map(c => c.name), objs), gg => META.plain(gg, 'TextScriptImporter'));
 
     // ---------- the package
-    if (opt.prog) opt.prog(0.92, 'Packing…');
-    const entries = [];
-    for (const a of assets) {
-      entries.push({ name: `${a.guid}/pathname`, data: te.encode(a.path) }, { name: `${a.guid}/asset.meta`, data: te.encode(a.meta) });
-      if (a.data != null) entries.push({ name: `${a.guid}/asset`, data: typeof a.data === 'string' ? te.encode(a.data) : a.data });
-    }
-    const blob = await gzip(tar(entries));
     const tips = G.nodes.some(nd => nd.skin) ? ['Bending layers use Sprite Skin: the Unity project needs the 2D Animation package (Window › Package Manager).'] : [];
+    if (opt.raw) return { assets, root, warnings: [...warnings], baked: G.baked, still: G.still, tips }; // buildGroups packs several of these together
+    if (opt.prog) opt.prog(0.92, 'Packing…');
+    const blob = await packOf(assets);
     // the same assets as files, for writing straight into a Unity project (js/io/gamelink.js): each with its .meta, folders too
-    const project = { own: [root], files: assets.flatMap(a => [a.data != null ? { path: a.path, data: a.data } : { path: a.path, dir: true }, { path: a.path + '.meta', data: a.meta }]) };
+    const project = projectOf(assets, [root]);
     return { files: [{ name: `${U.slug(base)}.unitypackage`, blob }], warnings: [...warnings], baked: G.baked, still: G.still, tips, project };
   }
   const rankDoc = d => { const m = d.match(/^--- !u!(\d+)/), c = m ? +m[1] : 0; return c === 1 ? 0 : c === 4 ? 1 : 2; };
@@ -906,5 +903,71 @@ too, animate them or set their position from a script) and the rig follows, like
 shows as a gizmo, so you see them in the editor and not in the game.
 ${objs.some(o => o.nd && o.nd.skin) ? 'Layers that bend with the rig use Sprite Skin (2D Animation package). If they show unbent, run\nTools > Toonzi 2D > Set Up Sprite Rigs once.\n' : ''}100 pixels = 1 unit.
 `;
-  SB.unity = { build, crc32, tar };
+  /** A .unitypackage of these assets (a gzipped tar: <guid>/pathname, <guid>/asset.meta, <guid>/asset). */
+  async function packOf(assets) {
+    const entries = [];
+    for (const a of assets) {
+      entries.push({ name: `${a.guid}/pathname`, data: te.encode(a.path) }, { name: `${a.guid}/asset.meta`, data: te.encode(a.meta) });
+      if (a.data != null) entries.push({ name: `${a.guid}/asset`, data: typeof a.data === 'string' ? te.encode(a.data) : a.data });
+    }
+    return gzip(tar(entries));
+  }
+  const projectOf = (assets, own) => ({ own, files: assets.flatMap(a => [a.data != null ? { path: a.path, data: a.data } : { path: a.path, dir: true }, { path: a.path + '.meta', data: a.meta }]) });
+
+  /** Groups of screens (Screen › Group: a character, an enemy…), each its own prefab with its own Animator Controller
+      (one state per screen and rig action), all in one package: Assets/<folder>/<project>/<group>/. */
+  async function buildGroups(groups, opt) {
+    const sub = String(opt.folder || '').split('/').filter(Boolean).map(fileName).join('/'), base = opt.base || 'animation', parent = 'Assets/' + (sub ? sub + '/' : '') + fileName(opt.title || base);
+    const assets = [{ path: parent, data: null, meta: '', guid: await guidOf(base + '|' + parent) }], seen = new Set([parent]), warnings = new Set(), baked = [], still = [], tips = new Set(), used = new Set();
+    assets[0].meta = META.folder(assets[0].guid);
+    for (let i = 0; i < groups.length; i++) {
+      const g = groups[i]; let name = fileName(g.name); while (used.has(name.toLowerCase())) name += ' 2'; used.add(name.toLowerCase());
+      const r = await build(g.screens, Object.assign({}, opt, { title: name, root: parent + '/' + name, raw: true, prog: opt.prog ? (f, m) => opt.prog((i + Math.min(1, f)) / groups.length, `${name}: ${m || ''}`) : null }));
+      for (const a of r.assets) if (!seen.has(a.path)) { seen.add(a.path); assets.push(a); }
+      r.warnings.forEach(w => warnings.add(`${name}: ${w}`)); baked.push(...r.baked.map(b => `${name} › ${b}`)); still.push(...r.still.map(b => `${name} › ${b}`)); r.tips.forEach(t => tips.add(t));
+    }
+    if (opt.prog) opt.prog(0.95, 'Packing…');
+    return { files: [{ name: `${U.slug(base)}.unitypackage`, blob: await packOf(assets) }], warnings: [...warnings], baked, still, tips: [...tips], project: projectOf(assets, [parent]) };
+  }
+
+  // ---------- updating an Animator Controller that is already in the project, without losing your work on it
+  /** Merge a freshly exported controller (fresh) into the one already in the project (old): your parameters, layers,
+      transitions, extra states and positions stay; a state for each new animation is added, and the states of the
+      animations the export no longer makes (their clip ids in gone) are removed with the transitions into them.
+      Animations are matched by their clip's guid (each clip keeps its guid from export to export). */
+  function mergeController(old, fresh, gone = []) {
+    const docs = t => t.split(/(?=^--- !u!)/m), head = t => docs(t)[0].startsWith('--- !u!') ? '' : docs(t)[0], body = t => docs(t).filter(d => d.startsWith('--- !u!'));
+    const idOf = d => (/^--- !u!\d+ &(-?\d+)/.exec(d) || [])[1], cls = d => +(/^--- !u!(\d+)/.exec(d) || [])[1];
+    const motion = d => (/\n  m_Motion: \{fileID: -?\d+, guid: ([0-9a-f]{32})/.exec(d) || [])[1];
+    const O = body(old), F = body(fresh); if (!O.length || !F.length || !O.some(d => cls(d) === 91)) return fresh; // not a controller we understand: the fresh one
+    const oldStates = O.filter(d => cls(d) === 1102), haveG = new Set(oldStates.map(motion).filter(Boolean)), goneG = new Set(gone);
+    const removed = new Set(oldStates.filter(d => goneG.has(motion(d)) && !F.some(f => cls(f) === 1102 && motion(f) === motion(d))).map(idOf));
+    const addStates = F.filter(d => cls(d) === 1102 && motion(d) && !haveG.has(motion(d)));
+    const oldIds = new Set(O.map(idOf)); let out = O.slice();
+    // remove: the gone states, the transitions into them (and the lists that pointed at those transitions)
+    if (removed.size) {
+      const deadT = new Set(out.filter(d => (cls(d) === 1101 || cls(d) === 1109) && [...removed].some(id => new RegExp(`\\n  m_DstState: \\{fileID: ${id}\\}`).test(d))).map(idOf));
+      out = out.filter(d => !removed.has(idOf(d)) && !deadT.has(idOf(d))).map(d => {
+        let x = d; for (const id of [...removed, ...deadT]) x = x.replace(new RegExp(`\\n  - serializedVersion: 1\\n    m_State: \\{fileID: ${id}\\}\\n    m_Position: \\{[^}]*\\}`, 'g'), '').replace(new RegExp(`\\n  - \\{fileID: ${id}\\}`, 'g'), '');
+        return x.replace(/(\n  m_(?:ChildStates|Transitions|AnyStateTransitions|EntryTransitions):)\n(?!  -)/g, '$1 []\n');
+      });
+    }
+    // add: the new states, into the first state machine (the base layer's)
+    if (addStates.length) {
+      const smI = out.findIndex(d => cls(d) === 1107); if (smI < 0) return fresh;
+      let sm = out[smI]; const n0 = (sm.match(/\n    m_State: /g) || []).length;
+      const add = addStates.map((d, k) => { let id = idOf(d); while (oldIds.has(id)) id = String(BigInt(id) + 1n); oldIds.add(id); return { d: d.replace(/^(--- !u!1102 &)-?\d+/, '$1' + id), id, k }; });
+      const rows = add.map(({ id, k }) => `  - serializedVersion: 1\n    m_State: {fileID: ${id}}\n    m_Position: {x: 300, y: ${60 + (n0 + k) * 60}, z: 0}\n`).join('');
+      sm = /\n  m_ChildStates: \[\]\n/.test(sm) ? sm.replace(/\n  m_ChildStates: \[\]\n/, `\n  m_ChildStates:\n${rows}`) : sm.replace(/(\n  m_ChildStates:\n(?:  [ -].*\n)*)/, `$1${rows}`);
+      out[smI] = sm; out.splice(smI, 0, ...add.map(a => a.d));
+    }
+    // the default state, if it was removed: the first one left
+    const smI = out.findIndex(d => cls(d) === 1107);
+    if (smI >= 0) { const m = /\n  m_DefaultState: \{fileID: (-?\d+)\}/.exec(out[smI]); if (m && removed.has(m[1])) { const first = /\n    m_State: \{fileID: (-?\d+)\}/.exec(out[smI]); out[smI] = out[smI].replace(m[0], `\n  m_DefaultState: {fileID: ${first ? first[1] : 0}}`); } }
+    return head(old) + out.join('');
+  }
+  /** The guid every export gives a clip at that path (so gamelink can tell which states were ours). */
+  const clipGuid = (base, path) => guidOf(base + '|' + path);
+
+  SB.unity = { build, buildGroups, mergeController, clipGuid, crc32, tar };
 })(window.SB);

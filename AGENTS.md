@@ -12,13 +12,40 @@ You are an AI (Claude, ChatGPT, Gemini, Copilot, a coding agent…) and someone 
 2. Write it as one JSON file (the [project format](#the-project-format)). Leave out anything you don't need: the editor fills ids and defaults.
 3. Check it: `node tools/toonzi.mjs check my.json` (needs only Node 18+).
 4. Look at it: `node tools/toonzi.mjs preview my.json` writes a PNG strip of five moments (needs Playwright). Fix what looks wrong.
-5. **Give the person the editor with the animation in it**:
+5. **Give the person the editor with the animation in it** (in a chat that shows pages, like Claude's artifacts, best right in the chat: see [Inside a chat window](#inside-a-chat-window-no-long-links)):
    - a link: `node tools/toonzi.mjs link my.json` → `https://idont12.github.io/toonzi-2d/#project=…` (the whole project is packed into the link, nothing is uploaded), and/or
    - a file: `node tools/toonzi.mjs editor my.json` → `my-editor.html`, the full editor in one page that works offline.
    Also give them `my.json` (Logo menu › Open project in the editor).
 6. The person plays it, changes things in the editor, and asks you for more. They send you back **Logo menu › Copy a link to this animation** (or a saved `.json`). Read it with `node tools/toonzi.mjs unlink "<link>" my.json`, change it, and send a new link. Never throw away their edits: start from what they sent.
 
 No Node or shell? You can still write the JSON (steps 2 and 5). Tell the person to open https://idont12.github.io/toonzi-2d/, then Logo menu › Open project, and pick the file. If you can't make files either, give the JSON in a code block and tell them to save it as `animation.json`.
+
+## Inside a chat window (no long links)
+
+Links carry the whole project, so a big one gets long. Instead, put the editor in the chat (or any page) and talk to it with messages: you send the animation in, and you hear every change the person makes. The editor's side is `js/io/bridge.js`.
+
+**In Claude (artifacts).** Make the editor page and publish it as an artifact with the `db` capability:
+
+1. `node tools/toonzi.mjs editor my.json editor.html` (the whole editor in one page, with your animation).
+2. Publish `editor.html` as an artifact with `capabilities: { db: {} }`. The person edits right there in the chat.
+3. Every change the person makes is saved (a moment later) in the artifact's database, document `toonzi/state`:
+   `{ rev, by: "editor", at, name, json: "<the project as JSON text>" }`. Read it (collection `toonzi`, document `state`) whenever the person asks for more, and start from it: it is their latest version. A big project comes packed instead: `z` (or `parts: n` with the pieces in `toonzi/state/parts/p0…`, joined in order): save `z` to a file and run `node tools/toonzi.mjs unlink z.txt my.json`.
+4. To change the animation while the page is open, write the document yourself: `{ "by": "ai", "rev": <a bigger number than the last, e.g. the time in ms>, "project": { …the whole project… } }`. Every open copy of the page loads it at once. The person's previous version stays in their Recent projects.
+
+**Anywhere else (another chat app, your site, a tool): a host page.** `node tools/toonzi.mjs host my.json [out.html] [--base URL] [--inline]` makes a page with the editor in a frame. It sends the animation in by message, keeps the person's latest version (in their browser), and has **Copy for AI** (the person pastes it back to you) and **Save .json**. `--inline` puts the editor inside the page instead of loading the public site (for places that block frames from other sites).
+
+Your own page can do the same with a few lines (every message is `{ toonzi: 1, type, … }`):
+
+```js
+const ed = document.querySelector('iframe');            // src="https://idont12.github.io/toonzi-2d/?embed"
+addEventListener('message', e => {
+  if (e.source !== ed.contentWindow || !e.data || e.data.toonzi !== 1) return;
+  if (e.data.type === 'ready') ed.contentWindow.postMessage({ toonzi: 1, type: 'open', project }, '*');
+  if (e.data.type === 'changed') save(e.data.project);   // the person changed something: the whole project
+});
+// also: { type: 'get', id } → { type: 'project', id, project }; { type: 'link', id } → { type: 'link', id, link };
+// { type: 'time', t }, { type: 'play' }, { type: 'pause' }, { type: 'watch', on: false } (stop the changed messages)
+```
 
 ## Run or copy the app yourself
 
@@ -95,7 +122,7 @@ More than one screen (for example an idle and a walk animation of the same chara
 - filled path: `{ "b": 1, "subs": [{ "p": [x0, y0, c1x, c1y, c2x, c2y, x1, y1, …], "cl": true }], "c": "#24213F", "s": 3, "fc": "#FFD84D" }` — a start point, then one cubic curve per (control 1, control 2, end) triple; `cl` closes it; `fc` fill color, `s: 0` for no outline. A straight segment: put the controls on the line's ends.
 - several frames: `"frames": [{ "strokes": […] }, { "strokes": […] }]` and either `"play": "loop"` with `"fps": 8` (cycles by itself: flicker, fire, a walk drawn by hand) or `"play": "library"` and key `frame` with `hold` (pick each frame: blinks, mouth shapes, poses).
 
-**pixels**: pixel art. `cs` = size of one pixel in px; `frames[i].px` = `{ "col,row": "#color" }` (cells from the layer's position, right and down). `play`/`fps` as for drawings. Best on a pixel art screen (`project.pixel`). A pixel gradient (Normal, Dithering or Halftone) is easiest made in the editor with the Gradient tool; it stays editable there.
+**pixels**: pixel art (right-click › Convert to vector drawing turns it into editable shapes, one per color). `cs` = size of one pixel in px; `frames[i].px` = `{ "col,row": "#color" }` (cells from the layer's position, right and down). `play`/`fps` as for drawings. Best on a pixel art screen (`project.pixel`). A pixel gradient (Normal, Dithering or Halftone) is easiest made in the editor with the Gradient tool; it stays editable there.
 
 **particles**: emitters (fire, smoke, snow, rain, confetti, sparkles, bubbles, magic). Main settings: `emit` (`stream` or `burst`), `rate` (a second) or `count` (a burst), `life` (seconds), `ptSpeed`, `ptDir` (degrees, -90 = up), `ptSpread` (degrees), `ptGravity`, `sizeMin`, `sizeMax`, `sizeEnd` (size at the end, × start), `color`, `color2`, `colorMode` (`life` = fades from color to color2, `random`), `fade`, `ptGlow`, `ptShape` (`circle`, `soft`, `square`, `star`, `spark`, `ring`), `area` (width of the line they start from), `spin`, `seed`, `ptSpace` (`local`: they move with the layer, the default; `world`: each one flies on from where the layer was when it was born, so a moving emitter leaves a trail).
 
@@ -162,7 +189,7 @@ Think like an animator, then pick the simplest tool that does the job. Things th
 - Hold poses for a beat (at least 0.2 s) so they read. Stagger groups of things by 0.05–0.15 s.
 - Leave some space around the action; keep text big and readable (at least 1/20 of the screen height).
 
-**For game engines** (Unity, Godot): prefer rigs and keyframes; avoid blend modes. Looks effects (outline, glow, shadow, blur) work but are marked "not recommended": a look that never changes is drawn onto the layer's sprite (it keeps its bones and controllers); one that changes makes the layer frame by frame (bigger files, no rig in the engine). Put each animation (idle, walk, jump) on its own screen with the same layer names.
+**For game engines** (Unity, Godot): prefer rigs and keyframes; avoid blend modes. Looks effects (outline, glow, shadow, blur) work but are marked "not recommended": a look that never changes is drawn onto the layer's sprite (it keeps its bones and controllers); one that changes makes the layer frame by frame (bigger files, no rig in the engine). Put each animation (idle, walk, jump) on its own screen with the same layer names. Several characters in one project: give their screens a `"group"` (in `"screens": [{ "name": "Idle", "group": "Hero", … }]`); each group exports as its own prefab or scene with its own animations.
 
 **Hand it over**
 - Run `check` and `preview`, look at the pictures, fix overlaps, things off screen, text cut off.
@@ -181,10 +208,11 @@ Complete projects that open as they are (check them with `node tools/toonzi.mjs 
 ```
 node tools/toonzi.mjs check   my.json                  errors and tips
 node tools/toonzi.mjs link    my.json [--base URL]     a link to the editor with the animation in it
-node tools/toonzi.mjs editor  my.json [out.html]       a self-contained editor page with it (offline)
+node tools/toonzi.mjs editor  my.json [out.html]       a self-contained editor page with it (offline; as a Claude artifact with db it syncs)
+node tools/toonzi.mjs host    my.json [out.html] [--base URL] [--inline]   a page with the editor in a frame that hears every change
 node tools/toonzi.mjs preview my.json [out.png] [--at 0,1,2] [--width 360]
-node tools/toonzi.mjs unlink  "<link>" [out.json]      the project inside a link
+node tools/toonzi.mjs unlink  "<link>" [out.json]      the project inside a link, a packed z (or a file holding one)
 node tools/toonzi.mjs serve   [port]                   run the editor from this folder
 ```
 
-Very long links (a project with pictures, over ~60 kB) can be cut by chat apps; send the editor file or the JSON instead.
+Very long links (a project with pictures, over ~60 kB) can be cut by chat apps; use the editor in the chat instead ([Inside a chat window](#inside-a-chat-window-no-long-links)), or send the editor file or the JSON.
