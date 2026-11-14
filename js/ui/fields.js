@@ -34,7 +34,7 @@
     },
     slider(v, o = {}) { const r = h('input', { type: 'range', min: o.min ?? 0, max: o.max ?? 100, step: o.step ?? 1, value: v, 'aria-label': o.label || '', style: o.width ? { width: o.width } : null }); r.addEventListener('input', () => o.input && o.input(+r.value)); r.addEventListener('change', () => o.change && o.change(+r.value)); return r; },
     color(v, o = {}) { const el = h('input', { type: 'color', value: v || '#000000', 'aria-label': o.label || 'Color' }); el.addEventListener('input', () => o.input && o.input(el.value)); el.addEventListener('change', () => o.change && o.change(el.value)); const w = h('label.swatch', { style: { '--sw': v } }, el); el.addEventListener('input', () => w.style.setProperty('--sw', el.value)); w._set = x => { el.value = x; w.style.setProperty('--sw', x); }; return w; },
-    check(v, label, onChange) { const el = h('input', { type: 'checkbox' }); el.checked = !!v; el.addEventListener('change', () => onChange(el.checked)); return h('label.chk', null, el, label || ''); },
+    check(v, label, onChange) { const el = h('input', { type: 'checkbox' }); el.checked = !!v; el.addEventListener('change', () => onChange(el.checked)); const lb = h('label.chk', null, el, label || ''); lb._set = x => { el.checked = !!x; }; return lb; },
     select(v, options, onChange, label) {
       const pairs = Array.isArray(options) ? options : Object.entries(options);
       const el = h('select', { 'aria-label': label || '' }, pairs.map(([k, t, off]) => { const op = h('option', { value: k }, t); if (off) op.disabled = true; if (String(k) === String(v)) op.selected = true; return op; }));
@@ -143,6 +143,7 @@
     const targets = [o].concat(f.single ? [] : sameType(o));
     for (const t of targets) {
       if (f.set) f.set(t, v);
+      else if (f.anim && typeof v === 'boolean' && TR.animated(t, f.k)) TR.put(t, f.k, tree.localTime(t), v); // a keyed on/off switch: clicking it keys it here (nothing in between to preview)
       else if (f.anim) { let val = typeof v === 'number' ? v / TR.uiMul(f.k) : v; if (f.k === 'opacity') val = U.clamp(val, 0, 1); TR.set(t, f.k, val); }
       else t[f.k] = v;
     }

@@ -48,13 +48,15 @@
     if (hit.part === 'head') { if (rigLocked(rig)) { lockedMsg(); return; } SB.select.startXform(rig, 'move', P); return; }
     const lt = tree.localTime(rig), cur = ids => Object.fromEntries(ids.map(id => [id, TR.value(rig, id, lt)]));
     /** A bone drag. While recording (R), the angles are sampled as the animation plays and become keyframes. */
-    const drag = (kind, ids, compute) => {
+    const drag = (kind, ids0, compute0) => {
+      const ids1 = ids0.concat(R.mirrorIds(rig, ids0)), plant = R.plantTargets(rig, ids1), ids = ids1.concat(plant.flatMap(t => [t.foot, ...t.chain].map(id => 'bone:' + id)));
+      const compute = (P, e) => R.replant(rig, R.withMirror(rig, compute0(P, e)), plant); // a bone with a mirror: the other side moves the mirrored way; planted feet stay put
       const d = { kind, o: rig, moved: false, recProps: ids, rec0: cur(ids),
         move(P, e) { this.moved = true; const v = compute(P, e); if (this.rec) return SB.record.sample(this, Object.assign({}, this.cur, v)); for (const id in v) TR.set(rig, id, v[id]); SB.fields.refresh(); },
         up() { if (this.rec) return SB.record.end(this); if (this.moved) SB.commit(); }, cancel() { if (this.moved) SB.revert(); } };
       if (S.recording) SB.record.begin(d); SB.tool.drag = d;
     };
-    const b = hit.bone, mode = S.boneMode || 'turn', AF = R.AF;
+    const b = hit.bone, mode = b.grab === 'move' && hit.part === 'body' && !e.altKey ? 'move' : S.boneMode || 'turn', AF = R.AF; // b.grab: this bone moves when you drag it (Alt: turns)
     if (hit.part === 'seg' && mode !== 'turn') hit = Object.assign({}, hit, { part: 'body' });
     const q0 = R.poseAt(rig, S.time)[b.id];
     if (q0.ch && (hit.part === 'seg' || (hit.part === 'tail' && e.altKey))) { // turn one segment of a B-bone around its first joint; the rest of the bone follows
@@ -128,11 +130,12 @@
         SB.tool.drag = { kind: 'joint', moved: false,
           move(P, e) { this.moved = true; const b = j.bone, ps = R.poseAt(rig, S.time), q = ps[b.id]; if (j.part === 'tail') P = SB.tool.straight(X.world(rig).transformPoint(pt(q.hx, q.hy)), P, e); const l = R.toRig(rig, P);
             if (j.part === 'head' && b.parent && ps[b.parent]) { const E = ps[b.parent].mEnd, det = E[0] * E[3] - E[1] * E[2] || 1e-9, dx = l.x - E[4], dy = l.y - E[5]; b.ox = U.r1((E[3] * dx - E[2] * dy) / det - TR.now(rig, 'bonex:' + b.id)); b.oy = U.r1((-E[1] * dx + E[0] * dy) / det - TR.now(rig, 'boney:' + b.id)); } // a free bone's head
-            else if (j.part === 'head') { b.x = U.r1(l.x); b.y = U.r1(l.y); } else { const par = b.parent && ps[b.parent]; b.len = U.r1(Math.max(4, Math.hypot(l.x - q.hx, l.y - q.hy) / (Math.hypot(q.m[0], q.m[1]) || 1))); b.ang = U.r1(Math.atan2(l.y - q.hy, l.x - q.hx) * 180 / Math.PI - (par ? par.a : 0) - TR.now(rig, 'bone:' + b.id)); } R.keepAttached(snap); },
+            else if (j.part === 'head') { b.x = U.r1(l.x); b.y = U.r1(l.y); } else { const par = b.parent && ps[b.parent]; b.len = U.r1(Math.max(4, Math.hypot(l.x - q.hx, l.y - q.hy) / (Math.hypot(q.m[0], q.m[1]) || 1))); b.ang = U.r1(Math.atan2(l.y - q.hy, l.x - q.hx) * 180 / Math.PI - (par ? par.a : 0) - TR.now(rig, 'bone:' + b.id)); } R.syncMirror(rig, b.id); R.keepAttached(snap); },
           up() { if (this.moved) return SB.commit(); S.boneDraft = { rig: rig.id, from: j.part === 'tail' ? { type: 'tail', bone: j.bone.id } : { type: 'head', bone: j.bone.id } }; S.selBone = j.bone.id; SB.invalidate('ctxbar', 'inspector'); } };
         return;
       }
-      if (j && (j.part === 'body' || j.part === 'seg')) { boneBodyDrag(rig, j.bone, P, e); return; } // grab a bone itself: move it, or turn it near its tip
+      if (j && j.bone && e.shiftKey) { selToggle(j.bone.id); return; } // Shift-click: several bones (to join them)
+      if (j && (j.part === 'body' || j.part === 'seg')) { S.selBones = null; boneBodyDrag(rig, j.bone, P, e); return; } // grab a bone itself: move it, or turn it near its tip
       if (!rig) { rig = R.make(P); tree.rootList().unshift(rig); tree.reindex(); tree.select([rig.id]); }
       const l = R.toRig(rig, P); S.boneDraft = { rig: rig.id, from: { type: 'pt', x: U.r1(l.x), y: U.r1(l.y) } }; SB.invalidate('ctxbar');
     },
@@ -172,6 +175,13 @@
         return;
       }
       if (!S.selBone) return SB.toast('Pick a bone in the panel first.');
+      if (S.wpaint.mode === 'joint') { // the joint circle: drag inside to move it, its edge to size it, elsewhere to put it there
+        const b = R.boneById(r, S.selBone), jt = b && jointOf(r, b); if (!jt) return SB.toast('This bone has no parent or child that bends a layer: pick another bone.');
+        const k = SB.view.k(), d0 = Math.hypot(P.x - jt.c.x, P.y - jt.c.y), edge = Math.abs(d0 - jt.r) * k < 10; if (!edge && d0 > jt.r) { jt.c = { x: P.x, y: P.y }; SB.dirty(); }
+        const c0 = Object.assign({}, jt.c), r0 = jt.r;
+        SB.tool.drag = { kind: 'wjoint', move(Q) { if (edge) jt.r = Math.max(4, Math.hypot(Q.x - c0.x, Q.y - c0.y)); else jt.c = { x: c0.x + Q.x - P.x, y: c0.y + Q.y - P.y }; SB.dirty(); }, up() { if (edge && Math.round(r0) !== Math.round(jt.r)) SB.invalidate('ctxbar'); }, cancel() { jt.c = c0; jt.r = r0; SB.dirty(); } };
+        return;
+      }
       if (S.wpaint.mode === 'lasso') { // a loop: the bone takes (or loses) the area inside it
         const pts = [P.x, P.y]; SB.tool.drag = { kind: 'wlasso', pts, move(Q) { const l = pts.length; if (Math.hypot(Q.x - pts[l - 2], Q.y - pts[l - 1]) * SB.view.k() >= 3) { pts.push(Q.x, Q.y); SB.dirty(); } },
           up(Q, e) { if (pts.length < 8) return SB.toast('Draw a loop around the area.'); const k = SB.view.k(); let a = 0; for (let i = 0, n = pts.length / 2, j = n - 1; i < n; j = i++) a += (pts[j * 2] - pts[i * 2]) * (pts[j * 2 + 1] + pts[i * 2 + 1]); if (Math.abs(a / 2) * k * k < 200) return SB.toast('Draw a bigger loop around the area.');
@@ -191,7 +201,7 @@
       SB.tool.drag = { kind: 'wpaint', move: dab, up() { SB.commit(); }, cancel() { SB.revert(); } }; dab(P);
     },
     move: customMove, up: customUp, cancel() { SB.revert(); },
-    overlay(O) { weightOverlay(O); const d = SB.tool.drag;
+    overlay(O) { weightOverlay(O); if (S.wpaint.mode === 'joint') { jointOverlay(O); return; } const d = SB.tool.drag;
       if (d && d.kind === 'wgoal') { const c = O.c; c.save(); c.strokeStyle = '#18A999'; c.lineWidth = 3 * O.dpr; c.lineCap = c.lineJoin = 'round'; c.setLineDash([8 * O.dpr, 5 * O.dpr]); c.beginPath(); for (let i = 0; i < d.pts.length; i += 2) { const [x, y] = O.P(d.pts[i], d.pts[i + 1]); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); c.restore(); return; }
       if (d && d.kind === 'wlasso') { const c = O.c, col = S.wpaint.lasso === 'sub' ? '#2F7FF0' : '#E5484D'; c.save(); c.strokeStyle = col; c.fillStyle = col + '22'; c.lineWidth = 2 * O.dpr; c.setLineDash([6 * O.dpr, 4 * O.dpr]); c.beginPath(); for (let i = 0; i < d.pts.length; i += 2) { const [x, y] = O.P(d.pts[i], d.pts[i + 1]); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.closePath(); c.fill(); c.stroke(); c.restore(); return; }
       if (d && d.kind === 'wgrad') { const c = O.c, [ax, ay] = O.P(d.A.x, d.A.y), [bx, by] = O.P(d.B.x, d.B.y), g = c.createLinearGradient(ax, ay, bx, by); g.addColorStop(0, '#E5484D'); g.addColorStop(1, '#2F7FF0');
@@ -206,12 +216,19 @@
       if (w != null) { const t = `${Math.round(w * 100)}%`; c.font = `${600} ${12 * O.dpr}px system-ui, sans-serif`; const tw = c.measureText(t).width; c.fillStyle = 'rgba(20,18,40,.85)'; c.fillRect(x + 12 * O.dpr, y + 12 * O.dpr, tw + 10 * O.dpr, 18 * O.dpr); c.fillStyle = '#fff'; c.fillText(t, x + 17 * O.dpr, y + 25 * O.dpr); }
       c.restore(); },
     bar() {
-      const r = tree.sel(), b = r && r.type === 'rig' && R.boneById(r, S.selBone), mode = S.wpaint.mode || 'brush', grad = mode === 'gradient', smooth = mode === 'smooth', goal = mode === 'goal', lasso = mode === 'lasso';
-      return [rigSteps(r, 'weights'), h('span.lbl', null, h('b', null, b ? b.name : 'Pick a bone')),
+      const r = tree.sel(), b = r && r.type === 'rig' && R.boneById(r, S.selBone), mode = S.wpaint.mode || 'brush', grad = mode === 'gradient', smooth = mode === 'smooth', goal = mode === 'goal', lasso = mode === 'lasso', joint = mode === 'joint';
+      if (joint) { const jt = b && jointOf(r, b); return [rigSteps(r, 'weights'), r && r.type === 'rig' ? bonePicker(r, b) : null, wModeBtn(mode), h('span.vsep'),
+        jt ? h('span.lbl', null, `Drag the circle onto the joint with ${R.boneById(r, jt.partner).name}, its edge to size it`) : h('span.lbl', null, b ? 'This bone has no parent or child that bends a layer' : 'Pick a bone'),
+        jt ? W.popSlider('Size', Math.round(jt.r), { min: 4, max: 600, unit: 'px', title: 'The circle’s radius: small for a tight joint, big for a soft bend', input: v => { jt.r = v; SB.dirty(); } }) : null,
+        jt ? W.btn('Reset', () => { S.wpaint.jt = null; SB.invalidate('ctxbar'); SB.dirty(); }, { cls: 'sm ghost', title: 'Put the circle back on the joint' }) : null,
+        jt ? W.btn('OK', () => { R.jointW(r, b.id, jt.partner, jt.c, jt.r, jt.u); SB.commit(); SB.toast(`${b.name} and ${R.boneById(r, jt.partner).name} now share a ${jt.r < 25 ? 'tight' : jt.r > 80 ? 'big, soft' : ''} joint there.`.replace('  ', ' ')); }, { cls: 'sm primary', title: 'Make the weights of this bone and its partner into a joint the size of the circle' }) : null,
+        W.btn('Done', () => SB.tool.set('select'), { cls: 'sm ghost' })]; }
+      return [rigSteps(r, 'weights'), r && r.type === 'rig' ? bonePicker(r, b) : null,
         wModeBtn(mode), h('span.vsep'),
         lasso ? W.seg(S.wpaint.lasso || 'add', [['add', 'Add', 'Inside the loop the bone moves everything fully (100%)'], ['sub', 'Remove', 'Inside the loop the bone moves nothing (0%)'], ['only', 'Only here', 'The bone moves the area inside the loop and nothing outside it']], v => { S.wpaint.lasso = v; SB.invalidate('ctxbar'); }) : null,
         lasso ? W.popSlider('Soft edge', S.wpaint.soft ?? 6, { min: 0, max: 80, unit: 'px', title: 'How wide the weight eases across the loop’s edge', input: v => S.wpaint.soft = v }) : null,
         smooth || goal || lasso ? null : W.seg(S.wpaint.add ? 'add' : 'sub', [['add', 'Add'], ['sub', 'Remove']], v => { S.wpaint.add = v === 'add'; SB.invalidate('ctxbar'); }),
+        smooth || goal ? null : Object.assign(W.check(!!S.wpaint.keep, 'Keep other bones', v => { S.wpaint.keep = v; SB.invalidate('ctxbar'); }), { title: 'On: this bone only trades weight with the bones joined to it (its parent and children); every other bone keeps its weights. Off: any bone can give or take weight.' }),
         smooth ? W.seg(S.wpaint.smode || 'blur', [['blur', 'Even out', 'Smooths both ways: strong spots (100%) come down, weak spots come up. Works on painted, lasso and goal-curve weights'], ['soft', 'Undo paint', 'Painted weight eases back to the automatic falloff']], v => { S.wpaint.smode = v; SB.invalidate('ctxbar'); }) : null,
         goal ? W.seg(S.wpaint.gline === 'line' ? 'line' : 'free', [['free', 'Freehand', 'Draw the edge freehand (Shift: a straight line, level or upright)'], ['line', 'Straight', 'A straight edge: drag from one end to the other (Shift: level or upright)']], v => { S.wpaint.gline = v; SB.invalidate('ctxbar'); }) : null,
         goal && S.wpaint.gline !== 'line' ? W.popSlider('Smoothing', Math.round((S.wpaint.gsm ?? 0.4) * 100), { min: 0, max: 100, unit: '%', title: 'How much your line is smoothed while you draw it', input: v => S.wpaint.gsm = v / 100 }) : null,
@@ -227,6 +244,7 @@
   });
   addEventListener('keydown', e => {
     if (S.tool !== 'weights' || e.ctrlKey || e.metaKey || (e.target.closest && e.target.closest('input,textarea'))) return;
+    if ((e.key === ',' || e.key === '.') && !e.altKey) { const r = tree.sel(); if (!r || r.type !== 'rig' || !r.bones.length) return; e.preventDefault(); const L = r.bones, i = L.findIndex(x => x.id === S.selBone), d = e.key === '.' ? 1 : -1; S.selBone = L[((i < 0 ? (d > 0 ? -1 : 0) : i) + d + L.length) % L.length].id; SB.invalidate('ctxbar', 'inspector'); SB.dirty(); return; } // step through the bones
     if (e.key !== '[' && e.key !== ']' && e.key !== '{' && e.key !== '}') return; e.preventDefault(); const up = e.key === ']' || e.key === '}';
     if (e.shiftKey) S.wpaint.k = U.clamp(Math.round((S.wpaint.k + (up ? 0.1 : -0.1)) * 100) / 100, 0.05, 1); else S.wpaint.r = U.clamp(Math.round(S.wpaint.r * (up ? 1.2 : 1 / 1.2)), 10, 200);
     SB.invalidate('ctxbar'); SB.dirty();
@@ -301,14 +319,14 @@
           else if (par0) { const E = par0.mEnd, det = E[0] * E[3] - E[1] * E[2] || 1e-9, hx = q0.hx + dx - E[4], hy = q0.hy + dy - E[5]; // its start leaves the parent's tip: a free bone, still following it
             b.ox = U.r1((E[3] * hx - E[2] * hy) / det - TR.now(rig, 'bonex:' + b.id)); b.oy = U.r1((-E[1] * hx + E[0] * hy) / det - TR.now(rig, 'boney:' + b.id)); if (Math.hypot(b.ox, b.oy) < 0.05) { delete b.ox; delete b.oy; } }
         } else { let a = (Math.atan2(l.y - q0.hy, l.x - q0.hx) - Math.atan2(l0.y - q0.hy, l0.x - q0.hx)) * 180 / Math.PI; if (ev && ev.shiftKey) a = Math.round(a / 15) * 15; b.ang = U.r1(b0.ang + a); }
-        R.keepAttached(snap);
+        R.syncMirror(rig, b.id); R.keepAttached(snap);
       },
       up() { if (this.moved) SB.commit(); else SB.dirty(); },
       cancel() { if (this.moved) SB.revert(); } };
   }
   /** The weight tools, as one button with a menu: Brush, Smooth, Gradient, Goal curve. */
   const WMODES = [['brush', 'Brush', 'brush', 'Paint weight with a brush ([ and ] change its size, Shift with them its strength)'], ['smooth', 'Smooth', 'smooth', 'Even out the weights: strong spots come down, weak spots come up (or undo painted weight)'],
-    ['gradient', 'Gradient', 'curve', 'Drag a line: full weight where you start, none where you end'], ['lasso', 'Lasso', 'lasso', 'Draw a loop: the bone takes the area inside it, lets it go, or moves only that area (Alt: the opposite)'], ['goal', 'Goal curve', 'goal', 'Pose the rig, then draw how the bent edge should look: the weights change to match it (the rest pose stays the same)']];
+    ['gradient', 'Gradient', 'curve', 'Drag a line: full weight where you start, none where you end'], ['lasso', 'Lasso', 'lasso', 'Draw a loop: the bone takes the area inside it, lets it go, or moves only that area (Alt: the opposite)'], ['goal', 'Goal curve', 'goal', 'Pose the rig, then draw how the bent edge should look: the weights change to match it (the rest pose stays the same)'], ['joint', 'Joint', 'target', 'A circle round the joint: move it and size it, then OK. The bone and its parent share the circle, from a tight knee to a big soft bend']];
   function wModeBtn(mode) {
     const m = WMODES.find(x => x[0] === mode) || WMODES[0];
     return W.btn(m[1] + ' ▾', e => { const rc = e.currentTarget.getBoundingClientRect(); SB.menu.open(rc.left, rc.bottom + 4, WMODES.map(([k, label, icon, tip]) => ({ label, icon, title: tip, run: () => { S.wpaint.mode = k; SB.tool.set('weights'); SB.invalidate('ctxbar', 'inspector'); SB.dirty(); } }))); },
@@ -321,7 +339,7 @@
     const segs = R.segsWorld(rig), sel = rig.id === S.sel, c = O.c, d = O.dpr; c.save();
     for (const s of segs) {
       const [hx, hy] = O.P(s.h.x, s.h.y), [tx, ty] = O.P(s.t.x, s.t.y), L = Math.hypot(tx - hx, ty - hy) || 1, nx = -(ty - hy) / L, ny = (tx - hx) / L, w = Math.min(L * 0.16, 11 * d);
-      const mx = hx + (tx - hx) * 0.22, my = hy + (ty - hy) * 0.22, on = sel && s.b.id === S.selBone, dyn = s.b.dyn && s.b.dyn.on;
+      const mx = hx + (tx - hx) * 0.22, my = hy + (ty - hy) * 0.22, on = sel && (s.b.id === S.selBone || !!(S.selBones && S.selBones.has(s.b.id))), dyn = s.b.dyn && s.b.dyn.on;
       if (s.curve) { // a B-bone: one slim bone per segment, with a dot at every joint you can drag to turn that segment
         const pts = s.curve.map(p => O.P(p.x, p.y)), ss = S.selSeg && S.selSeg.bone === s.b.id ? S.selSeg.k : -1;
         for (let k = 0; k < pts.length - 1; k++) {
@@ -340,6 +358,10 @@
     for (const s of segs) for (const [p, root] of s.root || s.float ? [[s.h, true], [s.t, false]] : [[s.t, false]]) {
       const [x, y] = O.P(p.x, p.y); c.beginPath(); c.arc(x, y, (root ? 6 : 4.5) * d * big, 0, Math.PI * 2); c.fillStyle = '#fff'; c.fill(); c.strokeStyle = s.b.pin && !root ? '#24213F' : RIG; c.lineWidth = (s.b.pin && !root ? 2.5 : 1.8) * d; c.stroke();
     }
+    if (sel && !S.playing) { const Mw = X.world(rig); for (const s of segs) { const v = s.b.bend && R.BEND[s.b.bend]; if (!v) continue; // a bend arrow: the way this joint folds
+      let ex = Mw.a * v[0] + Mw.c * v[1], ey = Mw.b * v[0] + Mw.d * v[1]; const l = Math.hypot(ex, ey) || 1; ex /= l; ey /= l; const [x, y] = O.P(s.h.x, s.h.y), x2 = x + ex * 20 * d, y2 = y + ey * 20 * d;
+      c.strokeStyle = '#18A999'; c.fillStyle = '#18A999'; c.lineWidth = 2.5 * d; c.lineCap = 'round'; c.beginPath(); c.moveTo(x + ex * 7 * d, y + ey * 7 * d); c.lineTo(x2, y2); c.stroke();
+      c.beginPath(); c.moveTo(x2 + ex * 6 * d, y2 + ey * 6 * d); c.lineTo(x2 - ey * 5 * d, y2 + ex * 5 * d); c.lineTo(x2 + ey * 5 * d, y2 - ex * 5 * d); c.closePath(); c.fill(); } }
     c.restore();
   }
   SB.overlays.extra.push(O => {
@@ -422,30 +444,37 @@
       bound.some(y => R.bendsWith(y, o)) ? row(btn('Clean up weights…', () => SB.weightFix.open(o), 'ghost', 'check')) : null,
       bound.length ? note('Bound: ' + bound.map(x => x.name).join(', ')) : note('Select a layer and use “Attach to a bone” or “Bend with rig” to connect it.'),
     ], { key: 'rig' }),
-    sec('Bones', [h('div.bonelist', null, o.bones.length ? o.bones.map(x => { const on = x.id === S.selBone, wt = S.tool === 'weights';
-      const nameBtn = h('button' + (on ? '.on' : ''), { type: 'button', onclick: () => { S.selBone = x.id; SB.invalidate('inspector', 'ctxbar'); SB.dirty(); } }, h('span', null, x.name), h('small', null, x.dyn && x.dyn.on ? 'dynamic' : x.pin ? 'pinned' : U.r1(TR.now(o, 'bone:' + x.id)) + '°'));
+    sec('Bones', [o.bones.length > 1 ? row(btn('Bone tree…', () => boneTree(o), 'ghost', 'rows'), S.selBones && S.selBones.size > 1 ? btn(`Join ${S.selBones.size} bones`, () => joinSel(o), 'ghost') : null) : null, h('div.bonelist', null, o.bones.length ? o.bones.map(x => { const on = x.id === S.selBone, wt = S.tool === 'weights';
+      const many = S.selBones && S.selBones.has(x.id) && x.id !== S.selBone;
+      const nameBtn = h('button' + (on ? '.on' : '') + (many ? '.on2' : ''), { type: 'button', title: 'Click to pick it, Shift-click to pick several, double-click to rename', 'data-bone': x.id, onclick: e => { if (e.shiftKey) return selToggle(x.id); const now = performance.now(), dbl = lastBoneClick.id === x.id && now - lastBoneClick.t < 450; lastBoneClick = { id: x.id, t: now }; if (dbl) return renameInline(o, x, e.currentTarget); /* the list redraws after a click, so a double-click is two clicks on the same bone */ S.selBones = null; S.selBone = x.id; SB.invalidate('inspector', 'ctxbar'); SB.dirty(); } }, h('span', null, x.name), h('small', null, x.dyn && x.dyn.on ? 'dynamic' : x.pin ? 'pinned' : U.r1(TR.now(o, 'bone:' + x.id)) + '°'));
       if (!on) return nameBtn;
       // the selected bone: its weights, right under its name
       const wbtn = (mode, label, icon, title) => { const b = W.btn(label, () => { S.wpaint.mode = mode; SB.tool.set('weights'); SB.invalidate('inspector', 'ctxbar'); }, { cls: 'sm' + (wt && (S.wpaint.mode || 'brush') === mode ? ' on' : ''), icon, title }); return b; };
-      return h('div.bone-sel', null, nameBtn, bound.some(y => R.bendsWith(y, o)) ? h('div.bone-w', null, wbtn('brush', 'Paint weights', 'weights', 'Paint where the layers follow this bone'), wbtn('gradient', 'Gradient', 'curve', 'Drag a line: full weight where you start, none where you end'), wbtn('lasso', 'Lasso', 'lasso', 'Draw a loop: the bone takes the area inside it, or lets it go'), wbtn('goal', 'Goal curve', 'goal', 'Pose the rig, then draw how the bent edge should look'),
-        W.iconBtn('trash', 'Clear the weights painted for this bone', () => { tree.all().forEach(y => { if (R.bendsWith(y, o) && y.bind.paint) delete y.bind.paint[x.id]; }); R.wChanged(); SB.commit(); }, 'sm')) : null); }) : note('No bones yet. Use the Bones tool and click on the stage.'))], { key: 'bones' })];
+      return h('div.bone-sel', null, nameBtn, bound.some(y => R.bendsWith(y, o)) ? h('div.bone-w', null, wbtn('brush', 'Paint weights', 'weights', 'Paint where the layers follow this bone'), wbtn('gradient', 'Gradient', 'curve', 'Drag a line: full weight where you start, none where you end'), wbtn('lasso', 'Lasso', 'lasso', 'Draw a loop: the bone takes the area inside it, or lets it go'), wbtn('goal', 'Goal curve', 'goal', 'Pose the rig, then draw how the bent edge should look'), wbtn('joint', 'Joint', 'target', 'A circle round the joint: size it, then OK'),
+        W.iconBtn('trash', 'Clear the weights painted for this bone', () => { tree.all().forEach(y => { if (R.bendsWith(y, o) && y.bind.paint) delete y.bind.paint[x.id]; }); R.wChanged(); SB.commit(); }, 'sm')) : null); }) : h('div', null, note('No bones yet. Use the Bones tool and click on the stage, or start from a ready skeleton.'), rigLocked(o) ? null : row(btn('Human skeleton', () => addHuman(o), '', 'rig'))))], { key: 'bones' })];
+    const mset = function (t, v) { const f = this, val = typeof v === 'number' ? v / TR.uiMul(f.k) : v, all = R.withMirror(t, { [f.k]: val }); for (const id in all) TR.set(t, id, all[id]); }; // a pose value, also on the mirror bone
+    const mb = b && R.mirrorOf(o, b);
     if (b) out.push(sec(b.name, [
       FL.row(b, { k: 'name', label: 'Name', type: 'text', single: true, after: () => SB.invalidate('timeline') }),
+      mb ? W.row('Mirror', h('button.linkbtn', { type: 'button', title: 'Select the mirror bone', onclick: () => { S.selBone = mb.id; SB.invalidate('inspector', 'ctxbar'); SB.dirty(); } }, mb.name), W.iconBtn('x', 'Unlink: pose them on their own', () => { R.unmirror(o, b.id); SB.commit(); }, 'sm'))
+        : rigLocked(o) ? null : row(btn('Mirror', () => mirrorBone(o, b), 'ghost', 'flipH'), h('span.hint', null, 'A copy on the other side, with its children. They pose together.')),
       h('div.subhead', null, 'Pose'),
-      FL.row(o, { k: 'bone:' + b.id, label: 'Turn', type: 'range', min: -180, max: 180, anim: true, single: true }),
-      FL.row(o, { k: 'bonex:' + b.id, label: 'Move X', type: 'num', anim: true, single: true }), FL.row(o, { k: 'boney:' + b.id, label: 'Move Y', type: 'num', anim: true, single: true }),
-      FL.row(o, { k: 'bonesx:' + b.id, label: 'Length %', type: 'range', min: 5, max: 400, anim: true, single: true }), FL.row(o, { k: 'bonesy:' + b.id, label: 'Width %', type: 'range', min: 5, max: 400, anim: true, single: true }),
+      FL.row(o, { set: mset, k: 'bone:' + b.id, label: 'Turn', type: 'range', min: -180, max: 180, anim: true, single: true }),
+      FL.row(o, { set: mset, k: 'bonex:' + b.id, label: 'Move X', type: 'num', anim: true, single: true }), FL.row(o, { set: mset, k: 'boney:' + b.id, label: 'Move Y', type: 'num', anim: true, single: true }),
+      FL.row(o, { set: mset, k: 'bonesx:' + b.id, label: 'Length %', type: 'range', min: 5, max: 400, anim: true, single: true }), FL.row(o, { set: mset, k: 'bonesy:' + b.id, label: 'Width %', type: 'range', min: 5, max: 400, anim: true, single: true }),
       row(btn('Reset pose', () => { resetBone(o, b, true); SB.commit(); }, 'ghost'), h('span.hint', null, 'Children move and scale with it.')),
       h('div.subhead', null, 'Segments'),
       rigLocked(o) ? null : FL.row(b, { label: 'Segments', type: 'num', min: 1, max: 16, step: 1, single: true, get: x => x.segs || 1, set: (x, v) => { v = Math.round(U.clamp(v, 1, 16)); const was = R.nSegs(x); if (v > 1) x.segs = v; else delete x.segs; S.selSeg = null; if (v > 1 && !was) bendCtrl(o, x); }, rerender: true }),
       R.nSegs(b) ? [
-        FL.row(o, { k: 'bonebend:' + b.id, label: 'Bend', type: 'range', min: -360, max: 360, anim: true, single: true }),
+        FL.row(o, { set: mset, k: 'bonebend:' + b.id, label: 'Bend', type: 'range', min: -360, max: 360, anim: true, single: true }),
         S.selSeg && S.selSeg.bone === b.id && S.selSeg.k < R.nSegs(b) ? FL.row(o, { k: `bseg:${b.id}:${S.selSeg.k}`, label: `Segment ${S.selSeg.k + 1}`, type: 'range', min: -180, max: 180, anim: true, single: true })
           : note('Drag the dots on the bone to turn its segments (Alt-drag the tip turns the last one).'),
         row(btn('Straighten', () => { resetBone(o, b, false); SB.commit(); }, 'ghost'))]
         : note('Split the bone into segments to make it bend smoothly: a tail, a spine, a rubber arm.'),
       rigLocked(o) ? null : [FL.row(b, { k: 'len', label: 'Rest length', type: 'num', min: 4, single: true }), FL.row(b, { k: 'ang', label: 'Rest angle', type: 'num', single: true })],
       FL.row(b, { k: 'pin', label: 'Pin', type: 'check', text: 'IK stops at this bone', single: true }),
+      b.parent ? W.row('Bends toward', bendArrows(o, [b]), W.info(['Which way the joint at the start of this bone (a knee, an elbow) bends when you drag the end of the limb (IK) or the body moves with planted feet.', 'Pick an arrow: the joint always bends that way, so a leg never folds backwards. The dot: whichever way it bends now.'], 'Bends toward')) : null,
+      b.parent ? FL.row(b, { k: 'plant', label: 'Planted', type: 'check', text: 'Stays put when the body moves (a foot)', single: true, title: 'When you pose the rest of the rig, this bone keeps its place and angle, and the two bones above it bend to reach it (Feet stay planted in the Pose bar)' }) : null,
       FL.row(b, { label: 'Dynamic', type: 'check', text: 'Swings with follow-through', single: true, get: x => !!(x.dyn && x.dyn.on), set: (x, v) => { x.dyn = Object.assign(x.dyn || { stiff: 0.35, damp: 0.25, grav: 1 }, { on: v }); }, rerender: true }),
       b.dyn && b.dyn.on ? [FL.row(b, { label: 'Stiffness %', type: 'range', min: 0, max: 100, single: true, get: x => Math.round((x.dyn.stiff ?? 0.35) * 100), set: (x, v) => x.dyn.stiff = v / 100 }), FL.row(b, { label: 'Damping %', type: 'range', min: 0, max: 100, single: true, get: x => Math.round((x.dyn.damp ?? 0.25) * 100), set: (x, v) => x.dyn.damp = v / 100 }), FL.row(b, { label: 'Gravity', type: 'range', min: 0, max: 3, step: 0.05, single: true, get: x => x.dyn.grav ?? 1, set: (x, v) => x.dyn.grav = v })] : null,
       rigLocked(o) ? null : W.row('Parent', W.select(b.parent || '', [['', 'None (a free bone)'], ...o.bones.filter(x => x !== b && !isUnder(o, x, b)).map(x => [x.id, x.name])], v => { const sn = R.editSnap(o); if (R.setParent(o, b.id, v || null)) { R.keepAttached(sn); SB.commit(); SB.toast(v ? `${b.name} now follows ${R.boneById(o, v).name}, staying where it is.` : `${b.name} is free now.`); } }, 'Parent bone'),
@@ -454,6 +483,114 @@
     ], { key: 'bone' }));
     return out;
   }
+  /** The joint circle of bone b (made from where the bone meets its parent, or its child for a top bone; kept while you adjust it). */
+  function jointOf(rig, b) {
+    const jt = S.wpaint.jt; if (jt && jt.rig === rig.id && jt.bone === b.id) return jt;
+    const sp = R.jointSpot(rig, b.id); S.wpaint.jt = sp ? Object.assign({ rig: rig.id, bone: b.id }, sp) : null; return S.wpaint.jt;
+  }
+  function jointOverlay(O) {
+    const rig = tree.sel(), b = rig && rig.type === 'rig' && R.boneById(rig, S.selBone), jt = b && jointOf(rig, b); if (!jt) return;
+    const c = O.c, d = O.dpr, [x, y] = O.P(jt.c.x, jt.c.y), [ex] = O.P(jt.c.x + jt.r, jt.c.y), R0 = Math.abs(ex - x), [ax, ay] = O.P(jt.c.x - jt.u.x * jt.r, jt.c.y - jt.u.y * jt.r), [bx, by] = O.P(jt.c.x + jt.u.x * jt.r, jt.c.y + jt.u.y * jt.r);
+    c.save(); c.fillStyle = 'rgba(24,169,153,.10)'; c.beginPath(); c.arc(x, y, R0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#18A999'; c.lineWidth = 2.5 * d; c.beginPath(); c.arc(x, y, R0, 0, Math.PI * 2); c.stroke();
+    const g = c.createLinearGradient(ax, ay, bx, by); g.addColorStop(0, '#2F7FF0'); g.addColorStop(1, '#E5484D'); c.strokeStyle = g; c.lineWidth = 4 * d; c.lineCap = 'round'; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); // blue: its partner, red: this bone
+    c.fillStyle = '#fff'; c.strokeStyle = '#18A999'; c.lineWidth = 2 * d; c.beginPath(); c.arc(x, y, 5 * d, 0, Math.PI * 2); c.fill(); c.stroke();
+    const hx = x + R0 * Math.SQRT1_2, hy = y - R0 * Math.SQRT1_2; c.beginPath(); c.rect(hx - 5 * d, hy - 5 * d, 10 * d, 10 * d); c.fill(); c.stroke(); // size handle
+    c.restore();
+  }
+  /** The Weights bar's bone: a menu of every bone (by family) and ‹ › to step through them, so a whole rig is quick to go over. */
+  function bonePicker(rig, b) {
+    const list = rig.bones, i = b ? list.indexOf(b) : -1, depth = x => { let n = 0; for (let p = x.parent && R.boneById(rig, x.parent); p; p = p.parent && R.boneById(rig, p.parent)) n++; return n; };
+    const pick = x => { S.selBone = x.id; SB.invalidate('ctxbar', 'inspector'); SB.dirty(); }, step = d => { if (!list.length) return; pick(list[((i < 0 ? (d > 0 ? -1 : 0) : i) + d + list.length) % list.length]); };
+    const menu = e => { const rc = e.currentTarget.getBoundingClientRect(); SB.menu.open(rc.left, rc.bottom + 4, [{ head: 'Paint weights of' }, ...list.map(x => ({ label: '\u2003\u2003'.repeat(Math.min(6, depth(x))) + x.name, icon: x === b ? 'check' : 'bone', run: () => pick(x) }))]); };
+    return h('span.bonepick', null, W.btn('‹', () => step(-1), { cls: 'sm ghost bonepick-s', title: 'Previous bone (,)' }),
+      W.btn((b ? b.name : 'Pick a bone') + ' ▾', menu, { cls: 'sm bonepick-b', title: 'The bone you paint weights for. Pick another one here, click one on the stage, or step with , and .' }),
+      W.btn('›', () => step(1), { cls: 'sm ghost bonepick-s', title: 'Next bone (.)' }));
+  }
+  let lastBoneClick = { id: null, t: 0 };
+  /** The bend arrows (none, ←, →, ↑, ↓) for bones bs: the joint at each one's start bends that way. A mirrored bone gets the mirrored arrow. */
+  const ARROWS = [['', '•', 'Free: it bends whichever way it is bent now'], ['left', '←', 'Bends toward the left'], ['right', '→', 'Bends toward the right'], ['up', '↑', 'Bends upward'], ['down', '↓', 'Bends downward']];
+  function setBend(rig, bs, v) {
+    const flip = { left: 'right', right: 'left' }; for (const b of bs) { if (!b.parent) continue; if (v) b.bend = v; else delete b.bend; const m = S.rigMirror !== false && R.mirrorOf(rig, b); if (m && !bs.includes(m)) { if (v) m.bend = flip[v] || v; else delete m.bend; } }
+    SB.commit(); SB.invalidate('inspector'); SB.dirty();
+  }
+  function bendArrows(rig, bs) { const cur = bs[0] && bs[0].bend || ''; return W.seg(cur, ARROWS.map(([k, t, tip]) => [k, t, tip]), v => setBend(rig, bs, v)); }
+  /** The bones a "Bends toward" choice applies to: of the picked bones, those whose parent is picked too (the knees of a picked leg); one bone: itself. */
+  const bendTargets = (rig, b) => { const set = S.selBones && S.selBones.size > 1 ? [...S.selBones].map(id => R.boneById(rig, id)).filter(Boolean) : [b]; if (set.length === 1) return set; const inner = set.filter(x => x.parent && set.some(y => y.id === x.parent)); return inner.length ? inner : set; };
+  /** Shift-click: add a bone to the picked ones, or take it out. */
+  function selToggle(id) {
+    const set = S.selBones || new Set(S.selBone ? [S.selBone] : []); if (set.has(id) && set.size > 1) { set.delete(id); if (S.selBone === id) S.selBone = [...set][0]; } else { set.add(id); S.selBone = id; }
+    S.selBones = set.size > 1 ? set : null; SB.invalidate('inspector', 'ctxbar'); SB.dirty();
+  }
+  function joinSel(rig) {
+    const ids = [...(S.selBones || [])]; const sn = R.editSnap(rig), b = R.joinBones(rig, ids); if (typeof b === 'string') return SB.toast(b);
+    R.keepAttached(sn); S.selBones = null; S.selBone = b.id; SB.commit(); SB.invalidate('inspector', 'ctxbar'); SB.toast(`${ids.length} bones are now one: ${b.name}.`);
+  }
+  function splitSel(rig, b, n) {
+    const sn = R.editSnap(rig), m = R.mirrorOf(rig, b), made = R.splitBone(rig, b.id, n); R.keepAttached(sn); R.addToBinds(sn, made, b.id);
+    if (m && S.rigMirror !== false) { const sn2 = R.editSnap(rig), mm = R.splitBone(rig, m.id, n); R.keepAttached(sn2); R.addToBinds(sn2, mm, m.id); made.forEach((x, i) => { if (mm[i]) { x.mirror = mm[i].id; mm[i].mirror = x.id; } }); }
+    S.selBones = null; SB.commit(); SB.invalidate('inspector', 'ctxbar'); SB.toast(`${b.name.replace(/ 1$/, '')} is now ${n} bones${m && S.rigMirror !== false ? ', and its mirror too' : ''}.`);
+  }
+  /** Double-click a bone in the list: type its new name in place (Enter keeps it, Esc cancels). */
+  function renameInline(rig, b, btn) {
+    const inp = h('input.bone-ren', { type: 'text', value: b.name, 'aria-label': 'Bone name' }); let done = false;
+    const fin = ok => { if (done) return; done = true; const v = inp.value.trim(); if (ok && v && v !== b.name) { b.name = v; SB.commit(); } SB.invalidate('inspector', 'ctxbar', 'timeline'); };
+    inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') fin(true); else if (e.key === 'Escape') fin(false); }; inp.onblur = () => fin(true); inp.onclick = e => e.stopPropagation();
+    btn.replaceWith(inp); inp.focus(); inp.select();
+  }
+  /** The bone tree in a window: drag a bone onto another to hang it there (or onto "Top level"), or pick its parent in the list. */
+  function boneTree(rig) {
+    let dragId = null; const body = h('div.btree');
+    const depth = x => { let n = 0; for (let p = x.parent && R.boneById(rig, x.parent); p; p = p.parent && R.boneById(rig, p.parent)) n++; return n; };
+    const under = (x, b) => { for (let y = x; y && y.parent; y = R.boneById(rig, y.parent)) if (y.parent === b.id) return true; return false; };
+    const move = (id, np) => { if (np === id) return; const b = R.boneById(rig, id); if (!b || (b.parent || null) === (np || null)) return; const t = np && R.boneById(rig, np); if (t && under(t, b)) return SB.toast(`${t.name} hangs on ${b.name}: it can't be its parent.`);
+      const sn = R.editSnap(rig); if (!R.setParent(rig, id, np || null)) return SB.toast('That would make a loop.'); R.keepAttached(sn); SB.commit(); render(); SB.invalidate('inspector'); };
+    const drop = (el, np) => { el.ondragover = e => { if (!dragId) return; e.preventDefault(); el.classList.add('drop'); }; el.ondragleave = () => el.classList.remove('drop'); el.ondrop = e => { e.preventDefault(); el.classList.remove('drop'); const id = dragId; dragId = null; if (id) move(id, np); }; };
+    function render() {
+      const locked = rigLocked(rig), top = h('div.bt-top', null, 'Top level (no parent)'); drop(top, null);
+      body.replaceChildren(locked ? note('The rig is locked: unlock it to change the tree.') : top, ...rig.bones.map(x => {
+        const opts = [['', '— none (top level)'], ...rig.bones.filter(y => y !== x && !under(y, x)).map(y => [y.id, y.name])];
+        const row = h('div.bt-row' + (x.id === S.selBone ? '.on' : ''), { draggable: locked ? 'false' : 'true', style: { paddingLeft: 8 + depth(x) * 18 + 'px' } },
+          h('span.bt-grip', { html: SB.icon('grip') }), h('button.bt-name', { type: 'button', title: 'Pick this bone', onclick: () => { S.selBone = x.id; SB.invalidate('inspector', 'ctxbar'); SB.dirty(); render(); } }, x.name),
+          locked ? null : W.select(x.parent || '', opts, v => move(x.id, v || null), 'Parent of ' + x.name));
+        row.ondragstart = e => { dragId = x.id; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', x.id); } catch (er) { /* ok */ } }; row.ondragend = () => { dragId = null; };
+        if (!locked) drop(row, x.id); return row; }));
+    }
+    render();
+    const dlg = SB.dialog.sheet([h('h2', null, `Bone tree: ${rig.name}`), h('p.sub', null, 'Each bone hangs on the one above it and moves with it. Drag a bone onto another to hang it there, or onto Top level; or pick its parent on the right. Nothing on the stage moves.'), body,
+      h('div.sheet-actions', null, h('button.btn.primary', { type: 'button', onclick: () => dlg.close() }, 'Done'))], { size: 'md' });
+  }
+  /** A ready human skeleton in rig (empty) or a new rig at the middle of the screen; its feet stand near the bottom. */
+  function addHuman(rig) {
+    const P = S.project, H = P.h * 0.62; let r = rig && rig.type === 'rig' && !rig.bones.length ? rig : null;
+    if (!r) { r = R.make({ x: P.w / 2, y: P.h * 0.86 }); r.name = 'Human rig'; tree.rootList().unshift(r); tree.reindex(); }
+    R.humanBones(r, H); tree.select([r.id]); S.selBone = null; SB.commit(); SB.tool.set('select'); SB.invalidate('inspector', 'ctxbar');
+    SB.toast('A human skeleton, mirrored left and right. Drag the Hips up and down: the legs bend and the feet stay planted. Attach your drawing with Bend with rig.');
+  }
+  /** Mirror bone b (and its children) to the other side of the skeleton; they pose together from then on. */
+  function mirrorBone(rig, b) {
+    const sn = R.editSnap(rig), nb = R.mirrorBones(rig, b.id); if (typeof nb === 'string') return SB.toast(nb); R.keepAttached(sn);
+    S.selBone = nb.id; SB.commit(); SB.invalidate('inspector', 'ctxbar');
+    const n = rig.bones.filter(x => x.mirror).length / 2; SB.toast(`${nb.name} mirrors ${b.name}${n > 1 ? ` (${n} pairs)` : ''}. Pose one side and the other follows (Mirror posing in the Pose bar).`);
+  }
+  /** Right-click a bone of the selected rig: its own menu. */
+  SB.menus.stagePre.push((e, P) => {
+    const rig = tree.sel(); if (!rig || rig.type !== 'rig' || !(S.tool === 'bone' || poseable(rig))) return null; const j = R.hit(rig, P); if (!j || !j.bone) return null;
+    const b = j.bone, m = R.mirrorOf(rig, b), locked = rigLocked(rig); if (!(S.selBones && S.selBones.has(b.id))) S.selBones = null; S.selBone = b.id; SB.invalidate('inspector', 'ctxbar'); SB.dirty();
+    const many = S.selBones && S.selBones.size > 1 ? S.selBones.size : 0;
+    return [{ head: b.name },
+      m ? { label: `Select its mirror (${m.name})`, icon: 'flipH', run: () => { S.selBone = m.id; SB.invalidate('inspector', 'ctxbar'); SB.dirty(); } } : { label: 'Mirror', icon: 'flipH', title: 'A copy on the other side, with its children; _l and _r swap in the names. They pose together.', disabled: locked, run: () => mirrorBone(rig, b) },
+      m && { label: 'Unlink the mirror', run: () => { R.unmirror(rig, b.id); SB.commit(); SB.invalidate('inspector'); SB.toast(`${b.name} and ${m.name} pose on their own now.`); } },
+      '-', { label: 'Rename…', run: async () => { const v = await SB.dialog.prompt('Rename bone', 'A clear name helps: Arm_L, Head, Tail 2.', b.name); if (v && v.trim()) { b.name = v.trim(); SB.commit(); } } },
+      !locked && many ? { label: `Join ${many} bones into one`, title: 'The picked bones (one chain) become one bone from the first joint to the last tip', run: () => joinSel(rig) } : null,
+      !locked && !many ? { label: 'Split into', sub: [2, 3, 4, 5].map(n => ({ label: `${n} bones`, run: () => splitSel(rig, b, n) })) } : null,
+      { label: 'Bone tree…', icon: 'rows', title: 'See and change which bone hangs on which', run: () => boneTree(rig) },
+      b.parent || many ? { label: 'Bends toward', title: 'Which way the joint bends (a knee, an elbow), so the limb always folds the right way', sub: ARROWS.map(([k, t, tip]) => ({ label: `${t}  ${k ? tip.replace('Bends ', '') : 'Free'}`, title: tip, run: () => { const bs = bendTargets(rig, b); setBend(rig, bs, k); SB.toast(k ? `${bs.map(x => x.name).join(', ')}: ${tip.toLowerCase()}.` : 'They bend whichever way they are bent now.'); } })) } : null,
+      '-', { label: 'Reset pose', run: () => { resetBone(rig, b, true); if (m && S.rigMirror !== false) resetBone(rig, m, true); SB.commit(); } },
+      !locked && { label: 'Delete bone', icon: 'trash', run: () => { const sn = R.editSnap(rig); R.deleteBoneOnly(rig, b.id); R.keepAttached(sn); S.selBone = null; SB.commit(); } },
+      !locked && { label: 'Delete with its children', run: () => { R.deleteBone(rig, b.id); S.selBone = null; SB.commit(); } },
+      '-', { label: rig.name, sub: SB.menus.layerItems(rig) }];
+  });
   /** A bone split into segments gets a controller that bends it: drag it to one side of the bone and the
       bone curls that way (it sits at the bone's tip; its box moves both ways). */
   function bendCtrl(rig, b) {
@@ -467,6 +604,31 @@
     SB.toast(`${c.name} added: drag it to either side of ${b.name} to bend it. Record other poses for it in the rig's Controls.`);
     return c;
   }
+  /** Which bones of rig r bend layer o: all of them, or only the ones picked (B.only), so a leg drawing moves only with its leg. */
+  function bendBonesRow(o, r) {
+    const B = o.bind, all = Object.keys(B.inv || {}).filter(id => B.seg && B.seg[id] && R.boneById(r, id) && (!B.rigOf || !B.rigOf[id] || B.rigOf[id] === r.id)), on = R.bindBoneIds(B).filter(id => all.includes(id));
+    const label = on.length === all.length ? `All ${all.length} bones` : on.length === 1 ? R.boneById(r, on[0]).name : `${on.length} of ${all.length} bones`;
+    return W.row('Bent by', W.btn(label + ' ▾', e => bendBonesPop(o, r, e.currentTarget), { cls: 'sm', title: 'Pick the bones that move this layer; the others leave it alone' }));
+  }
+  function bendBonesPop(o, r, anchor) {
+    const B = o.bind, ids = Object.keys(B.inv || {}).filter(id => B.seg && B.seg[id] && R.boneById(r, id) && (!B.rigOf || !B.rigOf[id] || B.rigOf[id] === r.id)), list = r.bones.filter(b => ids.includes(b.id));
+    const depth = x => { let n = 0; for (let p = x.parent && R.boneById(r, x.parent); p; p = p.parent && R.boneById(r, p.parent)) n++; return n; };
+    const others = Object.keys(B.inv || {}).filter(id => !ids.includes(id)), body = h('div.bbpick');
+    const set = sel => { if (!sel.length) return; const keep = (B.only ? others.filter(id => B.only.includes(id)) : others).concat(sel); if (keep.length >= others.length + ids.length) delete B.only; else B.only = keep; R.wChanged(); SB.commit(); render(); SB.invalidate('inspector'); }; // bones of other rigs stay as they were
+    const cur = () => R.bindBoneIds(B).filter(id => ids.includes(id));
+    function render() {
+      const now = new Set(cur()), under = (x, b) => { for (let y = x; y && y.parent; y = R.boneById(r, y.parent)) if (y.parent === b.id) return true; return false; };
+      body.replaceChildren(h('div.bb-btns', null,
+          W.btn('All', () => set(ids), { cls: 'sm ghost', title: 'Every bone of the rig bends it' }),
+          W.btn('Near this layer', () => { const n = R.bonesNear(o, r); if (!n.length) return SB.toast('No bone runs over this layer: pick them below.'); set(n); }, { cls: 'sm ghost', title: 'Only the bones that run over this layer' })),
+        ...list.map(b => { const c = h('input', { type: 'checkbox' }); c.checked = now.has(b.id);
+          c.onchange = () => { const s2 = new Set(cur()); if (c.checked) s2.add(b.id); else { if (s2.size <= 1) { c.checked = true; return SB.toast('Keep at least one bone.'); } s2.delete(b.id); } set(ids.filter(id => s2.has(id))); };
+          const chain = W.iconBtn('plus', `Add ${b.name} and the bones under it`, () => { const s2 = new Set(cur()); list.forEach(x => { if (x === b || under(x, b)) s2.add(x.id); }); set(ids.filter(id => s2.has(id))); }, 'sm');
+          return h('label.bb-row', { style: { paddingLeft: 4 + depth(b) * 14 + 'px' } }, c, h('span', null, b.name), chain); }),
+        h('p.hint', null, 'Checked bones move this layer, the others leave it alone. + adds a bone with everything under it (a whole leg).'));
+    }
+    render(); SB.popover(anchor, h('div.bb-pop', null, h('div.bb-title', null, `Bones that bend ${o.name}`), body));
+  }
   /** How a layer is connected to a rig: a card like a controller's (what it follows, change it, remove it). */
   function bindSection(o) {
     const B = o.bind; if (!B || o.type === 'rig') return null;
@@ -476,9 +638,10 @@
       const rs = R.bindRigs(B).map(tree.find).filter(Boolean), more = R.rigs().filter(x => !rs.includes(x));
       const cards = rs.map(r => h('div.fxitem', null, h('div.hd', null,
         h('button.linkbtn', { type: 'button', title: 'Select this rig', onclick: () => tree.select([r.id]) }, h('span', { html: SB.icon('rig') }), `Bends with ${r.name}`),
-        W.iconBtn('x', 'Stop bending with this rig', () => { R.unbendFrom(o, r); SB.commit(); }, 'sm'))));
+        W.iconBtn('x', 'Stop bending with this rig', () => { R.unbendFrom(o, r); SB.commit(); }, 'sm')), bendBonesRow(o, r)));
       return sec('Rig', [...cards,
-        h('div.fxitem', null, FL.row(B, { k: 'soft', label: 'Softness', type: 'range', min: 10, max: 300, single: true }), lockRow,
+        h('div.fxitem', null, FL.row(B, { k: 'soft', label: 'Softness', type: 'range', min: 10, max: 300, single: true }),
+          W.row('Smooth bend', W.check(R.smoothBend(B), 'Keep bends round and full', v => { B.dq = v; SB.commit(); }), W.info(['On: at a joint the drawing swings round it on a smooth arc, so the bend stays round and full (no pinched inside, no bumps outside).', 'Off: each point is a plain mix of where the bones would put it, the way Unity and Godot bend (so it is off by default in Game Engine projects).'], 'Smooth bend')), lockRow,
           row(btn('Rebind at this pose', () => { R.rebind(o); SB.commit(); }, 'ghost'), more.length ? btn('Also bend with…', () => pickBend([o]), 'ghost', 'target') : null)),
         note('It stretches with the bones. Paint where each bone moves it in the rig’s Bones list (Paint weights, Gradient).')], { key: 'bind', badge: h('span.badge', null, 'bends') });
     }
@@ -754,12 +917,49 @@
       h('small.chg-was', { title: 'Value at rest' }, typeof rest[P] === 'number' ? '← ' + U.r2(rest[P] * TR.uiMul(P)) : ''),
       W.iconBtn('x', 'Remove: keep the rest value at this point', () => { TR.set(o, P, rest[P]); SB.bump(); SB.invalidate('inspector', 'frames'); }, 'sm'))));
   }
-  /** Outside recording: the values this link drives, as chips; × stops driving that value. */
+  /** Remove value P from every point of link L for good (and from points saved later: L.cut). */
+  function dropValue(L, P) {
+    L.states.forEach(s => delete s.p[P]); L.cut = [...new Set((L.cut || []).concat(P))];
+    if (L.ignore) { L.ignore = L.ignore.filter(x => x !== P); if (!L.ignore.length) delete L.ignore; }
+    L._rbf = null; SB.commit(); SB.toast('Removed from every point.');
+  }
+  const setIgnored = (L, P, off) => { const ig = (L.ignore || []).filter(x => x !== P); if (off) ig.push(P); if (ig.length) L.ignore = ig; else delete L.ignore; L._rbf = null; SB.commit(); };
+  /** Outside recording: the values this link drives, as chips; × removes that value from every point. */
   function drivenChips(o, L) {
     const lab = propLabels(o), keys = C.varying(L), ig = L.ignore || [];
     if (!keys.length && !ig.length) return null;
-    return h('div.dchips', null, h('span.hint', null, 'Drives:'), ...keys.map(P => h('span.dchip', null, lab[P] || P, W.iconBtn('x', 'Stop driving this value', () => { L.ignore = ig.concat(P); L._rbf = null; SB.commit(); }, 'sm'))),
-      ...ig.map(P => h('span.dchip.off', { title: 'Not driven. Click to drive it again', onclick: () => { L.ignore = ig.filter(x => x !== P); if (!L.ignore.length) delete L.ignore; SB.commit(); } }, lab[P] || P)));
+    return h('div.dchips', null, h('span.hint', null, 'Drives:'), ...keys.map(P => h('span.dchip', null, lab[P] || P, W.iconBtn('x', 'Remove this value from every point', () => dropValue(L, P), 'sm'))),
+      ...ig.map(P => h('span.dchip.off', { title: 'Paused: not driven. Click to drive it again', onclick: () => setIgnored(L, P, false) }, lab[P] || P)));
+  }
+  /** One stored value of a point, editable in place (the point's data, not the layer). */
+  function storedField(o, L, st, P) {
+    const v = st.p[P], ty = TR.type(P), mul = TR.uiMul(P), set = x => { st.p[P] = typeof x === 'number' ? U.r3(x) : x; L._rbf = null; };
+    if (v === undefined) return h('button.pt-add', { type: 'button', title: 'No value saved here: this point uses the layer’s own value. Click to save the layer’s value now', onclick: () => { set(C.stateVals(o, tree.localTime(o))[P]); SB.commit(); } }, '+');
+    if (ty === 'color') return W.color(v, { input: x => { set(x); SB.bump(); }, change: () => SB.commit() });
+    if (ty === 'bool') { const c = h('input', { type: 'checkbox', title: P }); c.checked = !!v; c.onchange = () => { set(c.checked); SB.commit(); }; return c; }
+    if (P === 'frame' && o.frames) { const n = o.frames.length, el = W.num(Math.round(v) + 1, { step: 1, min: 1, max: n, label: 'Frame number', change: x => { set(U.clamp(Math.round(x), 1, n) - 1); SB.commit(); } }); el.title = (o.frames[Math.round(v)] || {}).name || `Frame ${Math.round(v) + 1} of ${n}`; return el; }
+    if (typeof v !== 'number') { const t = h('input', { type: 'text', value: String(v) }); t.onchange = () => { set(t.value); SB.commit(); }; return t; }
+    return W.num(U.r2(v * mul), { step: mul > 1 ? 1 : P.startsWith('fx:') ? 0.05 : 1, label: P, input: x => { set(x / mul); SB.bump(); }, change: x => { set(x / mul); SB.commit(); } });
+  }
+  /** Every value each point of link L holds, as a table: edit any of them, pause or remove a value. */
+  function pointsTable(o, L, c) {
+    if (!L.states.length) return null;
+    const lab = propLabels(o), order = c ? C.slotsFor(c).map(q => q.k) : [], sts = L.states.slice().sort((a, b) => (order.indexOf(a.slot) + 1 || 99) - (order.indexOf(b.slot) + 1 || 99));
+    const nameOf = s => (c && C.slotOf(c, s.slot) || {}).name || s.slot || 'Point';
+    const all = [...new Set(sts.flatMap(s => Object.keys(s.p)))], ig = L.ignore || [], vary = C.varying(Object.assign({}, L, { ignore: [] }));
+    const shown = S.ctrlAllVals ? all : all.filter(P => vary.includes(P) || ig.includes(P) || sts.some(s => s.p[P] === undefined));
+    const same = all.length - shown.length, cut = (L.cut || []).filter(P => !all.includes(P));
+    const row = P => { const off = ig.includes(P); return h('tr' + (off ? '.off' : ''), null,
+      h('th', { title: P }, h('div.pt-n', null, h('span', null, lab[P] || P), h('span.pt-act', null, W.iconBtn(off ? 'eyeOff' : 'eye', off ? 'Paused: click to drive it again' : 'Pause: keep it but stop driving it', () => setIgnored(L, P, !off), 'sm'), W.iconBtn('trash', 'Remove from every point', () => dropValue(L, P), 'sm')))),
+      ...sts.map(s => h('td', null, storedField(o, L, s, P)))); };
+    const open = S.ctrlTableOpen && S.ctrlTableOpen[L.id];
+    const d = h('details.pts', open ? { open: true } : null, h('summary', null, `Values at each point (${shown.length})`),
+      h('div.pts-wrap', null, h('table.pts-t', null, h('thead', null, h('tr', null, h('th', null, 'Value'), ...sts.map(s => h('th', null, nameOf(s))))), h('tbody', null, shown.map(row)))),
+      !shown.length ? note('Nothing differs between the points yet.') : null,
+      h('div.pts-foot', null, W.check(!!S.ctrlAllVals, same ? `Show all values (${same} the same everywhere)` : 'Show all values', v => { S.ctrlAllVals = v; SB.invalidate('inspector'); }),
+        cut.length ? W.select('', [['', 'Bring back a removed value…'], ...cut.map(P => [P, lab[P] || P])], P => { if (!P) return; const now = C.stateVals(o, tree.localTime(o)); L.states.forEach(s => { if (now[P] !== undefined) s.p[P] = now[P]; }); L.cut = L.cut.filter(x => x !== P); if (!L.cut.length) delete L.cut; L._rbf = null; SB.commit(); }, 'Bring back') : null));
+    d.addEventListener('toggle', () => { S.ctrlTableOpen = Object.assign({}, S.ctrlTableOpen, { [L.id]: d.open }); });
+    return d;
   }
   function driveItem(o, L) {
     const c = tree.find(L.ctrl), pl = S.poseLink && S.poseLink.oid === o.id && S.poseLink.id === L.id ? S.poseLink : null, t = c ? C.motion(c) : 'xy', custom = c && c.ctype === 'custom' && c.points && c.points.length, grid = !custom && t !== 'x' && t !== 'y';
@@ -790,7 +990,7 @@
       slots,
       pl ? [h('div.slotbar', null, h('span', null, 'Change the layer for ', h('b', null, plName)), btn('Save', C.saveSlot, 'primary'), pl.slot !== 'center' && C.stateOf(L, pl.slot) ? btn('Clear', C.clearSlot, 'ghost') : null, btn('Cancel', C.cancelSlot, 'ghost')),
         C.stateOf(L, pl.slot) && L.blend !== 'hold' ? W.row('', W.check(!!C.stateOf(L, pl.slot).snap, 'Snap to this point (no blending near it)', v => { const st = C.stateOf(L, pl.slot); if (v) st.snap = true; else delete st.snap; SB.commit(); })) : null, changedList(o, L)]
-        : [note('Click a point, move or change the layer, then Save. The layer blends between the points as the controller moves.'), drivenChips(o, L)],
+        : [note('Click a point, move or change the layer, then Save. The layer blends between the points as the controller moves.'), drivenChips(o, L), pointsTable(o, L, c)],
       FL.row(L, { label: 'Influence %', type: 'range', min: 0, max: 100, single: true, get: x => Math.round((x.amt ?? 1) * 100), set: (x, v) => x.amt = v / 100 }));
   }
   function consItem(o, c) {
@@ -908,6 +1108,8 @@
   SB.bars.rig = o => [rigSteps(o, 'pose'), h('span.lbl', null, h('b', null, o.name)),
     W.seg(S.boneMode || 'turn', [['turn', 'rotate', 'Turn: drag a bone to turn it, a tip to pose the chain (IK), the dots of a segmented bone to bend it'], ['move', 'move', 'Move: drag a bone to move it (Shift: straight)'], ['scale', 'scale', 'Scale: drag a bone or its tip to make it longer (Shift: evenly, Alt: only wider)']], v => { S.boneMode = v; SB.invalidate('ctxbar'); }),
     h('span.vsep'),
+    o.bones.some(b => b.plant) ? ib('target', S.rigPlant === false ? 'Planted feet are free: they move with the body. Click to keep them in place' : 'Feet stay planted: when you move the body, planted bones keep their place and the legs bend. Click to let them move', () => { S.rigPlant = S.rigPlant === false; SB.invalidate('ctxbar'); }, S.rigPlant !== false, 'Feet stay') : null,
+    o.bones.some(b => R.mirrorOf(o, b)) ? ib('flipH', S.rigMirror === false ? 'Mirror posing is off: each side poses on its own. Click to pose mirrored bones together' : 'Mirror posing: a bone and its mirror (_l and _r) pose together. Click to pose one side alone', () => { S.rigMirror = S.rigMirror === false; SB.invalidate('ctxbar'); }, S.rigMirror !== false, 'Mirror posing') : null,
     o.locked ? null : ib('bone', 'Add bones (J)', () => SB.tool.set('bone'), false, 'Add bones'), ib('key', 'Keyframe the pose', () => SB.ops.addKey(), false, 'Keyframe'),
     ib(o.locked ? 'lock' : 'unlock', o.locked ? 'Locked: the bones can be posed but not changed or moved. Click to unlock' : 'Lock the rig: keep posing, but its bones and place can’t change by accident', () => { o.locked = !o.locked; if (o.locked && S.tool === 'bone') SB.tool.set('select'); SB.commit(); }, o.locked, o.locked ? 'Locked' : 'Lock'),
     ib(o.showBones ? 'eye' : 'eyeOff', o.showBones ? 'Bones always show. Click to show them only when the rig is selected' : 'Bones show only when the rig is selected. Click to always show them', () => { o.showBones = !o.showBones; SB.commit(); }, o.showBones, 'Always show')];
@@ -920,5 +1122,5 @@
     if (!b) { const l = R.toRig(rig, P), Q = R.poseAt(rig, S.time); let bd = Infinity; for (const x of rig.bones) { const q = Q[x.id], d = Math.hypot(q.tx - l.x, q.ty - l.y) + Math.hypot(q.hx - l.x, q.hy - l.y); if (d < bd) { bd = d; b = x; } } }
     if (!b) return false; poseDrag(rig, { bone: b, part: 'tail' }, P, e); return true;
   }
-  SB.rigUI = { get labelBoxes() { return labelBoxes; }, resetRig, poseFromLayer, finishBones, ctrlHit, ctrlFromLayer, arrangeCtrls, makeToggle, rebuildToggle, showToggle };
+  SB.rigUI = { get labelBoxes() { return labelBoxes; }, addHuman, boneTree, resetRig, poseFromLayer, finishBones, ctrlHit, ctrlFromLayer, arrangeCtrls, makeToggle, rebuildToggle, showToggle };
 })(window.SB);

@@ -18,7 +18,7 @@
 (function (SB) {
   const U = SB.util, S = SB.state, tree = SB.tree, TR = SB.tracks, X = SB.xf, h = U.h;
   const MAX = 3000, ARROW = 0.4; // the arrow is 0.4 px long per px/s of speed
-  const DEF = { emit: 'stream', rate: 40, count: 60, every: 2, repeat: true, prewarm: true, life: 1.6, lifeVar: 0.3, ptSpeed: 260, speedVar: 0.3, ptDir: -90, ptSpread: 25,
+  const DEF = { emitOn: true, emit: 'stream', rate: 40, count: 60, every: 2, repeat: true, prewarm: true, life: 1.6, lifeVar: 0.3, ptSpeed: 260, speedVar: 0.3, ptDir: -90, ptSpread: 25,
     ptGravity: 200, drag: 0, sizeMin: 8, sizeMax: 22, sizeEnd: 0.2, color: '#FFB020', color2: '#FF4F8B', colorMode: 'life', fade: true, ptGlow: false, ptShape: 'circle', spin: 0, area: 0, seed: 1, ptSrc: '', ptPick: 'random', ptSpace: 'local' };
   const PRESETS = {
     fire: { label: 'Fire', v: { emit: 'stream', rate: 90, life: 1, lifeVar: 0.4, ptSpeed: 230, speedVar: 0.4, ptDir: -90, ptSpread: 12, ptGravity: -120, drag: 0.9, sizeMin: 50, sizeMax: 90, sizeEnd: 0.15, color: '#FFD23F', color2: '#FF3D1F', colorMode: 'life', fade: true, ptGlow: true, ptShape: 'soft', spin: 0, area: 40 } },
@@ -40,6 +40,7 @@
     const at = (k, tb) => (o && o.tracks[k] && o.tracks[k].length > 1) ? TR.value(o, k, tb) : val(v, k); // keyed settings count from each particle's birth
     const world = o && o.id && val(v, 'ptSpace') === 'world' && tree.find(o.id) === o ? worldFrom(o, lt) : null;
     const born = []; // [n, birth time]
+    const keyedOn = o && o.tracks && o.tracks.emitOn && o.tracks.emitOn.length, sending = tb => keyedOn ? TR.value(o, 'emitOn', tb) !== false : val(v, 'emitOn') !== false; // Emitting off: no new ones (those out live on)
     if (val(v, 'emit') === 'burst') {
       const cnt = Math.min(MAX, Math.max(1, Math.round(val(v, 'count')))), ev = Math.max(0.1, val(v, 'every')), rep = val(v, 'repeat') !== false;
       const w1 = rep ? Math.floor(lt / ev) : 0, w0 = rep ? Math.max(0, Math.floor((lt - life) / ev)) : 0;
@@ -49,7 +50,7 @@
       const n1 = Math.floor(t * rate), n0 = Math.max(0, Math.floor((t - life) * rate)); for (let n = Math.max(n0, n1 - MAX); n <= n1; n++) born.push([n, n / rate - pre]);
     }
     for (const [n, tb] of born) {
-      const L = life * (1 - lv * rnd(seed, n, 1)), age = lt - tb; if (age < 0 || age >= L) continue;
+      const L = life * (1 - lv * rnd(seed, n, 1)), age = lt - tb; if (age < 0 || age >= L || !sending(tb)) continue;
       const sp = at('ptSpeed', tb) * (1 + U.clamp(val(v, 'speedVar'), 0, 1) * (2 * rnd(seed, n, 2) - 1)), ang = (at('ptDir', tb) + at('ptSpread', tb) * (2 * rnd(seed, n, 3) - 1)) * Math.PI / 180;
       const vx = Math.cos(ang) * sp, vy = Math.sin(ang) * sp, g = at('ptGravity', tb), k = Math.max(0, val(v, 'drag'));
       const ar = val(v, 'area') / 2 * Math.sqrt(rnd(seed, n, 4)), aa = rnd(seed, n, 5) * Math.PI * 2, x0 = Math.cos(aa) * ar, y0 = Math.sin(aa) * ar;
@@ -118,12 +119,13 @@
     defaults: () => Object.assign({}, DEF, { seed: 1 + Math.floor(Math.random() * 9999) }),
     bounds(o) { const r = Math.max(30, val(o, 'area') / 2 + 10); return { x0: -r, y0: -r, x1: r, y1: r }; }, // the emitter, not the particles (they fly far)
     draw, alive,
-    props: () => [['rate', 'Particles per second'], ['ptSpeed', 'Speed'], ['ptDir', 'Direction'], ['ptSpread', 'Spread'], ['ptGravity', 'Gravity'], ['sizeMin', 'Smallest size'], ['sizeMax', 'Biggest size'], ['color', 'Color'], ['color2', 'Second color']],
+    props: () => [['emitOn', 'Emitting'], ['rate', 'Particles per second'], ['ptSpeed', 'Speed'], ['ptDir', 'Direction'], ['ptSpread', 'Spread'], ['ptGravity', 'Gravity'], ['sizeMin', 'Smallest size'], ['sizeMax', 'Biggest size'], ['color', 'Color'], ['color2', 'Second color']],
     sections: o => {
       const burst = val(o, 'emit') === 'burst';
       return [
         { title: 'Particles', fields: [
           { k: '_preset', label: 'Start from', type: 'select', options: [['', 'Pick a look…'], ...Object.entries(PRESETS).map(([k, p]) => [k, p.label])], get: () => '', set: (t, k) => { if (PRESETS[k]) { Object.assign(t, PRESETS[k].v); if (t === o) SB.toast(PRESETS[k].label + ': change anything below.'); } }, rerender: true },
+          F('emitOn', 'Emitting', 'check', { text: 'Sending out particles', anim: true, title: 'Off: no new particles (the ones already out finish their life). Key it to start and stop them; it works in Unity and Godot too' }),
           F('emit', 'Send out', 'seg', { options: [['stream', 'A stream', 'A steady flow'], ['burst', 'Bursts', 'Many at once']] }),
           burst ? F('count', 'How many', 'num', { min: 1, max: MAX, step: 1 }) : F('rate', 'Per second', 'num', { min: 0.1, max: 800, step: 1 }),
           burst ? F('repeat', '', 'check', { text: 'Again and again', rerender: true }) : F('prewarm', '', 'check', { text: 'Already flowing at the start' }),
@@ -175,7 +177,9 @@
     list.forEach((q, i) => { const m = Math.max(q.w, q.h) || 1, w = size * q.w / m, hh = size * q.h / m; c.drawImage(q.cv, i * size + (size - w) / 2, (size - hh) / 2, w, hh); });
     return { cv, n: list.length, size };
   }
-  SB.particles = { DEF, PRESETS, alive, val, ARROW, settings, keyed, picture, pictures, strip };
+  /** Is it sending out new particles at the layer's time lt (Emitting, keyed or not)? */
+  const emitting = (o, lt) => (o.tracks && o.tracks.emitOn && o.tracks.emitOn.length ? TR.value(o, 'emitOn', lt) : o.emitOn) !== false;
+  SB.particles = { DEF, PRESETS, alive, val, ARROW, settings, keyed, emitting, picture, pictures, strip };
 
   // ---------- on the stage: the emitter and its arrow
   const sel = () => { const o = tree.sel(); return o && o.type === 'particles' && tree.inRange(o) && !tree.hidden(o) && !S.playing ? o : null; };

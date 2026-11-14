@@ -360,14 +360,14 @@
     if (!a) return; let swapped = false;
     if (a.screen !== Sc.active()) { Sc.swapTo(a.screen); mix = 0; RT.prev = null; tree.select([]); swapped = true; }
     if (mix > 0 && RT.cur) { RT.prev = RT.cur; RT.mix = { t0: t, dur: mix, ease: TR.EASES[ease] || TR.EASES.smooth }; } else { RT.prev = null; RT.mix = null; }
-    if (a.actId && a.dur > S.project.duration + 1e-6) stretch(tree.find(a.rigId), a.dur);
+    if (a.actId && a.dur > S.project.duration + 1e-6) stretch(SB.actions.owner(a.rigId), a.dur);
     RT.cur = { a, t0: t, t: 0, dur: Math.max(0.01, a.dur), loop: opt.loop !== false, done: 0, after: new Set() }; RT.paused = false;
-    RT.members.clear(); (SB.rig ? SB.rig.rigs() : []).forEach(r => { if (SB.actions.of(r)) SB.actions.members(r).forEach(o => RT.members.set(o.id, r)); });
+    RT.members.clear(); (SB.rig ? SB.rig.rigs() : []).forEach(r => { if (SB.actions.of(r)) SB.actions.members(r).forEach(o => RT.members.set(o.id, r)); }); if (SB.actions.of(S.project)) SB.actions.members(S.project).forEach(o => RT.members.set(o.id, S.project)); // whose actions play each layer: a rig's (older) or the screen's
     if (swapped || opening) { RT.active.forEach((v, id) => { const r = ruleById(id); if (r && !['down', 'drag', 'hover', 'tick', 'move'].includes(r.when.type)) RT.active.delete(id); }); fireEvent('load', { screen: a.screen.id }); }
     SB.invalidate('ixpanel');
   }
-  function stretch(rig, d) { const set = (o, k, v) => { RT.undo.push([o, k, o[k]]); o[k] = v; }; set(S.project, 'duration', d); if (rig) SB.actions.members(rig).forEach(m => { if (!m.parts && m.type !== 'video' && m.type !== 'audio' && (m.start || 0) + m.dur < d) set(m, 'dur', d - (m.start || 0)); }); }
-  function tracksFor(ps, o, rig) { const a = ps && ps.a; if (!a || !a.actId || a.rigId !== rig.id) return null; const act = rig.actions.list.find(x => x.id === a.actId); if (!act || act.id === rig.actions.cur) return null; return (act.tracks || {})[keyOf(o)] || {}; }
+  function stretch(ow, d) { const set = (o, k, v) => { RT.undo.push([o, k, o[k]]); o[k] = v; }, grow = ow ? SB.actions.growing(ow, d) : []; set(S.project, 'duration', d); grow.forEach(m => set(m, 'dur', d - (m.start || 0))); }
+  function tracksFor(ps, o, rig) { const a = ps && ps.a; if (!a || !a.actId || a.rigId !== SB.actions.idOf(rig)) return null; const act = rig.actions.list.find(x => x.id === a.actId); if (!act || act.id === rig.actions.cur) return null; return (act.tracks || {})[keyOf(o)] || {}; }
   function mixer(o, id, lt) {
     const rig = RT.members.get(o.id); if (!rig || !RT.cur) return undefined;
     const A = tracksFor(RT.cur, o, rig), mixing = RT.mix && RT.prev; if (!A && !mixing) return undefined;

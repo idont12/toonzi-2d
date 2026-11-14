@@ -48,7 +48,7 @@
     tool: 'select', toolGroup: {},
     brush: { color: '#24213F', size: 8 }, brushId: 'pen', brushMode: 'free', smooth: 0.35, stab: false, stabR: 40,
     eraser: 28, fillGap: 3, softEdit: 40, smoothR: 40, smoothK: 0.5, widthR: 30, widthK: 0.5, widthMode: 'up', pullR: 60, eraseMode: 'mask', penFill: false,
-    onion: true, onionOpt: { before: 1, after: 1, cb: '#FF4F8B', ca: '#18A999', alpha: 0.35 },
+    onion: true, onionOpt: { before: 1, after: 1, cb: '#FF4F8B', ca: '#18A999', alpha: 0.35, gap: 3 },
     zoom: 90, tlAnimOnly: false, solo: null, snap: true, recSmooth: 40,
     view: { z: 1, px: 0, py: 0 }, frameOverride: null, hover: null, guides: null,
     clip: null, fxClip: null, exporting: false, cancelExport: false,

@@ -101,7 +101,17 @@
     L._rbf[P] = { key, f }; return f;
   }
   /** The values a controller link changes: they differ between its states and are not switched off (L.ignore). */
-  const varying = L => { if (L.states.length < 2) return []; const s0 = L.states[0].p, ig = L.ignore || []; return Object.keys(s0).filter(P => !ig.includes(P) && L.states.every(s => s.p[P] !== undefined) && L.states.some(s => s.p[P] !== s0[P])); };
+  /** A point that has no value for P (P was added to the layer after the point was saved, like an outline turned on later)
+      counts as "the layer's own value there", so it still blends (see filled). */
+  const varying = L => { if (L.states.length < 2) return []; const ig = L.ignore || [], all = new Set(); L.states.forEach(s => { for (const P in s.p) all.add(P); });
+    return [...all].filter(P => { if (ig.includes(P)) return false; const has = L.states.filter(s => s.p[P] !== undefined); return has.length < L.states.length || has.some(s => s.p[P] !== has[0].p[P]); }); };
+  /** L with every point holding every value in keys: a missing one is the layer's own value (On top: no change from the rest point). */
+  function filled(o, L, keys, T) {
+    if (L.states.every(s => keys.every(P => s.p[P] !== undefined))) return L;
+    const base = stateVals(o, ltAt(o, T)), R = onTop(L) && rest(L);
+    return Object.assign(Object.create(L), { states: L.states.map(s => { if (keys.every(P => s.p[P] !== undefined)) return s; const p = Object.assign({}, s.p);
+      keys.forEach(P => { if (p[P] === undefined) p[P] = R && s !== R && R.p[P] !== undefined ? R.p[P] : base[P]; }); return Object.assign({}, s, { p }); }) });
+  }
   const blend = (a, b, P, u) => isColor(P) ? U.lerpColor(a, b, u) : discrete(P) ? (u < 0.5 ? a : b) : U.lerp(a, b, u);
   /** A link seen with only the states whose points the controller still has (a point removed in the designer stops counting at once). */
   function live(L, c) { if (c.ctype !== 'custom' || !c.points) return L; const sl = slotsFor(c), st = L.states.filter(s => !s.slot || sl.some(q => q.k === s.slot)); return st.length === L.states.length ? L : Object.assign(Object.create(L), { states: st }); }
@@ -113,7 +123,7 @@
     try {
       for (let L of o.drv) {
         if (S.poseLink && (S.poseLink.multi ? L.ctrl === S.poseLink.cid : S.poseLink.oid === o.id && S.poseLink.id === L.id)) continue;
-        const c = tree.find(L.ctrl); if (!c || c === o || L.off || !ctrlOn(c, T)) continue; /* a link or a controller turned off moves nothing */ L = live(L, c); const keys = varying(L); if (!keys.length) continue;
+        const c = tree.find(L.ctrl); if (!c || c === o || L.off || !ctrlOn(c, T)) continue; /* a link or a controller turned off moves nothing */ L = live(L, c); const keys = varying(L).filter(P => L.states.some(s => s.p[P] !== undefined)); if (!keys.length) continue; L = filled(o, L, keys, T);
         const [u, v] = value(c, T), t = motion(c), vals = {};
         if (t === 'x' || t === 'y') {
           const w = t === 'x' ? u : v, pos = s => t === 'x' ? s.u : s.v, st = L.states.slice().sort((a, b) => pos(a) - pos(b));
@@ -138,7 +148,8 @@
         }
         if ((L.space || 'global') === 'local') { // add the change on top of the layer's own animation
           const C = (L.states.find(s => s.slot === 'center') || L.states[0]).p, raw = stateVals(o, ltAt(o, T));
-          keys.forEach(P => { if (raw[P] === undefined || C[P] === undefined || isColor(P) || discrete(P) || typeof raw[P] !== 'number') return; vals[P] = MULT.has(P) && Math.abs(C[P]) > 1e-6 ? raw[P] * vals[P] / C[P] : raw[P] + vals[P] - C[P]; });
+          keys.forEach(P => { if (raw[P] === undefined || C[P] === undefined || isColor(P) || discrete(P) || typeof raw[P] !== 'number') return; const b0 = out && typeof out[P] === 'number' ? out[P] : raw[P]; // several On top links on one value add up
+            vals[P] = MULT.has(P) && Math.abs(C[P]) > 1e-6 ? b0 * vals[P] / C[P] : b0 + vals[P] - C[P]; });
         }
         const amt = U.clamp(L.amt ?? 1, 0, 1); if (amt < 1) { const base = stateVals(o, ltAt(o, T)); keys.forEach(P => { if (base[P] !== undefined) vals[P] = blend(base[P], vals[P], P, amt); }); }
         out = Object.assign(out || {}, vals);
@@ -147,6 +158,15 @@
     o._dv = { s: SB.stamp, T, v: out, m: mph }; return out;
   }
   /** A controller morphing a drawing between two frames: { a, b, u } at local time lt (js/model/frames.js change), or null. */
+  /** Values of o whose own keyframes a controller covers: { P: controller name }. An Exact link sets the value outright;
+      an On top link adds to numbers but sets colors, frames, switches and text outright. */
+  function overrides(o) {
+    const out = {}; if (!o.drv || !o.drv.length) return out;
+    for (const L of o.drv) { const c = tree.find(L.ctrl); if (!c || c === o || L.off) continue;
+      for (const P of varying(live(L, c))) { const v = (L.states.find(s => s.p[P] !== undefined) || { p: {} }).p[P];
+        if (!onTop(L) || isColor(P) || discrete(P) || typeof v !== 'number') out[P] = c.name; } }
+    return out;
+  }
   function frameMorph(o, lt) { if (!o.drv || !o.drv.length || !o.drv.some(L => L.morph)) return null; driven(o, mainT(o, lt)); const m = o._dv && o._dv.m; if (!m) return null; const n = o.frames.length, cl = i => U.clamp(Math.round(i), 0, n - 1); return cl(m.a) === cl(m.b) ? null : { a: cl(m.a), b: cl(m.b), u: m.u }; }
   TR.hook(30, (o, lt, r) => { if (!o.drv || !o.drv.length || o._dvBusy) return; const dv = driven(o, mainT(o, lt)); if (dv) for (const P of TR.TRANSFORM) if (dv[P] !== undefined) r[P] = dv[P]; });
   // any other value (frames, effect amounts, bone angles…) is read through SB.tracks.value
@@ -192,10 +212,13 @@
   /** Keep what layer o shows now as spot k of link L, then put the layer back (snap, stash: from showPose). Returns a note or ''. */
   function savePose(o, L, k, snap, stash) {
     const c = tree.find(L.ctrl), sl = slotOf(c, k) || { u: 0, v: 0, name: k }, p = stateVals(o, tree.localTime(o)), old = stateOf(L, k);
+    const others = L.states.filter(s => s !== old); // a value the other points don't have (added to the layer since): kept only when this point changes it
+    if (others.length) for (const P in p) if (others.every(s => s.p[P] === undefined) && !(typeof p[P] === 'number' && typeof snap[P] === 'number' ? Math.abs(p[P] - snap[P]) > 1e-3 : p[P] !== snap[P])) delete p[P];
     const R = onTop(L) && rest(L), atRest = R && old === R, moveLayer = {}; // On top: a spot is kept as a change from the center spot
     if (R) for (const P in p) { const now = snap[P], cv = R.p[P]; if (!relNum(P, p[P], cv) || !relNum(P, now, 0)) continue;
       if (atRest) { const d = MULT.has(P) ? (Math.abs(now) > 1e-6 ? p[P] / now : 1) : p[P] - now; if (Math.abs(d - (MULT.has(P) ? 1 : 0)) > 1e-4) moveLayer[P] = d; p[P] = cv; } // the center spot is the layer at rest: a change there moves the layer itself
       else p[P] = U.r3(toRel(P, now, p[P], cv)); }
+    (L.cut || []).forEach(P => delete p[P]); // values removed from this link stay removed
     L.states = L.states.filter(s => s !== old); L.states.push({ slot: k, u: sl.u, v: sl.v, p }); L._rbf = null; let msg = '';
     if (o.frames && o.frames.length > 1 && o.play !== 'library' && L.states.some(s => s.p.frame !== p.frame)) { o.play = 'library'; msg = 'The frame now follows the controller (the drawing switched to Frame library).'; }
     restoreSnap(o, snap, stash); for (const P in moveLayer) { const d = moveLayer[P]; if (TR.animated(o, P)) shiftTrack(o, P, d); else TR.setBase(o, P, U.r3(MULT.has(P) ? snap[P] * d : snap[P] + d)); }
@@ -361,5 +384,5 @@
     if (on) c.ixGrab = true; else delete c.ixGrab; SB.commit(); SB.invalidate('inspector', 'ixpanel');
     SB.toast(on ? `${c.name} is interactive: in Preview (Interactions › Preview) and the exported web page or Rive file, drag its knob.${SB.targets && SB.targets.get() !== 'web' ? ' Interactions need the Interactive web mode.' : ''}` : `${c.name} is no longer interactive.`);
   }
-  SB.controls = { setGrab, ctrlOn, frameMorph, targetAt, activeSpans, setActive, CTYPES, SLOTS, CONS, RX, RY, motion, varying, slotsFor, slotOf, isCircle, stateOf, stateProps, value, make, stateVals, driven, drive, enterSlot, saveSlot, cancelSlot, enterMulti, saveMulti, unlink, linksOf, changedOthers, clearSlot, eyesFollow, driveWithNew, captureRest, addConstraint, constrainAll, usersOf, lockedProps };
+  SB.controls = { overrides, setGrab, ctrlOn, frameMorph, targetAt, activeSpans, setActive, CTYPES, SLOTS, CONS, RX, RY, motion, varying, slotsFor, slotOf, isCircle, stateOf, stateProps, value, make, stateVals, driven, drive, enterSlot, saveSlot, cancelSlot, enterMulti, saveMulti, unlink, linksOf, changedOthers, clearSlot, eyesFollow, driveWithNew, captureRest, addConstraint, constrainAll, usersOf, lockedProps };
 })(window.SB);

@@ -78,6 +78,7 @@
       h('h3', null, 'Onion skin'),
       W.row('Frames before', W.num(S.onionOpt.before, { min: 0, max: 10, change: v => { S.onionOpt.before = U.clamp(Math.round(v), 0, 10); SB.prefs.save(); SB.dirty(); } }), W.color(S.onionOpt.cb, { change: v => { S.onionOpt.cb = v; SB.prefs.save(); SB.dirty(); } })),
       W.row('Frames after', W.num(S.onionOpt.after, { min: 0, max: 10, change: v => { S.onionOpt.after = U.clamp(Math.round(v), 0, 10); SB.prefs.save(); SB.dirty(); } }), W.color(S.onionOpt.ca, { change: v => { S.onionOpt.ca = v; SB.prefs.save(); SB.dirty(); } })),
+      W.row('Motion: every', W.num(S.onionOpt.gap || 3, { min: 1, max: 24, change: v => { S.onionOpt.gap = U.clamp(Math.round(v), 1, 24); SB.prefs.save(); SB.dirty(); } }), h('span.hint', null, 'frames (keyframes, rigs, controllers)')),
       W.row('Strength %', W.range(Math.round(S.onionOpt.alpha * 100), { min: 5, max: 100, input: v => { S.onionOpt.alpha = v / 100; SB.dirty(); }, change: () => SB.prefs.save() })),
     ];
   }

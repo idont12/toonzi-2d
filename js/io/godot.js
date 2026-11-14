@@ -392,15 +392,16 @@ func _draw() -> void:
     G.clips.forEach((c, ci) => {
       const m = new Map(); series.set(ci, m);
       for (const g of animated) {
-        const tr = c.tracks.get(g.nd.key), L = [], vis = [], a = [], fi = [];
-        for (let i = 0; i < c.n; i++) { L.push(g.ridden ? null : localAt(g, c, i)); vis.push(!!(tr && tr.on[i])); a.push(tr ? U.clamp(tr.a[i] || 0, 0, 1) : 0); fi.push(tr ? tr.fi[i] || 0 : 0); }
-        m.set(g, { L: E.filled(L), vis, a, fi, here: !!tr });
+        const tr = c.tracks.get(g.nd.key), L = [], vis = [], a = [], fi = [], em = [];
+        for (let i = 0; i < c.n; i++) { L.push(g.ridden ? null : localAt(g, c, i)); vis.push(!!(tr && tr.on[i])); a.push(tr ? U.clamp(tr.a[i] || 0, 0, 1) : 0); fi.push(tr ? tr.fi[i] || 0 : 0); em.push(!(tr && tr.em && tr.em[i] === false)); }
+        m.set(g, { L: E.filled(L), vis, a, fi, em, here: !!tr });
         const P = props.get(g) || new Set(); props.set(g, P);
         if (c.pose) continue; // pose grids live in their controller; the controllers stay free to move while an animation plays
         const L0g = L0.get(g), Lf = E.filled(L);
         if (L0g && Lf[0]) { if (Lf.some(l => Math.abs(l.x - L0g.x) > 0.01 || Math.abs(l.y - L0g.y) > 0.01)) P.add('position'); if (Lf.some(l => Math.abs(l.rot - L0g.rot) > 0.01)) P.add('rotation'); if (Lf.some(l => Math.abs(l.sx - L0g.sx) > 1e-4 || Math.abs(l.sy - L0g.sy) > 1e-4)) P.add('scale'); }
         if (g.alpha || g.nd.kind === 'layer') { if (vis.some(v => !v)) P.add('visible'); if (a.some((x, i) => vis[i] && Math.abs(x - 1) > 0.004)) P.add('modulate'); }
         if (g.sheet && g.sheet.index.size > 1 && (new Set(fi).size > 1 || (tr && tr.fev))) P.add('frames');
+        if (g.nd.kind === 'particles' && em.some(x => x !== em[0] || !x)) P.add('emitting'); // Emitting, keyed: the node starts and stops
       }
     });
     const vec = (x, y) => `Vector2(${f(x)}, ${f(y)})`;
@@ -419,6 +420,7 @@ func _draw() -> void:
         if (P.has('scale')) { const v = end(L.map(l => [l.sx * 100, l.sy * 100])), k = keep(v); valueTrack(g.path, 'scale', k.map(i => f(i / fps)), k.map(i => vec(v[i][0] / 100, v[i][1] / 100))); }
         if (P.has('visible')) { const k = s.vis.map((v, i) => i).filter(i => i === 0 || s.vis[i] !== s.vis[i - 1]); valueTrack(g.path, 'visible', k.map(times), k.map(i => s.vis[i] ? 'true' : 'false'), true); }
         if (P.has('modulate')) { const v = end(s.a.map(x => [x * 100])), k = keep(v); valueTrack(g.path, g.self ? 'self_modulate' : 'modulate', k.map(i => f(i / fps)), k.map(i => `Color(1, 1, 1, ${f(v[i][0] / 100)})`)); }
+        if (P.has('emitting')) { const k = s.em.map((v, i) => i).filter(i => i === 0 || s.em[i] !== s.em[i - 1]); valueTrack(g.path, 'emitting', k.map(times), k.map(i => s.em[i] ? 'true' : 'false'), true); }
         if (P.has('frames')) { const ks = E.picKeys(c.tracks.get(g.nd.key), c.n, fps); valueTrack(g.pic.path, 'frame', ks.map(x => f(x[0])), ks.map(x => String(cellOf(g.sheet, x[1]))), true); } // morph in-betweens at their own moments
       }
       let nm = animName(c.name), i = 2; while (used.has(nm)) nm = `${animName(c.name)} ${i++}`; used.add(nm);
@@ -469,12 +471,14 @@ func _draw() -> void:
     const reset = (() => { tracks.length = 0; for (const g of animated) { const P = props.get(g); if (!P.size) continue; const l = L0.get(g) || { x: 0, y: 0, rot: 0, sx: 1, sy: 1 }, s = series.get(0).get(g);
       if (P.has('position')) valueTrack(g.path, 'position', ['0'], [vec(l.x, l.y)]); if (P.has('rotation')) valueTrack(g.path, 'rotation', ['0'], [fl(l.rot * Math.PI / 180)]); if (P.has('scale')) valueTrack(g.path, 'scale', ['0'], [vec(l.sx, l.sy)]);
       if (P.has('visible')) valueTrack(g.path, 'visible', ['0'], [s.vis[0] ? 'true' : 'false'], true); if (P.has('modulate')) valueTrack(g.path, g.self ? 'self_modulate' : 'modulate', ['0'], [`Color(1, 1, 1, ${f(s.a[0])})`]);
-      if (P.has('frames')) valueTrack(g.pic.path, 'frame', ['0'], [String(cellOf(g.sheet, s.fi[0]))], true); }
+      if (P.has('frames')) valueTrack(g.pic.path, 'frame', ['0'], [String(cellOf(g.sheet, s.fi[0]))], true);
+      if (P.has('emitting')) valueTrack(g.path, 'emitting', ['0'], [s.em[0] ? 'true' : 'false'], true); }
       const lines = ['resource_name = "RESET"', 'length = 0.001'];
       tracks.forEach((t, k) => lines.push(`tracks/${k}/type = "value"`, `tracks/${k}/imported = false`, `tracks/${k}/enabled = true`, `tracks/${k}/path = NodePath(${q(t.path)})`, `tracks/${k}/interp = 1`, `tracks/${k}/loop_wrap = true`,
         `tracks/${k}/keys = {\n"times": PackedFloat32Array(0),\n"transitions": PackedFloat32Array(1),\n"update": ${t.update},\n"values": [${t.values.join(', ')}]\n}`));
       return { nm: 'RESET', lines }; })();
     // starting visibility of frames and layers
+    for (const g of animated) if (g.nd && g.nd.kind === 'particles' && series.get(0).get(g).em[0] === false) g.props.push('emitting = false'); // Emitting off at the start
     for (const g of animated) { const s = series.get(0).get(g); if (!s.here) g.props.push('visible = false'); else if (!s.vis[0] && (g.alpha || g.nd.kind === 'layer')) g.props.push('visible = false');
       if (s.here && s.vis[0] && Math.abs(s.a[0] - 1) > 0.004) g.props.push(`${g.self ? 'self_modulate' : 'modulate'} = Color(1, 1, 1, ${f(s.a[0])})`);
       if (g.pic && g.sheet.index.size > 1) g.pic.props.push(`frame = ${cellOf(g.sheet, s.here ? s.fi[0] : [...g.sheet.index.keys()][0])}`); }

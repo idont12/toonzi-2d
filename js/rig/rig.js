@@ -228,10 +228,165 @@
     const kill = new Set([id]); let grew = true; while (grew) { grew = false; for (const b of rig.bones) if (b.parent && kill.has(b.parent) && !kill.has(b.id)) { kill.add(b.id); grew = true; } }
     rig.bones = rig.bones.filter(b => !kill.has(b.id)); for (const id in rig.tracks) { const [pre, bid] = id.split(':'); if ((BONE_P[pre] || pre === 'bseg') && kill.has(bid)) delete rig.tracks[id]; } if (kill.has(S.selBone)) S.selBone = null; SB.bump();
   }
+  // ---------- mirrored bones: a left and a right side that build and pose together (b.mirror: the other side's id)
+  const SIDE = { l: 'r', r: 'l', left: 'right', right: 'left' };
+  /** The name for the other side: _l ↔ _r, .L ↔ .R, Left ↔ Right (any case, as a word or after _ . - or a space). null: no side in it. */
+  function mirrorName(name) {
+    let hit = false; const out = String(name || '').replace(/(^|[\s._-])(left|right|l|r)(?=$|[\s._-])/gi, (m, pre, w) => { hit = true; const t = SIDE[w.toLowerCase()]; return pre + (w === w.toUpperCase() ? t.toUpperCase() : w[0] === w[0].toUpperCase() ? t[0].toUpperCase() + t.slice(1) : t); });
+    return hit ? out : null;
+  }
+  const mirrorOf = (rig, b) => { b = typeof b === 'string' ? boneById(rig, b) : b; const m = b && b.mirror && boneById(rig, b.mirror); return m && m.mirror === b.id ? m : null; };
+  /** A pose value as the mirror bone takes it: turns, bends and moves up-down flip; lengths and widths stay. */
+  const MIRROR_FLIP = { bone: -1, boney: -1, bonebend: -1, bseg: -1, bonex: 1, bonesx: 1, bonesy: 1 };
+  function mirrorKey(rig, id) { const [pre, bid, k] = id.split(':'); if (!(pre in MIRROR_FLIP)) return null; const m = mirrorOf(rig, bid); return m ? [pre + ':' + m.id + (k != null ? ':' + k : ''), MIRROR_FLIP[pre]] : null; }
+  /** Pose values vals ({ 'bone:id': v, … }) plus the same pose on the mirror bones (when mirror posing is on). */
+  function withMirror(rig, vals) {
+    if (S.rigMirror === false || !rig.bones.some(b => b.mirror)) return vals; const out = Object.assign({}, vals);
+    for (const id in vals) { const mk = mirrorKey(rig, id); if (mk && !(mk[0] in vals) && typeof vals[id] === 'number') out[mk[0]] = U.r3(vals[id] * mk[1]); }
+    return out;
+  }
+  /** Ids a drag of ids also changes on the mirror side. */
+  const mirrorIds = (rig, ids) => S.rigMirror === false ? [] : ids.map(id => { const mk = mirrorKey(rig, id); return mk && !ids.includes(mk[0]) ? mk[0] : null; }).filter(Boolean);
+  /** Make a mirrored copy of bone id and every bone under it, across the upright line through the middle of the skeleton
+      (the head of its top bone; for a top bone, of another top bone or the rig's start). Names swap sides (_l ↔ _r).
+      Returns the new top bone, or a message why it can't. */
+  function mirrorBones(rig, id) {
+    const b0 = boneById(rig, id); if (!b0) return 'Pick a bone first.'; if (mirrorOf(rig, b0)) return `${b0.name} already has a mirror: ${mirrorOf(rig, b0).name}.`;
+    const rest = poseRaw(rig, 0, { rest: true }), sub = rig.bones.filter(b => { for (let x = b; x; x = x.parent && boneById(rig, x.parent)) { if (x.id === id) return true; if (mirrorOf(rig, x)) return false; } return false; }); // bones mirrored already stay out
+    let top = b0; while (top.parent && boneById(rig, top.parent)) top = boneById(rig, top.parent);
+    const other = rig.bones.find(b => !b.parent && b !== top), ax = rig.mirrorX ?? (top !== b0 ? rest[top.id].hx : other ? rest[other.id].hx : 0);
+    if (Math.abs(rest[b0.id].hx - ax) < 1 && Math.abs(rest[b0.id].tx - ax) < 1) return `${b0.name} sits on the middle line: there is nothing to mirror it to. Mirror a bone off to one side (an arm, a leg).`;
+    const map = {}, made = [];
+    for (const b of sub) {
+      const q = rest[b.id], a = Math.atan2(q.m[1], q.m[0]) * 180 / Math.PI, nb = U.deep(b);
+      ['parent', 'ox', 'oy', 'mirror'].forEach(k => delete nb[k]); if (nb.bend === 'left' || nb.bend === 'right') nb.bend = nb.bend === 'left' ? 'right' : 'left'; // its bend arrow, mirrored
+      Object.assign(nb, { id: U.uid(), name: mirrorName(b.name) || b.name + ' mirror', parent: null, x: 2 * ax - q.hx, y: q.hy, ang: 180 - a });
+      for (const pre in MIRROR_FLIP) { const k = (BONE_P[pre] || [])[0]; if (k && nb[k] != null && MIRROR_FLIP[pre] < 0) nb[k] = -nb[k]; } // its pose, mirrored
+      if (nb.sa) nb.sa = nb.sa.map(v => -v);
+      map[b.id] = nb.id; b.mirror = nb.id; nb.mirror = b.id; rig.bones.push(nb); made.push([b, nb]);
+      for (const tid of Object.keys(rig.tracks || {})) { const [pre, bid, k] = tid.split(':'); if (bid !== b.id || !(pre in MIRROR_FLIP)) continue; // its keyframes, mirrored
+        rig.tracks[pre + ':' + nb.id + (k != null ? ':' + k : '')] = rig.tracks[tid].map(key => Object.assign({}, key, { v: typeof key.v === 'number' ? key.v * MIRROR_FLIP[pre] : key.v })); }
+    }
+    for (const [b, nb] of made) { const p = b.parent && (map[b.parent] || (mirrorOf(rig, b.parent) || {}).id || b.parent); if (p) setParent(rig, nb.id, p); else { nb.x = U.r1(nb.x); nb.y = U.r1(nb.y); nb.ang = U.r1(nb.ang); } }
+    if (rig.mirrorX == null) rig.mirrorX = U.r1(ax); // the middle line, kept for later changes
+    rig._pm = null; SB.bump(); return boneById(rig, map[id]);
+  }
+  /** After bone id's rest place changed (Bones tool): put its mirror at the mirrored place. */
+  function syncMirror(rig, id) {
+    const b = boneById(rig, id), m = mirrorOf(rig, b); if (!m || rig.mirrorX == null) return; const rest = poseRaw(rig, 0, { rest: true }), q = rest[b.id], ax = rig.mirrorX;
+    const hx = 2 * ax - q.hx, hy = q.hy, a = 180 - Math.atan2(q.m[1], q.m[0]) * 180 / Math.PI; m.len = b.len;
+    const par = m.parent && rest[m.parent];
+    if (!par) { m.x = U.r1(hx); m.y = U.r1(hy); m.ang = U.r1(a); }
+    else { const E = par.mEnd, l = AF.ap(AF.inv(E), hx, hy), ea = Math.atan2(E[1], E[0]) * 180 / Math.PI; let r = a - ea; while (r > 180) r -= 360; while (r < -180) r += 360; m.ang = U.r1(r);
+      if (Math.hypot(l[0], l[1]) > 0.05) { m.ox = U.r1(l[0]); m.oy = U.r1(l[1]); } else { delete m.ox; delete m.oy; } }
+    rig._pm = null;
+  }
+  // ---------- join and split bones (call between editSnap and keepAttached, then addToBinds for new bones)
+  /** Bones ids as one chain, top first (each the parent of the next), or null when they aren't one. */
+  function boneChain(rig, ids) {
+    const set = new Set(ids), bs = ids.map(id => boneById(rig, id)).filter(Boolean); if (bs.length < 2 || bs.length !== set.size) return null;
+    const top = bs.filter(b => !set.has(b.parent)); if (top.length !== 1) return null; const out = [top[0]];
+    while (out.length < bs.length) { const nx = bs.filter(b => b.parent === out[out.length - 1].id); if (nx.length !== 1) return null; out.push(nx[0]); }
+    return out;
+  }
+  /** Make bones kids top bones at their rest places (rest: the rest pose before a change), so a later setParent keeps them there. */
+  function free(rig, kids, rest) { for (const k of kids) { const q = rest[k.id]; if (!q) continue; k.parent = null; k.x = q.hx; k.y = q.hy; k.ang = Math.atan2(q.m[1], q.m[0]) * 180 / Math.PI; delete k.ox; delete k.oy; } rig._pm = null; }
+  /** Join a chain of bones into its top bone: it reaches the last one's tip, takes over its children, painted weights and what
+      followed the others. Returns the bone, or a message. */
+  function joinBones(rig, ids) {
+    const ch = boneChain(rig, ids); if (!ch) return 'Pick bones that make one chain (each joined to the next).'; const top = ch[0], last = ch[ch.length - 1], gone = ch.slice(1), goneIds = new Set(gone.map(b => b.id));
+    const rest = poseRaw(rig, 0, { rest: true }), h = rest[top.id], t = rest[last.id], pa = top.parent && rest[top.parent] ? rest[top.parent].a : 0;
+    const kids = rig.bones.filter(b => (goneIds.has(b.parent) || b.parent === top.id) && !goneIds.has(b.id)); free(rig, kids, rest); // the children (and side branches) keep their places…
+    top.len = U.r1(Math.max(4, Math.hypot(t.tx - h.hx, t.ty - h.hy))); top.ang = U.r1(Math.atan2(t.ty - h.hy, t.tx - h.hx) * 180 / Math.PI - pa); delete top.segs; rig._pm = null;
+    kids.forEach(k => setParent(rig, k.id, top.id)); // …and hang on the joined bone
+    tree.all().forEach(o => { const B = o.bind; if (!B) return;
+      if (B.mode === 'follow' && B.rig === rig.id && goneIds.has(B.bone)) B.bone = top.id;
+      if (B.paint) for (const id of goneIds) { if (B.paint[id]) { B.paint[top.id] = (B.paint[top.id] || []).concat(B.paint[id]); delete B.paint[id]; } }
+      for (const id of goneIds) { if (B.inv) delete B.inv[id]; if (B.seg) delete B.seg[id]; if (B.rigOf) delete B.rigOf[id]; if (B.bbf) delete B.bbf[id]; } });
+    for (const b of gone) { const m = mirrorOf(rig, b); if (m) delete m.mirror; }
+    rig.bones = rig.bones.filter(b => !goneIds.has(b.id)); for (const tid in rig.tracks) { const [pre, bid] = tid.split(':'); if ((BONE_P[pre] || pre === 'bseg') && goneIds.has(bid)) delete rig.tracks[tid]; }
+    const bases = ch.map(b => (/^(.*) \d+$/.exec(b.name || '') || [])[1]); if (bases[0] && bases.every(x => x === bases[0])) top.name = bases[0]; // "Arm 1" + "Arm 2" → "Arm"
+    if (goneIds.has(S.selBone)) S.selBone = top.id; rig._pm = null; SB.bump(); return top;
+  }
+  /** Split a bone into n equal bones in a row (the first keeps its id, weights and keys). Returns the new bones (their sources: from). */
+  function splitBone(rig, id, n) {
+    const b = boneById(rig, id); n = Math.round(U.clamp(n, 2, 12)); if (!b) return []; const kids = rig.bones.filter(x => x.parent === id), L = b.len, made = []; free(rig, kids, poseRaw(rig, 0, { rest: true }));
+    const base = String(b.name || 'Bone'); b.name = base + ' 1'; b.len = U.r1(L / n); delete b.segs; let prev = b;
+    for (let k = 2; k <= n; k++) { const nb = { id: U.uid(), name: `${base} ${k}`, parent: prev.id, x: 0, y: 0, len: U.r1(L / n), ang: 0, pose: 0 }; if (b.color) nb.color = b.color;
+      rig.bones.splice(rig.bones.indexOf(prev) + 1, 0, nb); made.push(nb); prev = nb; }
+    rig._pm = null; const rest = poseRaw(rig, 0, { rest: true }), pieces = [b, ...made];
+    kids.forEach(k => { const q = rest[k.id]; let best = prev, bd = Infinity; for (const pc of pieces) { const r = rest[pc.id], d = distSeg2(q.hx, q.hy, [r.hx, r.hy, r.tx, r.ty]) - (pc === prev ? 1e-3 : 0); if (d < bd) { bd = d; best = pc; } } setParent(rig, k.id, best.id); }); // each child hangs on the nearest piece
+    SB.bump(); return made;
+  }
+  /** New bones (from splitBone) bend the layers that bent with their source bone, so nothing jumps: call after keepAttached(sn). */
+  function addToBinds(sn, made, fromId) {
+    const { rig, T } = sn, P = poseAt(rig, T);
+    for (const [o] of sn.layers) { const B = o.bind; if (!B || B.mode !== 'deform' || !B.inv || !B.inv[fromId] || !sn.F[fromId]) continue;
+      for (const nb of made) { const Fn = boneFrameAt(rig, nb.id, T); if (!Fn) continue; const inv = matArr(Fn.inverse().multiply(arrMat(sn.F[fromId])).multiply(arrMat(sn.layers.find(l => l[0] === o)[1].inv[fromId])));
+        B.inv[nb.id] = inv; const K = AF.inv(inv), hh = AF.ap(K, 0, 0), tt = AF.ap(K, nb.len, 0); B.seg[nb.id] = [U.r1(hh[0]), U.r1(hh[1]), U.r1(tt[0]), U.r1(tt[1])]; if (B.rigOf && B.rig !== rig.id) B.rigOf[nb.id] = rig.id; } }
+    wChanged(); SB.bump(); void P;
+  }
+  // ---------- planted bones (feet): when the body moves, they stay put and the two bones above them bend
+  /** What stays planted during a pose drag of ids: [{ foot, chain, x, y, a }] (rig space, at the playhead). */
+  function plantTargets(rig, ids) {
+    if (S.rigPlant === false) return []; const moving = new Set(ids.map(id => id.split(':')[1])), P = poseAt(rig, S.time), out = [];
+    for (const f of rig.bones) { if (!f.plant || !f.parent) continue; const shin = boneById(rig, f.parent); if (!shin) continue; const chain = [shin.id]; if (shin.parent && !shin.pin) chain.push(shin.parent);
+      if (moving.has(f.id) || chain.some(c => moving.has(c))) continue;
+      let moves = false; for (let a = boneById(rig, chain[chain.length - 1]); a && a.parent; ) { a = boneById(rig, a.parent); if (a && moving.has(a.id)) { moves = true; break; } } if (!moves) continue; // only when a bone above it is moving
+      const q = P[f.id];
+      let bend = 1; if (chain.length === 2) { const t = P[chain[1]], k = P[chain[0]], cr = (t.tx - t.hx) * (k.ty - k.hy) - (t.ty - t.hy) * (k.tx - k.hx); // which way the knee bends now (straight: away from the middle)
+        bend = Math.abs(cr) > 1e-3 * (Math.hypot(t.tx - t.hx, t.ty - t.hy) * Math.hypot(k.tx - k.hx, k.ty - k.hy) || 1) ? Math.sign(cr) : rig.mirrorX != null ? (t.hx < rig.mirrorX ? 1 : -1) * Math.sign(t.ty - t.hy || 1) : 1; }
+      out.push({ foot: f.id, chain, x: q.hx, y: q.hy, a: q.a, bend }); }
+    return out;
+  }
+  const wrapDeg = d => { while (d > 180) d -= 360; while (d < -180) d += 360; return d; };
+  /** Which way a joint bends (bone.bend, set with the arrows: the joint at the bone's head goes that way, in the rig's space). */
+  const BEND = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] };
+  /** Turn thigh and shin (two bones) so the shin's tip lands on (x, y). The knee goes the shin's bend way when it has one, else to side bend
+      (+1 / -1). Returns the new pose values (not set). */
+  function twoBone(rig, thighId, shinId, x, y, bend) {
+    const lt = tree.localTime(rig), P = poseAt(rig, S.time), t = P[thighId], k = P[shinId], L1 = Math.hypot(t.tx - t.hx, t.ty - t.hy), L2 = Math.hypot(k.tx - k.hx, k.ty - k.hy), dx = x - t.hx, dy = y - t.hy;
+    const d = U.clamp(Math.hypot(dx, dy), Math.abs(L1 - L2) + 0.01, L1 + L2 - 0.01), base = Math.atan2(dy, dx), a1 = Math.acos(U.clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+    const want = BEND[(boneById(rig, shinId) || {}).bend];
+    if (want) { const side = sg => { const th = base - sg * a1; return Math.cos(th) * want[0] + Math.sin(th) * want[1] - (Math.cos(base) * want[0] + Math.sin(base) * want[1]) * Math.cos(a1); }; // how far that knee sits toward the arrow
+      const a = side(1), b = side(-1); if (Math.abs(a - b) > 1e-4) bend = a > b ? 1 : -1; }
+    const th = base - bend * a1, kx = t.hx + L1 * Math.cos(th), ky = t.hy + L1 * Math.sin(th), d1 = wrapDeg(th * 180 / Math.PI - t.a);
+    return { ['bone:' + thighId]: U.r1(TR.value(rig, 'bone:' + thighId, lt) + d1), ['bone:' + shinId]: U.r1(TR.value(rig, 'bone:' + shinId, lt) + wrapDeg(Math.atan2(y - ky, x - kx) * 180 / Math.PI - (k.a + d1))) };
+  }
+  /** The bend that a two-bone chain has now (+1 / -1), for keeping it when no arrow is set. */
+  function bendNow(rig, thighId, shinId) { const P = poseAt(rig, S.time), t = P[thighId], k = P[shinId]; const cr = (t.tx - t.hx) * (k.ty - k.hy) - (t.ty - t.hy) * (k.tx - k.hx); return cr === 0 ? 1 : Math.sign(cr); }
+  /** After the drag's values vals are set, bend each planted chain back so its foot stays where it was (and keeps its angle). Returns vals plus those. */
+  function replant(rig, vals, targets) {
+    if (!targets.length) return vals; const out = Object.assign({}, vals), lt = tree.localTime(rig);
+    const set = (id, v) => { if (S.recording && rig._live) rig._live[id] = v; else TR.set(rig, id, v); rig._pm = null; SB.bump(); }; // while recording, the values live in _live until the take ends
+    for (const id in vals) set(id, vals[id]);
+    for (const tg of targets) { const v = tg.chain.length === 2 ? twoBone(rig, tg.chain[1], tg.chain[0], tg.x, tg.y, tg.bend) : solveIK(rig, tg.chain[0], { x: tg.x, y: tg.y }, tg.chain, false); for (const id in v) set(id, v[id]); Object.assign(out, v);
+      const q = poseAt(rig, S.time)[tg.foot]; let d = tg.a - q.a; while (d > 180) d -= 360; while (d < -180) d += 360; const k = 'bone:' + tg.foot, fv = U.r1(TR.value(rig, k, lt) + d); set(k, fv); out[k] = fv; }
+    return out;
+  }
+  // ---------- a ready human skeleton
+  /** Bones of a simple person (seen from the front) standing with its feet at y = 0, H tall, in rig space: hips, spine, chest, neck,
+      head, arms and legs on both sides (mirrored, _L / _R), feet planted. The hips drag up and down; the legs bend to keep the feet. */
+  function humanBones(rig, H) {
+    const made = {}, k = H / 100, add = (key, name, par, hx, hy, tx, ty, extra) => { const b = Object.assign({ id: U.uid(), name, parent: null, x: hx * k, y: hy * k, len: U.r1(Math.hypot(tx - hx, ty - hy) * k), ang: U.r1(Math.atan2(ty - hy, tx - hx) * 180 / Math.PI), pose: 0 }, extra); rig.bones.push(b); made[key] = b; rig._pm = null; if (par) setParent(rig, b.id, made[par].id); return b; };
+    add('hips', 'Hips', null, 0, -52, 0, -60, { grab: 'move' });
+    add('spine', 'Spine', 'hips', 0, -60, 0, -72); add('chest', 'Chest', 'spine', 0, -72, 0, -84); add('neck', 'Neck', 'chest', 0, -84, 0, -88); add('head', 'Head', 'neck', 0, -88, 0, -100);
+    for (const [s, x] of [['L', -1], ['R', 1]]) {
+      add('ua' + s, 'Upper_arm_' + s, 'chest', 9 * x, -82, 15 * x, -66); add('fa' + s, 'Forearm_' + s, 'ua' + s, 15 * x, -66, 18 * x, -52); add('ha' + s, 'Hand_' + s, 'fa' + s, 18 * x, -52, 19 * x, -45);
+      add('th' + s, 'Thigh_' + s, 'hips', 5.5 * x, -51, 7 * x, -27); add('sh' + s, 'Shin_' + s, 'th' + s, 7 * x, -27, 7.5 * x, -3); add('ft' + s, 'Foot_' + s, 'sh' + s, 7.5 * x, -3, 12 * x, 0, { plant: true });
+    }
+    for (const key of ['ua', 'fa', 'ha', 'th', 'sh', 'ft']) { made[key + 'L'].mirror = made[key + 'R'].id; made[key + 'R'].mirror = made[key + 'L'].id; }
+    made.shL.bend = made.faL.bend = 'left'; made.shR.bend = made.faR.bend = 'right'; // knees and elbows bend outward (seen from the front); change it with the arrows
+    rig.mirrorX = 0; rig.ik = 2; rig._pm = null; SB.bump(); return made;
+  }
+  /** Stop two bones being mirrors of each other. */
+  function unmirror(rig, id) { const b = boneById(rig, id), m = mirrorOf(rig, b); if (b) delete b.mirror; if (m) delete m.mirror; }
   /** Bones that IK turns when you drag a tail: up the chain, stopping at a pinned bone. */
   function ikChain(rig, b) { const ch = [b.id]; let cur = b, n = rig.ik || 2; while (ch.length < n && cur.parent && !cur.pin) { cur = boneById(rig, cur.parent); if (!cur) break; ch.push(cur.id); } return ch; }
   /** Turn the chain so the end bone's tail reaches target (rig-local), CCD style. */
   function solveIK(rig, endId, target, chain, apply = true) {
+    if (chain.length === 2 && chain[0] === endId && boneById(rig, endId) && BEND[boneById(rig, endId).bend]) { // a knee or elbow with a bend arrow: the exact two-bone answer, bent that way
+      const out = twoBone(rig, chain[1], endId, target.x, target.y, bendNow(rig, chain[1], endId)); if (apply) for (const id in out) TR.set(rig, id, out[id]); return out; }
     const lt = tree.localTime(rig), poseVals = {}; rig.bones.forEach(b => poseVals[b.id] = TR.value(rig, 'bone:' + b.id, lt));
     for (let it = 0; it < 14; it++) {
       for (const id of chain) {
@@ -248,7 +403,15 @@
   // ---------- binding layers
   const bindRigs = B => B ? [...new Set([B.rig, ...Object.values(B.rigOf || {})])].filter(Boolean) : [];
   function boneOwner(B, id) { const r = tree.find((B.rigOf && B.rigOf[id]) || B.rig); return r && boneById(r, id) ? r : null; }
-  const bindBoneIds = B => Object.keys(B.inv || {}).filter(id => B.seg && B.seg[id] && boneOwner(B, id));
+  /** The bones that bend a layer: all it was bound to, or only B.only (picked in the layer's Rig section) when that keeps any. */
+  const bindBoneIds = B => { const all = Object.keys(B.inv || {}).filter(id => B.seg && B.seg[id] && boneOwner(B, id)); if (!B.only || !B.only.length) return all; const some = all.filter(id => B.only.includes(id)); return some.length ? some : all; };
+  /** Bones of rig r that sit on layer o (their line, where o is bound, crosses its box grown a little): for "Near this layer". */
+  function bonesNear(o, r) {
+    const B = o.bind; if (!B || !B.seg) return []; const b = SB.scene.bounds(o); if (!b) return []; const M = X.world(o), q = U.emptyBox();
+    [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]].forEach(([x, y]) => { const p = M.transformPoint(pt(x, y)); U.growBox(q, p.x, p.y); });
+    const m = Math.max(6, 0.06 * Math.max(q.x1 - q.x0, q.y1 - q.y0)), inBox = (x, y) => x >= q.x0 - m && x <= q.x1 + m && y >= q.y0 - m && y <= q.y1 + m;
+    return Object.keys(B.seg).filter(id => boneOwner(B, id) === r && (s => { for (let k = 0; k <= 8; k++) { const t = k / 8; if (inBox(s[0] + (s[2] - s[0]) * t, s[1] + (s[3] - s[1]) * t)) return true; } return false; })(B.seg[id]));
+  }
   const bendsWith = (o, rig) => !!(o.bind && o.bind.mode === 'deform' && bindRigs(o.bind).includes(rig.id));
   /** Attach o to a rig. mode 'follow' (one bone) or 'deform' (bend with all bones). add: keep bending with other rigs too. */
   function bindTo(o, rig, boneId, mode, add) {
@@ -300,11 +463,13 @@
     // (Fixes without a time count as made at B.goalsAt, or after everything when that is missing too: older projects.)
     const goals = B.goals && B.goals.length ? B.goals : null, gT = g => g[4] != null ? g[4] : B.goalsAt != null ? B.goalsAt : Infinity;
     let tFirst = Infinity; if (goals) for (const g of goals) { const t = gT(g); if (t < tFirst) tFirst = t; }
-    const atOf = d => (d[0] === 'l' ? d[5] : d[0] === 'g' ? d[6] : d[0] === 's' ? d[5] : d[4]) || 0;
+    const atOf = d => (d[0] === 'l' ? d[5] : d[0] === 'g' ? d[6] : d[0] === 's' ? d[5] : d[0] === 'j' ? d[7] : d[4]) || 0;
+    // "Keep other bones": an edit saved with a family (its last item: the ids of the bones joined to it) trades weight only with them
+    const famOf = d => { const f = d[0] === 'l' ? d[6] : d[0] === 'g' ? d[7] : typeof d[0] === 'number' ? d[5] : null; return Array.isArray(f) ? f : null; };
     for (let i = 0; i < n; i++) {
       const d2 = distSeg2(px, py, segs[i]); let w = 1 / ((d2 + s2) * (d2 + s2)), m = 0; const dabs = P[ids[i]]; base[i] = w; bsum += w;
       if (dabs) for (const d of dabs) {
-        if (d[0] === 'g' || d[0] === 'l') { ops.push([atOf(d), i, d]); continue; }
+        if (d[0] === 'g' || d[0] === 'l' || d[0] === 'j' || famOf(d)) { ops.push([atOf(d), i, d]); continue; }
         if (atOf(d) > tFirst) { ops.push([atOf(d), i, d]); continue; } // a brush dab made after a fix: on top of it
         if (d[0] === 's') { const [, sx, sy, r, k] = d, q = ((px - sx) * (px - sx) + (py - sy) * (py - sy)) / (r * r); if (q < 1) m *= 1 - k * (1 - q) * (1 - q); continue; } // smooth: painted weight eases back to the soft automatic falloff
         const [dx, dy, r, v] = d, q = ((px - dx) * (px - dx) + (py - dy) * (py - dy)) / (r * r); if (q < 1) { const f = 1 - q; m += v * f * f; } }
@@ -324,23 +489,39 @@
       else { let o = 0; for (let j = 0; j < n; j++) if (j !== i) o += base[j]; for (let j = 0; j < n; j++) if (j !== i) W[j] = o > 0 ? left * base[j] / o : 0; } // it had everything: the rest goes back by distance
       W[i] = target;
     };
+    /** The same, but bone i trades only with the bones F (indexes): it takes from them what it gains, gives them what it loses. */
+    const shareWith = (i, target, F) => {
+      F = F.filter(j => j >= 0 && j !== i); if (!F.length) return setShare(i, target); const wi = W[i]; let pool = 0; for (const j of F) pool += W[j];
+      if (target > wi) { const take = Math.min(target - wi, pool); if (pool > 1e-9) { const f = (pool - take) / pool; for (const j of F) W[j] *= f; } W[i] = wi + take; return; }
+      const give = wi - target; if (pool > 1e-9) for (const j of F) W[j] += give * W[j] / pool; else { let bs = 0; for (const j of F) bs += base[j]; if (bs <= 0) return setShare(i, target); for (const j of F) W[j] += give * base[j] / bs; }
+      W[i] = target;
+    };
     const renorm = () => { let s = 0; for (let i = 0; i < n; i++) s += W[i]; if (s > 1e-9) for (let i = 0; i < n; i++) W[i] /= s; };
-    ops.sort((a, b) => a[0] - b[0]);
+    ops.sort((a, b) => a[0] - b[0]); let dist = null; // distances to the bones, for joints (made when needed)
     for (const [, i, d] of ops) {
       if (i < 0) { const m = Math.min(1, d.gs); for (let j = 0; j < n; j++) W[j] = W[j] * (1 - m) + d.acc[j] / d.gs * m; renorm(); continue; } // a batch of fixes
-      const wi = W[i];
+      const wi = W[i], fam = famOf(d), set = fam ? (k, t) => shareWith(k, t, fam.map(id => ids.indexOf(id))) : setShare;
+      if (d[0] === 'j') { // a joint ['j', cx, cy, r, ux, uy, partnerId, at]: the bone and its partner split their weight smoothly across the circle,
+        // all the bone's beyond it and all the partner's behind it; only where these two are the nearest bones (easing off toward the others)
+        const [, cx, cy, r, ux, uy, pid] = d, j = ids.indexOf(pid); if (j < 0 || j === i) continue;
+        if (!dist) { dist = new Array(n); for (let k = 0; k < n; k++) dist[k] = Math.sqrt(distSeg2(px, py, segs[k])); }
+        let dO = Infinity; for (let k = 0; k < n; k++) if (k !== i && k !== j && dist[k] < dO) dO = dist[k];
+        const g = U.clamp((dO - Math.min(dist[i], dist[j])) / Math.max(r, 12) + 0.5, 0, 1), f = g * g * (3 - 2 * g); if (f <= 0) continue;
+        const t = U.clamp(((px - cx) * ux + (py - cy) * uy) / r * 0.5 + 0.5, 0, 1), sm = t * t * (3 - 2 * t), T = W[i] + W[j];
+        W[i] += (T * sm - W[i]) * f; W[j] += (T * (1 - sm) - W[j]) * f; continue;
+      }
       if (d[0] === 'l') { // lasso ['l', v, soft, pts, only]: inside → 100% (v > 0) or 0% (v < 0); "only" also takes the bone away outside
         const [, v, soft, pts, only] = d, f = lassoCover(pts, px, py, soft), s = U.clamp(Math.abs(v), 0, 1);
-        if (only) setShare(i, f * (wi + (1 - wi) * s) + (1 - f) * wi * (1 - s));
-        else { const k = s * f; if (k <= 0) continue; setShare(i, v > 0 ? wi + (1 - wi) * k : wi * (1 - k)); }
+        if (only) set(i, f * (wi + (1 - wi) * s) + (1 - f) * wi * (1 - s));
+        else { const k = s * f; if (k <= 0) continue; set(i, v > 0 ? wi + (1 - wi) * k : wi * (1 - k)); }
       } else if (d[0] === 'g') { // gradient: eases from what was there toward 100% (Add) or 0% (Remove), full at its start
         const [, ax, ay, bx, by, v] = d, L2 = (bx - ax) * (bx - ax) + (by - ay) * (by - ay) || 1, t = U.clamp(((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2, 0, 1);
-        const k = U.clamp(Math.abs(v), 0, 1) * (1 - t); if (k <= 0) continue; setShare(i, v > 0 ? wi + (1 - wi) * k : wi * (1 - k));
+        const k = U.clamp(Math.abs(v), 0, 1) * (1 - t); if (k <= 0) continue; set(i, v > 0 ? wi + (1 - wi) * k : wi * (1 - k));
       } else if (d[0] === 's') { // Undo paint after a fix: back toward the automatic falloff
         const [, sx, sy, r, k] = d, q = ((px - sx) ** 2 + (py - sy) ** 2) / (r * r); if (q >= 1) continue; const f = U.clamp(k * (1 - q) * (1 - q), 0, 1); for (let j = 0; j < n; j++) W[j] += (base[j] / (bsum || 1) - W[j]) * f;
       } else { // a brush dab after a fix: Add raises the share, Remove lowers it
         const [dx, dy, r, v] = d, q = ((px - dx) ** 2 + (py - dy) ** 2) / (r * r); if (q >= 1) continue; const s = U.clamp(Math.abs(v) * (1 - q) * (1 - q) * 1.5, 0, 1);
-        setShare(i, v > 0 ? wi + (1 - wi) * s : wi * (1 - s));
+        set(i, v > 0 ? wi + (1 - wi) * s : wi * (1 - s));
       }
     }
     renorm(); return W;
@@ -364,8 +545,10 @@
     const isId = m => Math.abs(m[0] - 1) < 1e-4 && Math.abs(m[1]) < 1e-4 && Math.abs(m[2]) < 1e-4 && Math.abs(m[3] - 1) < 1e-4 && Math.abs(m[4]) < 0.05 && Math.abs(m[5]) < 0.05;
     if (Ds.every(m => m.mats ? m.mats.every(isId) : isId(m))) return null;
     const segs = ids.map(id => B.seg[id]), Wm = root.inverse().multiply(Mo), Wl = matArr(Wm), Wli = matArr(Wm.inverse()), s2 = Math.pow(B.soft || 60, 2);
+    const dq = smoothBend(B);
     return (x, y) => {
       const [px, py] = mapA(Wl, x, y), W = weights(B, ids, segs, px, py, s2); let sx = 0, sy = 0;
+      if (dq) { const q = dqPoint(Ds, W, px, py); if (q) return mapA(Wli, q[0], q[1]); }
       for (let i = 0; i < Ds.length; i++) {
         if (!W[i]) continue; const q = moveBy(Ds[i], px, py); sx += q[0] * W[i]; sy += q[1] * W[i];
       }
@@ -375,7 +558,31 @@
   /** How each bone moved since binding, as matrices (a B-bone: one per joint, see bbDeform). */
   const bonesMoved = (B, ids, T) => ids.map(id => { const r = boneOwner(B, id), b = boneById(r, id), F = boneFrameAt(r, id, T); if (!F) return [1, 0, 0, 1, 0, 0]; return poseAt(r, T)[id].ch ? bbDeform(r, b, B, T) : matArr(F.multiply(arrMat(B.inv[id]))); });
   /** Where bone matrix m (from bonesMoved) takes stage point (px, py). */
-  function moveBy(m, px, py) { if (m.mats) { const g = m.sg, u = U.clamp(((px - g[0]) * (g[2] - g[0]) + (py - g[1]) * (g[3] - g[1])) / m.L2, 0, 1), f = u * m.n, k = Math.min(m.n - 1, Math.floor(f)), w = f - k, A = m.mats[k], Z = m.mats[k + 1]; m = [0, 1, 2, 3, 4, 5].map(j => A[j] + (Z[j] - A[j]) * w); } return mapA(m, px, py); }
+  function moveBy(m, px, py) { return mapA(matOf(m, px, py), px, py); }
+  /** The matrix of bone move m at (px, py) (a B-bone: the one for where the point sits along it). */
+  function matOf(m, px, py) { if (!m.mats) return m; const g = m.sg, u = U.clamp(((px - g[0]) * (g[2] - g[0]) + (py - g[1]) * (g[3] - g[1])) / m.L2, 0, 1), f = u * m.n, k = Math.min(m.n - 1, Math.floor(f)), w = f - k, A = m.mats[k], Z = m.mats[k + 1]; return [0, 1, 2, 3, 4, 5].map(j => A[j] + (Z[j] - A[j]) * w); }
+  /** Smooth bend: blend the bones' turns (dual complex numbers, the 2D form of dual quaternion skinning) instead of
+      averaging where each bone would put the point. Near a joint the point swings round the joint on an arc, so the
+      bend stays full and round (no pinched inside, no bumps outside). Works when the bones only move, turn and scale
+      evenly (all by the same amount); otherwise null, and the plain blend is used for that point. */
+  function dqPoint(Ds, W, px, py) {
+    let rc = 0, rs = 0, dc = 0, ds = 0, sc = null, r0 = null, top = -1;
+    for (let i = 0; i < Ds.length; i++) if (W[i] && (top < 0 || W[i] > W[top])) top = i;
+    if (top >= 0) { const m = matOf(Ds[top], px, py), th = Math.atan2(m[1], m[0]); r0 = [Math.cos(th / 2), Math.sin(th / 2)]; } // the bone it follows most sets which way round
+    for (let i = 0; i < Ds.length; i++) {
+      const w = W[i]; if (!w) continue; const m = matOf(Ds[i], px, py), a = m[0], b = m[1], c = m[2], d = m[3], k = Math.hypot(a, b), tol = 2e-3 * k + 1e-6;
+      if (Math.abs(a - d) > tol || Math.abs(b + c) > tol) return null; // stretched one way, or flipped
+      if (sc == null) sc = k; else if (Math.abs(k - sc) > 0.01 * sc) return null;
+      const th = Math.atan2(b, a); let qc = Math.cos(th / 2), qs = Math.sin(th / 2);
+      if (qc * r0[0] + qs * r0[1] < 0) { qc = -qc; qs = -qs; } // the shorter way round from it
+      const tx = m[4], ty = m[5]; rc += w * qc; rs += w * qs; dc += w * 0.5 * (tx * qc + ty * qs); ds += w * 0.5 * (ty * qc - tx * qs); // dual part ½·t·r̄ (a plane vector and a turn don't commute)
+    }
+    const n = Math.hypot(rc, rs); if (sc == null || n < 1e-9) return null; rc /= n; rs /= n; dc /= n; ds /= n;
+    const tx = 2 * (dc * rc - ds * rs), ty = 2 * (dc * rs + ds * rc), ca = rc * rc - rs * rs, sa = 2 * rc * rs, X = sc * px, Y = sc * py;
+    return [ca * X - sa * Y + tx, sa * X + ca * Y + ty];
+  }
+  /** Is smooth bend on for this layer? (B.dq; by default on, except in Game Engine projects: Unity and Godot blend plainly.) */
+  const smoothBend = B => B.dq != null ? !!B.dq : !(SB.targets && SB.targets.get() === 'game');
 
   // ---------- goal curve: draw how the bent shape should look in this pose, and the weights change to match it
   /** Best weights (on the simplex: none below 0, they add up to 1) so that Σ w_i · q_i comes to target t, staying near w0. */
@@ -472,17 +679,31 @@
   /** A weight gradient for a bone on every layer that bends with the rig: full at A, none at B (stage points). */
   /** An edit made now (at) goes on top of the fixes already there (older fixes had no time: they count as made just before). */
   const stampGoals = (B, at) => { if (B.goals && B.goals.length && B.goalsAt == null) B.goalsAt = at - 0.5; };
-  function gradient(rig, boneId, A, B, v) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push(['g', U.r1(A.x), U.r1(A.y), U.r1(B.x), U.r1(B.y), U.r3(v), at]); }); SB.bump(); }
+  /** The bones joined to bone id (its parent and its children): who it trades weight with when other bones are kept. */
+  const family = (rig, id) => { const b = boneById(rig, id); return b ? [b.parent, ...rig.bones.filter(x => x.parent === id).map(x => x.id)].filter(Boolean) : []; };
+  /** Weight edits keep the other bones (S.wpaint.keep): the record carries the family it trades with. */
+  const famRec = (rig, id) => S.wpaint && S.wpaint.keep ? [family(rig, id)] : [];
+  function gradient(rig, boneId, A, B, v) { wChanged(); const at = nextAt(), fam = famRec(rig, boneId); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push(['g', U.r1(A.x), U.r1(A.y), U.r1(B.x), U.r1(B.y), U.r3(v), at, ...fam]); }); SB.bump(); }
+  /** A joint: bone boneId and partnerId (its parent, or a child for a top bone) share the circle (c, r, weight space) with a smooth
+      hand-over along u (unit, from the partner's side to the bone's side); out to twice r it eases into what was there. */
+  function jointW(rig, boneId, partnerId, c, r, u) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push(['j', U.r1(c.x), U.r1(c.y), U.r1(Math.max(2, r)), U.r3(u.x), U.r3(u.y), partnerId, at]); }); SB.bump(); }
+  /** Where a joint goes by default: the bone's line in weight space (from a layer bending with the rig), its partner, centre, size and direction. */
+  function jointSpot(rig, boneId) {
+    const o = tree.all().find(x => bendsWith(x, rig) && x.bind.seg && x.bind.seg[boneId]); if (!o) return null; const B = o.bind, sg = B.seg[boneId], b = boneById(rig, boneId);
+    const kid = rig.bones.find(x => x.parent === boneId && B.seg[x.id]), up = b.parent && B.seg[b.parent] ? b.parent : null, partner = up || (kid && kid.id); if (!partner) return null;
+    const L = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]) || 1, ps = B.seg[partner], PL = Math.hypot(ps[2] - ps[0], ps[3] - ps[1]) || L, ux = (sg[2] - sg[0]) / L, uy = (sg[3] - sg[1]) / L;
+    return { partner, c: up ? { x: sg[0], y: sg[1] } : { x: sg[2], y: sg[3] }, r: Math.max(6, 0.3 * Math.min(L, PL)), u: up ? { x: ux, y: uy } : { x: -ux, y: -uy } };
+  }
   let lastAt = 0; const nextAt = () => (lastAt = Math.max(Date.now(), lastAt + 1)); // drawing order of gradients and lassos
   /** Lasso: inside the loop pts (flat, rig space) the bone gets 100% (mode 'add'), 0% ('sub'), or 100% inside and 0% outside ('only').
       soft: how wide the eased edge is; k: strength (1 = all the way). */
   function lasso(rig, boneId, pts, mode, soft, k) {
     wChanged(); const flat = simplifyLoop(pts, Math.max(0.5, soft * 0.05)).map(U.r1), v = U.r3((mode === 'sub' ? -1 : 1) * U.clamp(k, 0.05, 1)), at = nextAt();
-    tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}), rec = ['l', v, U.r1(soft), flat, mode === 'only' ? 1 : 0, at]; (pnt[boneId] = pnt[boneId] || []).push(rec); }); SB.bump();
+    const fam = famRec(rig, boneId); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}), rec = ['l', v, U.r1(soft), flat, mode === 'only' ? 1 : 0, at, ...fam]; (pnt[boneId] = pnt[boneId] || []).push(rec); }); SB.bump();
   }
   /** Fewer points on a drawn loop (keeps it under ~160 points). */
   function simplifyLoop(pts, tol) { let out = pts; for (let k = 0; k < 6 && (k === 0 || out.length > 320); k++, tol *= 1.8) { const r = [out[0], out[1]]; for (let i = 2; i < out.length; i += 2) if (Math.hypot(out[i] - r[r.length - 2], out[i + 1] - r[r.length - 1]) >= tol) r.push(out[i], out[i + 1]); out = r; } return out; }
-  function paint(rig, boneId, P, R, v) { wChanged(); const at = nextAt(); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push([U.r1(P.x), U.r1(P.y), U.r1(R), U.r3(v), at]); }); SB.bump(); }
+  function paint(rig, boneId, P, R, v) { wChanged(); const at = nextAt(), fam = famRec(rig, boneId); tree.all().forEach(o => { if (!bendsWith(o, rig)) return; stampGoals(o.bind, at); const pnt = o.bind.paint || (o.bind.paint = {}); (pnt[boneId] = pnt[boneId] || []).push([U.r1(P.x), U.r1(P.y), U.r1(R), U.r3(v), at, ...fam]); }); SB.bump(); }
 
   // ---------- the rig layer type
   SB.types.add({
@@ -509,7 +730,7 @@
   function normalizeW(rig, boneId) {
     const layers = tree.all().filter(o => bendsWith(o, rig) && o.bind.paint && (o.bind.paint[boneId] || []).length); if (!layers.length) return 0;
     const peak = () => Math.max(0, ...layers.flatMap(o => weightSamples(o, boneId, 32, paintedUp(o.bind.paint[boneId]))));
-    const keep = layers.map(o => o.bind.paint[boneId].map(d => d.slice())), scale = f => { wChanged(); layers.forEach((o, li) => { o.bind.paint[boneId] = keep[li].map(d => d[0] === 'g' ? Object.assign(d.slice(), { 5: U.r3(d[5] * f) }) : d[0] === 'l' ? Object.assign(d.slice(), { 1: U.r3(d[1] * f) }) : d[0] === 's' ? d.slice() : Object.assign(d.slice(), { 3: U.r3(d[3] * f) })); }); };
+    const keep = layers.map(o => o.bind.paint[boneId].map(d => d.slice())), scale = f => { wChanged(); layers.forEach((o, li) => { o.bind.paint[boneId] = keep[li].map(d => d[0] === 'g' ? Object.assign(d.slice(), { 5: U.r3(d[5] * f) }) : d[0] === 'l' ? Object.assign(d.slice(), { 1: U.r3(d[1] * f) }) : d[0] === 's' || d[0] === 'j' ? d.slice() : Object.assign(d.slice(), { 3: U.r3(d[3] * f) })); }); };
     if (peak() >= 0.98) return 1;
     let lo = 1, hi = 8; scale(hi); if (peak() < 0.98) { SB.bump(); return hi; }
     for (let it = 0; it < 14; it++) { const mid = (lo + hi) / 2; scale(mid); if (peak() >= 0.98) hi = mid; else lo = mid; }
@@ -517,5 +738,5 @@
   }
   /** Clear the painted weights of one bone (or every bone when boneId is null) on the layers bending with the rig. */
   function clearW(rig, boneId) { wChanged(); tree.all().forEach(o => { if (!bendsWith(o, rig) || !o.bind.paint) return; if (boneId) delete o.bind.paint[boneId]; else delete o.bind.paint; }); SB.bump(); }
-  SB.rig = { nextAt, goalCurve, blurW, clearGoals, hasGoals, wChanged, setParent, deleteBoneOnly, editSnap, keepAttached, smoothW, normalizeW, clearW, weightSamples, gradient, lasso, AF, BONE_P, nSegs, chainOf, boneProps, boneVals, placeBone, bbFrames, boneById, rigs, cached, ancSig, poseRaw, pose, poseAt, boneFrameAt, sim, hasDyn, dynOn, segsWorld, distSeg2, nearestBone, hit, toRig, make, addBone, deleteBone, ikChain, solveIK, bindTo, rebind, unbendFrom, bindRigs, boneOwner, bindBoneIds, bendsWith, weights, paint, matArr, arrMat };
+  SB.rig = { BEND, bonesNear, twoBone, boneChain, joinBones, splitBone, addToBinds, plantTargets, replant, humanBones, family, jointW, jointSpot, syncMirror, mirrorName, mirrorOf, mirrorBones, unmirror, withMirror, mirrorIds, smoothBend, dqPoint, nextAt, goalCurve, blurW, clearGoals, hasGoals, wChanged, setParent, deleteBoneOnly, editSnap, keepAttached, smoothW, normalizeW, clearW, weightSamples, gradient, lasso, AF, BONE_P, nSegs, chainOf, boneProps, boneVals, placeBone, bbFrames, boneById, rigs, cached, ancSig, poseRaw, pose, poseAt, boneFrameAt, sim, hasDyn, dynOn, segsWorld, distSeg2, nearestBone, hit, toRig, make, addBone, deleteBone, ikChain, solveIK, bindTo, rebind, unbendFrom, bindRigs, boneOwner, bindBoneIds, bendsWith, weights, paint, matArr, arrMat };
 })(window.SB);

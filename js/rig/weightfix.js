@@ -98,6 +98,7 @@
     if (!Array.isArray(d)) return false;
     if (d[0] === 's') return nums(d.slice(1), 4);
     if (d[0] === 'g') return nums(d.slice(1), 5);
+    if (d[0] === 'j') return nums(d.slice(1), 5) && d[3] > 0 && typeof d[6] === 'string';
     if (d[0] === 'l') return Number.isFinite(d[1]) && Number.isFinite(d[2]) && Array.isArray(d[3]) && d[3].length >= 6 && finite(d[3]);
     return nums(d, 4) && d[2] > 0;
   }

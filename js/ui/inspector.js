@@ -120,6 +120,13 @@
   I.typeSections = { shape: shapeSection };
   /** One effect: on/off, its parameters (animatable), remove. */
   I.fxItem = (o, e) => fxItem(o, e);
+  /** An effect card's play button: previews the effect; while the animation plays (or a preview runs) it is a pause button. */
+  const fxBusy = () => SB.state.playing || SB.fx.previewing();
+  function fxPlaySync(b) { const busy = fxBusy(); b.innerHTML = SB.icon(busy ? 'pause' : 'play'); const t = busy ? 'Pause' : 'Preview it on the stage (the playhead runs over it once)'; b.title = t; b.dataset.tip = t; b.setAttribute('aria-label', t); b.classList.toggle('on', busy); }
+  function fxPlayBtn(o, e) { const b = W.iconBtn(fxBusy() ? 'pause' : 'play', fxBusy() ? 'Pause' : 'Preview it on the stage (the playhead runs over it once)', () => { if (SB.state.playing) SB.time.pause(); else if (SB.fx.previewing()) SB.fx.stopPreview(); else SB.fx.preview(o, e); }, 'sm.fx-play'); fxPlaySync(b); return b; }
+  const fxPlayAll = () => document.querySelectorAll('button.fx-play').forEach(fxPlaySync);
+  SB.on('play', fxPlayAll); SB.on('fxprev', fxPlayAll);
+
   function fxItem(o, e) {
     const d = SB.effects.get(e.type), on = TR.now(o, `fx:${e.id}:on`);
     const same = o.effects.filter(x => x.type === e.type), name = same.length > 1 ? `${d.label} ${same.indexOf(e) + 1}` : d.label;
@@ -130,7 +137,7 @@
       : FL.row(o, { k: `fx:${e.id}:${k}`, label: p.label, type: 'range', min: p.min, max: p.max, step: p.step, anim: true, single: true }));
     const lost = !SB.fx.usable(d), warned = !lost && SB.fx.warned(d); // the project's target can't carry it (not exported), or only drawn into pictures (yellow)
     const wtxt = warned ? (SB.targets.get() === 'blender' ? `Not recommended for Blender: drawn frame by frame when exporting (heavier files, can’t be changed in Blender).` : `Not recommended for game engines: drawn onto the sprite (when it doesn’t change) or frame by frame when exporting. Heavier, and it can look a little different.`) : '';
-    return h('div.fxitem' + (on ? '' : '.off') + (lost ? '.lost' : '') + (warned ? '.warned' : ''), warned ? { title: wtxt } : null, lost ? h('p.hint.warn', null, `Not exported to ${SB.targets.short()}.`) : warned ? h('p.hint.bake.fx-nr.keep', { title: wtxt }, h('b', null, `(${SB.targets.NOT_REC}) `), SB.targets.get() === 'blender' ? 'Blender can’t make it: drawn frame by frame.' : 'Game engines can’t make it: drawn into the pictures.') : null, h('div.hd', null, h('span.row', null, FL.keyButton(o, `fx:${e.id}:on`), chk), d.designed ? W.iconBtn('edit', 'Edit this transition', () => SB.transitions.open((S.doc.transitions || []).find(t => 'tr:' + t.id === e.type)), 'sm') : d.fxDesign && SB.fxDesigner ? W.iconBtn('edit', 'Edit this effect in the designer', () => SB.fxDesigner.open(SB.fxDesigner.find(d.fxDesign)), 'sm') : null, SB.fx.timed(e) ? W.iconBtn('play', 'Preview it on the stage (the playhead runs over it once)', () => SB.fx.preview(o, e), 'sm') : null, W.iconBtn('x', 'Remove', () => { SB.fx.remove(o, e.id); tree.others(o).forEach(x => (x.effects || []).filter(y => y.type === e.type).forEach(y => SB.fx.remove(x, y.id))); SB.commit(); }, 'sm')), ...rows);
+    return h('div.fxitem' + (on ? '' : '.off') + (lost ? '.lost' : '') + (warned ? '.warned' : ''), warned ? { title: wtxt } : null, lost ? h('p.hint.warn', null, `Not exported to ${SB.targets.short()}.`) : warned ? h('p.hint.bake.fx-nr.keep', { title: wtxt }, h('b', null, `(${SB.targets.NOT_REC}) `), SB.targets.get() === 'blender' ? 'Blender can’t make it: drawn frame by frame.' : 'Game engines can’t make it: drawn into the pictures.') : null, h('div.hd', null, h('span.row', null, FL.keyButton(o, `fx:${e.id}:on`), chk), d.designed ? W.iconBtn('edit', 'Edit this transition', () => SB.transitions.open((S.doc.transitions || []).find(t => 'tr:' + t.id === e.type)), 'sm') : d.fxDesign && SB.fxDesigner ? W.iconBtn('edit', 'Edit this effect in the designer', () => SB.fxDesigner.open(SB.fxDesigner.find(d.fxDesign)), 'sm') : null, SB.fx.timed(e) ? fxPlayBtn(o, e) : null, W.iconBtn('x', 'Remove', () => { SB.fx.remove(o, e.id); tree.others(o).forEach(x => (x.effects || []).filter(y => y.type === e.type).forEach(y => SB.fx.remove(x, y.id))); SB.commit(); }, 'sm')), ...rows);
   }
   /** "Add …" picker for some kinds of effects, grouped by kind. */
   function fxAdder(o, cats, text) {

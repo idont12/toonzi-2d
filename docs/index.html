@@ -286,7 +286,7 @@
       <div class="grid">
         <div class="card wide"><h4>Brush <kbd>B</kbd> <span class="id">brush</span></h4>
           <p>Draw freehand on the selected drawing.</p>
-          <ul><li>The <strong>brush chip</strong> picks or edits brushes. Set color and size (<kbd>[</kbd> and <kbd>]</kbd> change the size).</li><li><strong>Detailed</strong> keeps every wiggle; <strong>Simple curve</strong> makes a clean path with a few editable points.</li><li><strong>Smoothing</strong> and <strong>Stabilize</strong> (with a Rope length) steady a shaky hand. <strong>Pressure</strong> shows when you use a pen.</li><li><strong>Mirror</strong> draws everything again across a line; drag its dots to move or turn the line.</li><li>Hold <kbd>Ctrl</kbd> and drag across loose ends to trim them.</li></ul></div>
+          <ul><li>The <strong>brush chip</strong> picks or edits brushes. Set color and size (<kbd>[</kbd> and <kbd>]</kbd> change the size).</li><li><strong>Detailed</strong> keeps every wiggle; <strong>Simple curve</strong> makes a clean path with a few editable points (close it and Fill colors its inside).</li><li><strong>Smoothing</strong> and <strong>Stabilize</strong> (with a Rope length) steady a shaky hand. <strong>Pressure</strong> shows when you use a pen.</li><li><strong>Mirror</strong> draws everything again across a line; drag its dots to move or turn the line.</li><li>Hold <kbd>Ctrl</kbd> and drag across loose ends to trim them.</li></ul></div>
         <div class="card"><h4>Fill brush <kbd>Shift</kbd>+<kbd>G</kbd> <span class="id">fillbrush</span></h4>
           <p>Paint solid shapes with no outline. Draw around an area and it fills with the color. The result is an editable filled path.</p></div>
         <div class="card"><h4>Eraser <kbd>E</kbd> <span class="id">eraser</span></h4>
@@ -310,7 +310,7 @@
           <ul><li>Click for a corner. Click and drag for a curve.</li><li>Click the first point again to close the shape, or press <kbd>Enter</kbd> to finish.</li><li>Hold <kbd>Shift</kbd> to go level or upright from the last point.</li></ul></div>
         <div class="card"><h4>Points <kbd>A</kbd> <span class="id">points</span></h4>
           <p>Edit the points of drawings and paths.</p>
-          <ul><li>Click a point or box-select several. Drag to move them; arrow keys nudge (<kbd>Ctrl</kbd> for 10 px).</li><li>Double-click a point to bend it (handles show). The bar sets it <strong>Sharp</strong> or <strong>Smooth</strong>.</li><li>Double-click a line to add a point. <kbd>Alt</kbd>+click a point deletes it.</li><li><kbd>Ctrl</kbd>+<kbd>J</kbd> copies the selected parts to a new layer.</li></ul></div>
+          <ul><li>Click a point or box-select several. Drag to move them; arrow keys nudge (<kbd>Ctrl</kbd> for 10 px).</li><li>Double-click a point to bend it (handles show). The bar sets it <strong>Sharp</strong> or <strong>Smooth</strong>.</li><li>Double-click a line to add a point. <kbd>Alt</kbd>+click a point deletes it.</li><li><kbd>Ctrl</kbd>+<kbd>J</kbd> copies the selected parts to a new layer.</li><li>A selected fill with no line shows <strong>Outline</strong> in the bar: pick a color to give it one (then set its width there).</li></ul></div>
       </div>
 
       <h3>Rig tools</h3>
@@ -396,6 +396,7 @@
         <li><kbd>,</kbd> and <kbd>.</kbd> step to the previous and next drawing frame. <kbd>Shift</kbd>+<kbd>D</kbd> duplicates the frame. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd> copy the frame's drawing and paste it as a new frame.</li>
         <li>Ctrl-click or Shift-click frames to pick several, then copy, drag or delete them.</li>
         <li><strong>Onion skin</strong> is a button in the timeline bar. Drag its ends on the ruler to show more or fewer frames. <em>Settings › Appearance › Onion skin</em> sets frames before, frames after, their colors and the strength.</li>
+        <li>Onion skin works for movement too, not only drawings: select a layer that moves with keyframes, a rig (it shows the layers the rig moves) or a controller (the layers it drives). Ghosts of where it was a few frames before (pink) and will be after (green) show around it; your current pose stays clear. <em>Motion: every</em> in the same settings sets how many frames apart the ghosts are (3 by default). A drawing with several frames that also moves shows both: its next and previous drawings, and where it is a few frames away.</li>
         <li><strong>Blank keyframe</strong> (<kbd>Shift</kbd>+<kbd>K</kbd>) starts an empty frame from the playhead on.</li>
         <li>Right-click the layer for <em>Tween to frame by frame…</em> (turns smooth motion into held pictures, like drawn animation), <em>Bake into frames…</em> (turns morphs and animated lines into real frames) and <em>Copy this drawing to frames…</em>.</li>
         <li>On a Frame keyframe, right-click › <em>Morph to the next keyframe</em> makes the drawing morph between two frames.</li>
@@ -442,6 +443,7 @@
       <ol class="steps">
         <li>Right-click a layer › <strong>Effects</strong> and pick a group, then an effect.</li>
         <li>It shows as a block in the layer's timeline row. Drag to move it, drag its edge to change its length. Right-click the block for <em>Settings…</em>, <em>Preview</em>, <em>Turn off</em> or <em>Delete</em>.</li>
+        <li>The ▶ on an effect's card in the panel previews it on the stage. While the animation plays (or a preview runs) it turns into ⏸: click it to stop.</li>
         <li>Tweak its amount and speed in the panel. The panel can also copy and paste effects to other layers.</li>
       </ol>
       <div class="tablewrap"><table>
@@ -457,6 +459,7 @@
       <ul>
         <li><strong>Design an effect</strong> / <strong>Design a transition</strong> (buttons in the panel, or <em>Settings › Effects</em> and <em>Settings › Transitions</em>) build one without code. An effect is a list of changes (move, scale, turn, fade, blur, colors, glow, shadow) and how each happens. A transition has its own small timeline where you animate the layer, and can mask it, cut holes in it or break it into pieces. Designed effects show with a ✦ and transitions with a ★, saved in the project.</li>
         <li><strong>Effects as code:</strong> <em>Settings › Effects</em> lets you paste a small piece of code for one effect, with examples for a look, an animated effect and a transition. They are kept on this device.</li>
+        <li>Effects show while the animation is paused too. While you draw on a layer (Brush, Pen, Eraser, Fill…), its looks (blur, shadow, glow, outline…) stay on, and only effects that move it (shake, wave, float, transitions) wait until you play, so your lines land where you draw them.</li>
       </ul>
       <div class="callout"><b>Heads up.</b> Not every export can show every effect. The app greys out what the format you chose can't carry, and lists what was left out after an export. See <a href="#export">Exporting</a>.</div>
     </section>
@@ -477,17 +480,27 @@
 
       <h3>Bone settings</h3>
       <p>Select a bone in the panel's <strong>Bones</strong> list: Rest length, Rest angle, Parent, <strong>Pin</strong>, <strong>Dynamic</strong> (swings with follow-through, good for tails and hair) and <strong>Segments</strong>.</p>
+      <p><strong>Rename</strong> a bone by double-clicking it in the Bones list (or right-click › Rename…). <strong>Bone tree…</strong> (above the list, or in a bone's right-click menu) shows which bone hangs on which: drag a bone onto another to hang it there, or onto Top level, or pick its parent from the list. Nothing on the stage moves.</p>
+      <p><strong>Join and split:</strong> with the Bones tool, Shift-click bones (or Shift-click them in the list) to pick several, then right-click › <em>Join … bones into one</em>: a chain becomes one bone from its first joint to its last tip, keeping what was attached. Right-click one bone › <em>Split into</em> 2–5 bones in a row; what bent with it bends with the new bones too.</p>
+      <p><strong>Bends toward:</strong> tell a knee or an elbow which way it folds. Select the lower bone (the shin, the forearm) and pick an arrow in its settings (← → ↑ ↓), or Shift-click a whole leg and right-click › <em>Bends toward</em>. A green arrow shows on the joint. When you drag the foot or the hand (IK), or the body moves with planted feet, the joint always bends that way, so a leg never folds backwards. A mirrored bone gets the mirrored arrow. The dot (Free) lets it bend whichever way it is bent now.</p>
+      <p><strong>Human skeleton:</strong> Add menu › <em>Human skeleton (rig)</em>, or <em>Human skeleton</em> in an empty rig's Bones list, makes a ready, mirrored person (hips, spine, chest, neck, head, arms, legs, feet). Drag the <strong>Hips</strong> in Pose mode: they move, the knees bend and the feet stay where they are. Any bone can do that: tick <strong>Planted</strong> in its settings (a foot, a hand on a wall); <strong>Feet stay</strong> in the Pose bar turns it off for a moment.</p>
+      <p><strong>Ready to animate:</strong> logo menu › Examples › <strong>Stick figure</strong> is a character already on this skeleton, with four controllers: <em>Look</em> (eyes and head), <em>Arms</em> (cheer up, hands down), <em>Crouch</em> (knees bend, feet stay) and <em>Mood</em> (sad, neutral, happy). Drag them, keyframe them (it comes with a little loop), or swap the lines for your own drawing.</p>
+      <p><strong>Mirror bones:</strong> right-click a bone on the stage (or use <strong>Mirror</strong> in its settings) to copy it, with every bone under it, to the other side of the skeleton. Names swap sides: <code>Arm_L</code> becomes <code>Arm_R</code> (also <code>.l</code>/<code>.r</code>, <code>Left</code>/<code>Right</code>). The two sides stay linked: when you adjust one with the Bones tool, or pose it (turn, move, scale, bend, IK), the other does the same, mirrored. <strong>Mirror posing</strong> in the Pose bar turns that off for a moment (to pose one hand alone); <em>Unlink the mirror</em> in the bone's right-click menu separates them for good. A bone on the middle line (a spine) can't be mirrored.</p>
 
       <h3>Weights and bending</h3>
       <p><strong>Weights</strong> say how much each bone moves each part of a drawing. Colors show it: red is a lot, blue is nothing.</p>
       <ol class="steps">
         <li>Select a bone, then click <strong>Paint weights</strong> in its card (or pick <strong>Weights</strong> in the rig bar).</li>
+        <li>Switch bones without leaving Weights: the bone's name in the bar opens a list of every bone (children under their parents), <strong>‹</strong> and <strong>›</strong> (or <kbd>,</kbd> and <kbd>.</kbd>) step to the previous and next one. Clicking a bone on the stage picks it too.</li>
         <li>Choose a weight tool: <strong>Brush</strong> (<kbd>[</kbd> and <kbd>]</kbd> change its size), <strong>Smooth</strong> (evens weights out), <strong>Gradient</strong> (drag a line: full weight where you start, none where you end), <strong>Lasso</strong> (draw a loop: the bone takes the area, or lets it go) or <strong>Goal curve</strong>.</li>
+        <li><strong>Joint</strong> makes a clean joint in two clicks: a circle sits where the bone meets its parent. Drag it onto the joint and drag its square to size it (small: a tight knee or elbow; big: a long soft bend like a tail or a belly), then <strong>OK</strong>. Across the circle the bone and its parent hand over smoothly; past it, each side follows its own bone. Other bones keep their weights.</li>
+        <li><strong>Bent by</strong> (the layer's Rig section, under “Bends with …”): pick which bones move this layer. A drawing of the left leg ticks only the left leg's bones, so the right leg can't pull it. <em>Near this layer</em> picks the bones that run over it, <strong>+</strong> next to a bone adds it with everything under it, <em>All</em> goes back to every bone.</li>
+        <li><strong>Keep other bones</strong> (in the bar, for Brush, Gradient and Lasso): on, the bone only trades weight with the bones joined to it (its parent and children), so fixing an elbow can't spoil the hand or the other arm. Off, any bone can give or take weight.</li>
         <li><strong>Goal curve</strong> is the clever one: pose the rig where it looks bad, then draw how the edge should look. The weights fix themselves. You can still paint over its fixes afterwards (Brush Add or Remove, Gradient, Lasso): what you do later goes on top. <strong>Clear fixes</strong> (in the bar whenever there are some) removes every goal-curve fix.</li>
       </ol>
       <ul>
         <li><strong>Smooth bending:</strong> set a bone's <strong>Segments</strong> (up to 16) to make a chain of equal pieces that curves smoothly. A <em>Bend controller</em> (Controls menu) curls it with one knob.</li>
-        <li><strong>Softness</strong> (on a layer that bends with a rig) makes the bend rounder. <strong>Rebind at this pose</strong> re-attaches it where it is. <strong>Also bend with…</strong> adds a second rig.</li>
+        <li><strong>Softness</strong> (on a layer that bends with a rig) makes the bend rounder. <strong>Smooth bend</strong> (on by default, off in Game Engine projects since Unity and Godot blend the simple way) keeps a bent part round and full instead of pinched or lumpy at the joint. <strong>Rebind at this pose</strong> re-attaches it where it is. <strong>Also bend with…</strong> adds a second rig.</li>
       </ul>
 
       <h3>Rig lock</h3>
@@ -495,8 +508,9 @@
 
       <h3>Actions and action strips</h3>
       <ul>
-        <li><strong>Actions</strong> are an animation library for one rig (walk, run, jump…). In the rig's <em>Actions</em> section choose <strong>Make actions</strong> or <strong>New action</strong> (<strong>From this one</strong> copies). Click an action to edit it. Each has its own keyframes and length. Rename, duplicate and delete are the small buttons.</li>
-        <li><strong>Action strips</strong> put actions one after another on the timeline. In <em>Action strips</em> choose <strong>Add at the playhead</strong>, pick the action and set <strong>Blend</strong> (seconds to change smoothly from the action before). Untick <em>Strips</em> to edit one action on its own.</li>
+        <li><strong>Actions</strong> are an animation library for a screen: idle, walk, jump, a happy and a sad version… Each action has its own keyframes, clip times and length for <em>every</em> layer of the screen (rigs, groups, shapes, text, particles, controllers). Click <strong>Actions</strong> in the timeline bar, or click an empty spot so nothing is selected and find <em>Actions</em> in the panel. <strong>Make actions</strong> keeps what the screen does now as <em>Action 1</em>. <strong>New action</strong> starts from the first pose of the current one, <strong>From this one</strong> copies it. Click an action to edit it. Rename, duplicate, move up and delete are the small buttons. Layers you add are in every action; their keyframes belong to the action you are on.</li>
+        <li>Projects from older versions may have actions on a rig. They still work for that rig; <strong>Move to the screen's actions</strong> (in the rig's panel or the Actions menu) turns them into screen actions.</li>
+        <li><strong>Action strips</strong> put actions one after another on a rig's clip: the rig (and what moves with it) does what it does in each action. Select the rig, and in <em>Action strips</em> choose <strong>Add at the playhead</strong>, pick the action and set <strong>Blend</strong> (seconds to change smoothly from the action before). Untick <em>Strips</em> to edit one action on its own.</li>
         <li>Unity, Godot and Blender export one animation per action. Rive too.</li>
       </ul>
     </section>
@@ -512,6 +526,8 @@
         <li>Put the knob at a spot, click that point in the Controls section, change the layer (position, size, rotation, colors, drawing frame, effect amounts, bone angles…), then <strong>Save</strong>.</li>
         <li>Drag the knob. The layer blends between the points. Keyframe the knob to animate it.</li>
       </ol>
+      <p><strong>Values at each point</strong> (under the points in the Controls section) is a table of what every point holds: one row per value, one column per point. Type a new number, color or frame straight into any cell. The eye <strong>pauses</strong> a value (it stays saved but isn't driven); the bin <strong>removes</strong> it from every point for good, also from points you save later (the × on a <em>Drives:</em> chip does the same). <em>Bring back a removed value…</em> puts it back. <strong>Show all values</strong> lists the ones that are the same everywhere too. The frame shown is a number field (frame 1, 2, 3…). A point that has no value for something you added later (an outline turned on, an effect) uses the layer's own value there, so new values blend in right away.</p>
+      <p>In the timeline, a value a controller sets gets a yellow <strong>!</strong> and a striped row: keyframes there do nothing, because the controller decides it. That is every driven value on an <em>Exact</em> link, and colors, frames and switches on an <em>On top</em> link (On top adds to numbers, so their keys still count).</p>
       <p><strong>Eyes follow a controller…</strong> does the whole setup for pupils in two clicks. Dragging the knob moves the knob; dragging the box's dashed edge moves the whole controller. <em>Reset controller</em> puts it back at rest.</p>
 
       <h3>Constraints</h3>
@@ -562,6 +578,7 @@
         <li>They play the same every time: scrub the timeline, play backwards, export. <strong>Random seed</strong> gives another pattern.</li>
         <li>They move with the layer: move, turn, scale or animate the layer and they come along.</li>
         <li>Speed, direction, spread, gravity, sizes and colors can have keyframes; each particle keeps the values it was born with.</li>
+        <li><strong>Emitting</strong> (top of the Particles section) starts and stops them: off, no new particles come out and the ones already out finish their life. Press its ◇ to key it: on at the start, off at 2 s, on again at 4 s. Click the box where it is keyed and it sets a keyframe there. Unity and Godot get it too: Godot keys the node's <code>emitting</code>, Unity keys <code>emitting</code> on <code>ToonziParticles</code> (which turns the Particle System's emission on and off).</li>
         <li><strong>Unity</strong> and <strong>Godot</strong> exports make real particle systems with the same settings (Godot: a CPUParticles2D; Unity: a Particle System set up by <code>ToonziParticles.cs</code>, whose settings you can change in the Inspector). They play in the game like on the stage, though not particle for particle. Video, GIF, web page and sprite sheet exports draw them as you see them. Lottie and Rive have no particles.</li>
       </ul>
     </section>
@@ -607,7 +624,7 @@
         </tr></tbody>
       </table></div>
       <ul>
-        <li>An animation is a screen, or an action of a rig. Screens can change with <em>Cut, Fade, Slide, Wipe, Zoom</em> or <em>Break apart</em>.</li>
+        <li>An animation is a screen, or one of its actions. Screens can change with <em>Cut, Fade, Slide, Wipe, Zoom</em> or <em>Break apart</em>.</li>
         <li><strong>Let viewers drag a controller:</strong> right-click the controller › <em>Make it interactive (viewer can drag it)</em>.</li>
         <li>The panel can show the rules as a list or as a flow graph. A rule can be turned off without deleting it.</li>
         <li><strong>Rive</strong> can do some of this (pointer, key, end and time triggers, mouse follow). The export tells you which rules it had to skip; use HTML for everything.</li>
@@ -658,7 +675,7 @@
       </ul>
 
       <h3>Groups: several characters in one export</h3>
-      <p>One project can hold the animations of every character in your game: the hero, an enemy, a door… Give each screen a <strong>Group</strong> (Screens tool, or click a screen's name: the bar at the top has <strong>Group</strong> › <em>New group…</em>). Every screen stays its own animation (and every action of a rig too); in Unity and Godot each group becomes <strong>its own prefab or scene</strong> with its own Animator or AnimationPlayer, all in one export and one folder (<code>&lt;project&gt;/&lt;group&gt;/</code>). Screens without a group share one named after the project. The board shows each screen's group as a green tag, and the export dialog lists the groups.</p>
+      <p>One project can hold the animations of every character in your game: the hero, an enemy, a door… Give each screen a <strong>Group</strong> (Screens tool, or click a screen's name: the bar at the top has <strong>Group</strong> › <em>New group…</em>). Every screen stays its own animation (and every action too); in Unity and Godot each group becomes <strong>its own prefab or scene</strong> with its own Animator or AnimationPlayer, all in one export and one folder (<code>&lt;project&gt;/&lt;group&gt;/</code>). Screens without a group share one named after the project. The board shows each screen's group as a green tag, and the export dialog lists the groups.</p>
       <h3>Effects in Unity, Godot and Blender</h3>
       <p>Game engines and Blender move, turn, scale and fade layers, but they can't draw outlines, glows, shadows, blurs and similar looks. You can still use them in a <strong>Game Engine</strong> or <strong>Blender</strong> screen: they are marked <strong>yellow</strong> (“not recommended”) in the effects menu, on the effect in the panel and on the layer's row in the timeline, and the export draws them into pictures:</p>
       <ul>

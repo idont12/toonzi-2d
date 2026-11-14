@@ -78,6 +78,7 @@
       if (!shut) for (const e of timed) { const [a, dd] = SB.fx.span(o, e), d = SB.effects.get(e.type), off = e.on === false;
         html += `<div class="tl-row sub${off ? ' off' : ''}" data-id="${o.id}" data-fx="${e.id}"><div class="tl-head" style="padding-left:${pad + 10}px" title="Double-click or ⚙: its settings. Right-click: turn ${off ? 'on' : 'off'}, delete"><button class="ib sm fxon${off ? '' : ' on'}" data-act="fxon" title="${off ? 'Turned off: click to turn it on' : 'On: click to turn it off'}">${SB.icon(off ? 'eyeOff' : 'eye')}</button><span class="pl">${esc(d.label)}</span><button class="ib sm" data-act="fxset" title="Settings: change how it looks and moves">${SB.icon('gear')}</button></div><div class="tl-lane" style="width:${Wd}px;--z:${z}px">${ghost}<div class="fxblk ${d.cat}${off ? ' off' : ''}" data-id="${o.id}" data-fx="${e.id}" style="left:${ltX(o, a) * z}px;width:${Math.max(6, dd * z)}px" title="${off ? 'Turned off. ' : ''}Drag to move, drag the ends to change the length. Double-click: settings"><span class="h l"></span><b>${U.r2(dd)}s</b><span class="h r"></span></div></div></div>`; }
     }
+    const ovr = SB.controls && SB.controls.overrides ? SB.controls.overrides(o) : {};
     for (const g of propGroups(o)) {
       const props = S.tlAnimOnly ? g.props.filter(p => TR.animated(o, p.id)) : g.props; if (!props.length) continue;
       const key = g.key || g.title, shut = isFolded(o, key);
@@ -91,7 +92,7 @@
           else if (nx) lane += `<span class="sbar${k.morph && p.id === 'frame' ? ' morph' : k.e === 'hold' || ty === 'int' ? ' hold' : ''}" style="left:${x0}px;width:${Math.max(0, x1 - x0)}px"${k.morph && p.id === 'frame' ? ' title="Morphs into the next frame"' : ''}></span>`;
           lane += `<span class="sk${k.e === 'hold' || (ty !== 'num' && ty !== 'color') ? ' hold' : k.e === 'spline' ? ' spline' : ''}${S.selKeys.has(k) ? ' ksel' : ''}" data-ki="${i}" style="left:${x0}px" title="${esc(p.label)} at ${U.r2(ltX(o, k.t))}s. Drag to move, right-click to change the ease."></span>`;
         });
-        html += `<div${o.tlColor && o.tlTint !== false ? ` style="--rc:${o.tlColor}"` : ''} class="tl-row sub${o.tlColor && o.tlTint !== false ? ' tinted' : ''}" data-id="${o.id}" data-p="${esc(p.id)}"><div class="tl-head" style="padding-left:${pad}px"><button class="${kbClass(o, p.id)}" data-act="pkey" title="${TR.animated(o, p.id) ? 'Add or remove a keyframe here' : 'Animate this'}"></button><span class="pl">${esc(p.label)}</span>${valueInput(o, p.id)}</div><div class="tl-lane" style="width:${Wd}px;--z:${z}px;--c:${col}">${lane}</div></div>`;
+        html += `<div${o.tlColor && o.tlTint !== false ? ` style="--rc:${o.tlColor}"` : ''} class="tl-row sub${o.tlColor && o.tlTint !== false ? ' tinted' : ''}${ovr[p.id] ? ' drvd' : ''}" data-id="${o.id}" data-p="${esc(p.id)}"><div class="tl-head" style="padding-left:${pad}px"><button class="${kbClass(o, p.id)}" data-act="pkey" title="${TR.animated(o, p.id) ? 'Add or remove a keyframe here' : 'Animate this'}"></button><span class="pl">${esc(p.label)}</span>${ovr[p.id] ? `<span class="tl-drv" title="${esc(`The controller “${ovr[p.id]}” sets ${p.label}, so keyframes here do nothing. ${p.id === 'frame' || TR.type(p.id) !== 'num' ? 'Animate the controller instead, or remove this value from its points (Controls section › Values at each point).' : 'Switch its link to “On top” to add these keys to it, animate the controller instead, or remove this value from its points.'}`)}">!</span>` : ''}${valueInput(o, p.id)}</div><div class="tl-lane" style="width:${Wd}px;--z:${z}px;--c:${col}">${lane}</div></div>`;
       }
     }
     return html;
@@ -179,8 +180,9 @@
     return `<span class="shotbars">${kids.map((c, i) => { const a = Math.max(c.start, i0), b = Math.min(c.start + c.dur, i0 + q.dur); return b > a ? `<i style="left:${(a - i0) * z}px;width:${(b - a) * z}px;bottom:${3 + i * 3}px;background:var(${SB.types.get(c.type).color})"></i>` : ''; }).join('')}</span>`;
   }
   /** Onion skin on the ruler: a band around the playhead as wide as the frames shown before and after; drag its ends. */
-  const onionStep = o => o.play === 'library' ? 1 / (S.project.fps || 24) : 1 / (o.fps || 8);
-  const onionLayer = () => { const o = tree.sel(); return S.onion && o && SB.types.get(o.type).frames && o.frames.length > 1 ? o : null; };
+  const byFrames = o => SB.types.get(o.type).frames && o.frames && o.frames.length > 1;
+  const onionStep = o => !byFrames(o) ? Math.max(1, S.onionOpt.gap || 3) / (S.project.fps || 24) : o.play === 'library' ? 1 / (S.project.fps || 24) : 1 / (o.fps || 8); // motion: every few frames
+  const onionLayer = () => { const o = tree.sel(); return S.onion && o && (byFrames(o) || (SB.onionTargets && SB.onionTargets(o).length)) ? o : null; };
   function onionBand(z) {
     const o = onionLayer(); if (!o) return ''; const st = onionStep(o) * z, a = S.onionOpt.before * st, b = S.onionOpt.after * st;
     return `<i class="on-band" id="onBand" data-a="${a}" style="left:${tree.dom.now() * z - a}px;width:${a + b}px"><b class="on-h l" title="Onion skin: ${S.onionOpt.before} frame${S.onionOpt.before === 1 ? '' : 's'} before. Drag to show more or fewer"></b><b class="on-h r" title="Onion skin: ${S.onionOpt.after} frame${S.onionOpt.after === 1 ? '' : 's'} after. Drag to show more or fewer"></b></i>`;

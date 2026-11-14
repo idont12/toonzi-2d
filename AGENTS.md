@@ -81,7 +81,10 @@ node tools/toonzi.mjs serve 8080        # or: python3 -m http.server 8080
 }
 ```
 
-More than one screen (for example an idle and a walk animation of the same character, each one becomes its own animation in Unity and Godot): use `"screens": [{ "name": "Idle", "proj": {…}, "objects": […] }, { "name": "Walk", … }]` instead of `project` and `objects`.
+Several animations of the same layers (idle, walk, jump…): give the screen **actions**. Each one has its own keyframes for every layer; the layers' own `tracks` are the current action, the others list theirs by layer id:
+`"project": { …, "actions": { "cur": "idle", "list": [{ "id": "idle", "name": "Idle", "dur": 2 }, { "id": "jump", "name": "Jump", "dur": 1.2, "tracks": { "<layer id>": { "y": [ … ] } } }] } }` (a layer without tracks in an action stands still there). Each action exports as its own animation to Unity, Godot and Blender.
+
+More than one screen (for example screens of different characters, or animations with different layers; each one becomes its own animation in Unity and Godot): use `"screens": [{ "name": "Idle", "proj": {…}, "objects": […] }, { "name": "Walk", … }]` instead of `project` and `objects`.
 
 ### Every layer
 
@@ -124,19 +127,22 @@ More than one screen (for example an idle and a walk animation of the same chara
 
 **pixels**: pixel art (right-click › Convert to vector drawing turns it into editable shapes, one per color). `cs` = size of one pixel in px; `frames[i].px` = `{ "col,row": "#color" }` (cells from the layer's position, right and down). `play`/`fps` as for drawings. Best on a pixel art screen (`project.pixel`). A pixel gradient (Normal, Dithering or Halftone) is easiest made in the editor with the Gradient tool; it stays editable there.
 
-**particles**: emitters (fire, smoke, snow, rain, confetti, sparkles, bubbles, magic). Main settings: `emit` (`stream` or `burst`), `rate` (a second) or `count` (a burst), `life` (seconds), `ptSpeed`, `ptDir` (degrees, -90 = up), `ptSpread` (degrees), `ptGravity`, `sizeMin`, `sizeMax`, `sizeEnd` (size at the end, × start), `color`, `color2`, `colorMode` (`life` = fades from color to color2, `random`), `fade`, `ptGlow`, `ptShape` (`circle`, `soft`, `square`, `star`, `spark`, `ring`), `area` (width of the line they start from), `spin`, `seed`, `ptSpace` (`local`: they move with the layer, the default; `world`: each one flies on from where the layer was when it was born, so a moving emitter leaves a trail).
+**particles**: emitters (fire, smoke, snow, rain, confetti, sparkles, bubbles, magic). Main settings: `emit` (`stream` or `burst`), `rate` (a second) or `count` (a burst), `life` (seconds), `ptSpeed`, `ptDir` (degrees, -90 = up), `ptSpread` (degrees), `ptGravity`, `sizeMin`, `sizeMax`, `sizeEnd` (size at the end, × start), `color`, `color2`, `colorMode` (`life` = fades from color to color2, `random`), `fade`, `ptGlow`, `ptShape` (`circle`, `soft`, `square`, `star`, `spark`, `ring`), `area` (width of the line they start from), `spin`, `seed`, `ptSpace` (`local`: they move with the layer, the default; `world`: each one flies on from where the layer was when it was born, so a moving emitter leaves a trail). `emitOn` (true by default) starts and stops them: key it (`"tracks": { "emitOn": [{ "t": 0, "v": true }, { "t": 2, "v": false }] }`) and no new particles come out while it is false; Unity and Godot exports key it too.
 
 **group**: `children` (front first, in the group's space). Move, scale, turn and fade the whole thing. `"seq": true` makes it a shot with its own clock (its children's times start at the group's start).
 
 **rig** (bones): `bones: [{ "id": "spine", "name": "Spine", "x": 0, "y": 60, "len": 140, "ang": -90 }, { "id": "neck", "parent": "spine", "len": 60, "ang": 0 }]`
 - a root bone (no `parent`) has `x`, `y` in the rig's space; a child starts at its parent's tip; `ang` is the rest angle in degrees, relative to the parent (0 = right, 90 = down, -90 = up for a root).
 - `segs: 6` makes a bendy bone (tails, spines, rubber arms; key `bonebend:<id>`).
-- layers attach to bones with `"bind": { "rig": "<rig id>", "mode": "follow", "bone": "<bone id>" }` (moves with that bone, best for rigid parts) or `"mode": "deform"` (bends with all the bones, for a drawing, shape, picture or pixel art that should stretch at the joints). The editor works out the attachment from where things are at time 0, so place each layer where it belongs in the rest pose.
+- layers attach to bones with `"bind": { "rig": "<rig id>", "mode": "follow", "bone": "<bone id>" }` (moves with that bone, best for rigid parts) or `"mode": "deform"` (bends with all the bones, for a drawing, shape, picture or pixel art that should stretch at the joints). The editor works out the attachment from where things are at time 0, so place each layer where it belongs in the rest pose. A deforming bind bends round and full (`"dq": false` in `bind` for the plain linear blend that game engines use).
+- a person: start from the editor's ready skeleton (Add › Human skeleton) or write the same idea: `"plant": true` on the feet keeps them where they are while the body moves (the two bones above bend), `"grab": "move"` on the hips makes dragging them move them.
+- `"bend": "left" | "right" | "up" | "down"` on a shin or forearm: the knee or elbow (the joint at that bone's start) always folds that way when the limb is solved (IK, planted feet). In a deforming bind, `"only": ["<bone id>", …]` limits which bones bend that layer (a leg drawing: only its leg).
+- symmetric limbs: `"mirror": "<other bone id>"` on both bones of a pair (`Arm_L` / `Arm_R`) poses them together in the editor (right-click a bone › Mirror makes the copy for you).
 - animate the bones, not the layers: `"tracks": { "bone:arm": [ … ] }` on the rig.
 
 **null** (a controller): a handle that drives other layers. `ctype`: `x` (left–right), `y` (up–down), `xy` (box), `free`; `rw`, `rh`: half the width and height it moves in. Layers it drives get
 `"drv": [{ "ctrl": "<controller id>", "space": "local", "states": [{ "slot": "left", "p": { "rot": -20 } }, { "slot": "center", "p": { "rot": 0 } }, { "slot": "right", "p": { "rot": 20 } }] }]`
-— the layer's values at each spot (`left`, `center`, `right`, `top`, `bottom`); in between they blend. `space: "local"` adds the change on top of the layer's own animation. Key the controller's `x`/`y` to animate everything it drives at once.
+— the layer's values at each spot (`left`, `center`, `right`, `top`, `bottom`); in between they blend. `space: "local"` adds the change on top of the layer's own animation. Leave a value out of every state to stop driving it (`"ignore": ["x"]` pauses it, `"cut": ["x"]` keeps it out of points saved later). Key the controller's `x`/`y` to animate everything it drives at once.
 
 **image**: pictures need their file packed in the project (`media`); prefer drawing with shapes, paths or pixels. If the person gives you pictures, tell them to drop the files on the stage in the editor.
 
@@ -175,6 +181,7 @@ Think like an animator, then pick the simplest tool that does the job. Things th
 | a retro, blocky look | a **pixel art** screen (`project.pixel`) with `pixels` layers; 12 fps; moves in whole pixels feel right |
 | a title that pops in, a label that types out | text with an in effect (`popIn`, `typewriter`) |
 | a scene cut, a second camera | a shot (group with `seq`) or another screen |
+| the same character or scene doing different things (idle, walk, jump; happy, sad) | **actions** on the screen (`project.actions`): one set of layers, one set of keyframes per action |
 
 **When to split into separate frames (frame by frame)**
 - The outline itself changes (squash that isn't just a stretch, a mouth, a blink, hands, liquids, fire): frames.
@@ -189,7 +196,7 @@ Think like an animator, then pick the simplest tool that does the job. Things th
 - Hold poses for a beat (at least 0.2 s) so they read. Stagger groups of things by 0.05–0.15 s.
 - Leave some space around the action; keep text big and readable (at least 1/20 of the screen height).
 
-**For game engines** (Unity, Godot): prefer rigs and keyframes; avoid blend modes. Looks effects (outline, glow, shadow, blur) work but are marked "not recommended": a look that never changes is drawn onto the layer's sprite (it keeps its bones and controllers); one that changes makes the layer frame by frame (bigger files, no rig in the engine). Put each animation (idle, walk, jump) on its own screen with the same layer names. Several characters in one project: give their screens a `"group"` (in `"screens": [{ "name": "Idle", "group": "Hero", … }]`); each group exports as its own prefab or scene with its own animations.
+**For game engines** (Unity, Godot): prefer rigs and keyframes; avoid blend modes. Looks effects (outline, glow, shadow, blur) work but are marked "not recommended": a look that never changes is drawn onto the layer's sprite (it keeps its bones and controllers); one that changes makes the layer frame by frame (bigger files, no rig in the engine). Put each animation (idle, walk, jump) in its own action of the screen (or on its own screen with the same layer names). Several characters in one project: give their screens a `"group"` (in `"screens": [{ "name": "Idle", "group": "Hero", … }]`); each group exports as its own prefab or scene with its own animations.
 
 **Hand it over**
 - Run `check` and `preview`, look at the pictures, fix overlaps, things off screen, text cut off.
@@ -202,6 +209,7 @@ Complete projects that open as they are (check them with `node tools/toonzi.mjs 
 - `ai/examples/bouncing-ball.json`: keyframes with eases, squash and stretch, a shadow
 - `ai/examples/robot-wave.json`: a group, a rig with bones, parts following bones, a controller that turns the face, drawing frames for blinks, particles, a text effect
 - `ai/examples/pixel-walk.json`: a pixel art screen with a two-frame walk cycle
+- `ai/examples/stick-figure.json`: a stick figure on the ready human skeleton (layers following bones, planted feet) with four controllers (Look, Arms, Crouch, Mood) keyed into a little loop: the quickest start for any character
 
 ## The command line (`tools/toonzi.mjs`)
 

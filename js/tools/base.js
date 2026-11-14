@@ -74,11 +74,12 @@
     /** Fresh drawing layers get their pivot centered on what was drawn. */
     centerFresh(o) { if (!o._fresh) return; delete o._fresh; const b = SB.scene.bounds(o); if (b) X.setOrigin(o, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2); },
 
-    /** While drawing, show the layer without effects so strokes land where you draw. */
+    /** While drawing, the layer stays still so strokes land where you draw: effects that move it (shake, wave, transitions…)
+        wait until you play, looks (blur, shadow, glow, outline…) still show (the set's looks flag). Editing text: no effects. */
     noFxSet() {
       if (S.textEdit && !S.playing) { const t = tree.find(S.textEdit); if (t) return new Set([t.id, ...tree.ancestors(t).map(a => a.id)]); }
       if (S.playing || !DRAW_TOOLS.has(S.tool) || !S.sel) return null;
-      const o = tree.sel(); return o ? new Set([o.id, ...tree.ancestors(o).map(a => a.id)]) : null;
+      const o = tree.sel(); if (!o) return null; const set = new Set([o.id, ...tree.ancestors(o).map(a => a.id)]); set.looks = true; return set;
     },
     /** While drawing, keep the selected layer visible even outside its clip. */
     showSelSet() { if (S.playing || !DRAW_TOOLS.has(S.tool)) return null; const o = tree.sel(); if (!o || !SB.types.get(o.type).frames) return null; return new Set([o.id, ...tree.ancestors(o).map(a => a.id)]); },

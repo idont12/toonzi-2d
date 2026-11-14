@@ -178,7 +178,7 @@
     c.globalCompositeOperation = 'source-over';
   }
   function drawPath(c, s, opt, budget, fillA, T) {
-    const { tint, boil, map, dash } = opt, col = tint || (s.c && paintOf(c, s)), fill = tint || (s.fc && paintOf(c, s, 'fc'));
+    const { tint, boil, map, dash } = opt, col = tint || (s.c && paintOf(c, s)), fill = s.fc ? tint || paintOf(c, s, 'fc') : null; // (a path with no fill stays a line, also when drawn as a silhouette: Fill's region finder, masks)
     const simple = !boil && !map && budget === Infinity; let trimmed = null;
     c.save(); if (s.op != null && s.op < 1) c.globalAlpha *= s.op;
     if (simple) { c.beginPath(); G.trace(c, s.subs); }

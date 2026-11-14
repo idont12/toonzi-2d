@@ -166,6 +166,7 @@
   SB.ready ? refreshRecent() : setTimeout(() => SB.project && SB.project.recent && refreshRecent(), 1500);
   SB.menus = {
     extra: [], // stage 2 adds rig, physics and controller items: (o, items) => menu item
+    stagePre: [], // (e, P) => menu items for something under the pointer that isn't a layer (a bone), or null
     layerItems, bakeFrames,
     layer(o, anchor) { const r = anchor.getBoundingClientRect(); SB.menu.open(r.left, r.bottom + 4, layerItems(o)); },
     stage(e) {
@@ -174,11 +175,12 @@
         ...(SB.pathEdit.joinable() ? [{ label: 'Join the two points', icon: 'link', run: () => SB.pathEdit.joinPts('merge') }, { label: 'Connect them with a line', run: () => SB.pathEdit.joinPts('line') }, '-'] : []),
         { label: 'Order', sub: [{ label: 'Bring to front', icon: 'front', run: () => SB.tools.get('points').edit('order', 'front') }, { label: 'Bring forward', icon: 'fwd', run: () => SB.tools.get('points').edit('order', 'fwd') }, { label: 'Send backward', icon: 'bwd', run: () => SB.tools.get('points').edit('order', 'bwd') }, { label: 'Send to back', icon: 'sendBack', run: () => SB.tools.get('points').edit('order', 'back') }] }, '-', { label: 'Copy', kbd: K('copy'), run: () => ops.copyParts(false) }, { label: 'Cut', kbd: K('cut'), run: () => ops.copyParts(true) }, '-', { label: 'Make a new layer', run: ops.partsToLayer }, { label: 'Make editable path', run: () => SB.tools.get('points').edit('toPath') }, { label: 'Smooth', run: () => SB.tools.get('points').edit('smooth') }, { label: 'Flip horizontally', icon: 'flipH', run: () => SB.tools.get('points').edit('flipH') }, { label: 'Flip vertically', icon: 'flipV', run: () => SB.tools.get('points').edit('flipV') }, '-', { label: 'Delete', kbd: 'Del', run: () => SB.tools.get('points').edit('delete') }]);
       if (S.tool === 'pen' && S.pen) return SB.tools.get('pen').finish();
+      for (const f of SB.menus.stagePre) { const it = f(e, P); if (it) return SB.menu.open(e.clientX, e.clientY, it); } // a bone of the selected rig…
       const sel = tree.sel(), hit = sel && tree.inRange(sel) && SB.scene.inside(sel, P) ? sel : SB.select.pick(P, false);
       if (hit) { if (!S.multi.has(hit.id)) tree.select([hit.id]); return SB.menu.open(e.clientX, e.clientY, layerItems(hit)); }
       SB.menu.open(e.clientX, e.clientY, [{ head: 'Stage' }, { label: 'New drawing layer', run: () => SB.add.drawing() }, { label: 'Add text', run: () => SB.add.text() }, { label: 'Add a shape', sub: Object.entries(SB.SHAPES).map(([k, v]) => ({ label: v, run: () => SB.add.shape(k) })) }, SB.particles ? { label: 'Add particles', icon: 'particles', sub: Object.entries(SB.particles.PRESETS).map(([k, p]) => ({ label: p.label, run: () => SB.add.particles(k) })) } : null,
         S.clip && { label: 'Paste', kbd: K('paste'), run: ops.paste }, { label: 'Select all', kbd: K('all'), run: () => tree.select(tree.rootList().map(o => o.id)) }, '-',
-        { label: 'Draw bones for a rig', kbd: K('tBone'), run: () => SB.tool.set('bone') }, { label: 'Add a controller', run: () => { const c = SB.controls.make(null); tree.select([c.id]); SB.commit(); } },
+        { label: 'Draw bones for a rig', kbd: K('tBone'), run: () => SB.tool.set('bone') }, { label: 'Human skeleton (rig)', icon: 'rig', title: 'A ready, mirrored skeleton: drag the hips and the legs bend with the feet planted', run: () => SB.rigUI.addHuman(null) }, { label: 'Add a controller', run: () => { const c = SB.controls.make(null); tree.select([c.id]); SB.commit(); } },
         { label: 'New empty shot', run: () => ops.newShot() }, S.ctx && { label: 'Back to the main timeline', run: () => { S.ctx = null; tree.select([]); } },
         { label: 'Add a screen', sub: [...SB.screens.SIZES.map(([k, v]) => ({ label: v, run: () => { const s = SB.screens.add(k); SB.board.focus(s, true); SB.board.fitAll(); SB.commit(); } })), ...(SB.tmplItems ? SB.tmplItems() : [])] },
         SB.templates && !SB.screens.active().from && { label: SB.screens.active().tmpl ? 'Stop being a template' : 'Save this screen as a template', icon: 'library', run: () => { const a = SB.screens.active(); if (a.tmpl) SB.templates.unmake(a); else SB.templates.make(a); } }, SB.screens.many() && { label: 'Show every screen', run: () => SB.board.fitAll() },

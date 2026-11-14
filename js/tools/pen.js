@@ -321,6 +321,9 @@
     else if (act === 'lineColor') list.forEach(s => { if (hasLine(s)) s.c = v; });
     else if (act === 'fillColor') list.forEach(s => { if (s.f) s.c = v; else if (s.b && (s.fc || v)) s.fc = v; });
     else if (act === 'width') list.forEach(s => { if (!s.f) s.s = v; });
+    else if (act === 'addOutline') list.forEach(s => { if (!hasFill(s) || hasLine(s)) return; const w = U.r1(Math.max(1, (S.brush.size || 6) * 0.6 / (ws || 1)));
+      if (s.b) { s.c = v; s.s = w; G.touch(s); return; } // a filled path: its own outline
+      const i = fr.strokes.indexOf(s), n = { b: 1, subs: s.loops.map(L => L.length <= 24 ? G.poly(L, true) : G.fitSub(L, 1.2 / ws, { closed: true })), c: v, s: w }; fr.strokes.splice(i + 1, 0, n); S.selStrokes.add(n); }); // a bucket fill: an outline path on top of it (the fill stays a fill)
     else if (act === 'brush') { const br = S.brushes.find(b => b.id === v); if (br) list.forEach(s => { if (!s.f && !s.er) SB.brush.apply(br, s); }); }
     else if (act === 'smooth') list.forEach(s => { if (s.f) s.loops = s.loops.map(L => G.smoothPts(L, 2, true)); else if (s.b) G.smoothSubs(s, () => 0.6); else s.pts = G.smoothPts(s.pts, 3); G.touch(s); });
     else if (act === 'simplify') list.forEach(s => { if (s.f) s.loops = s.loops.map(L => G.rdp(L, 1.5 / ws, true)); else if (s.b) G.refit(s, 2 / ws); else s.pts = G.rdp(s.pts, 1.5 / ws); G.touch(s); });
@@ -359,6 +362,7 @@
       const common = [ // what every selected part shares: change it once for all of them (like Figma)
         lines.length ? h('span.part-prop', { title: mixed(lines, s => s.c) ? 'The lines have different colors: picking one sets all of them' : '' }, h('span.lbl', null, 'Line'), W.colorBtn(lines[0].c || '#24213F', { label: lines.length > 1 ? `Line color of ${lines.length} parts` : 'Line color', change: v => partEdit('lineColor', v) })) : null,
         !fills.length && [...S.selStrokes].some(s => s.b && s.subs.some(sb => sb.cl)) ? h('span.part-prop', { title: 'This shape is closed: give it a fill' }, h('span.lbl', null, 'Fill'), W.colorBtn('#FFFFFF', { label: 'Fill color (no fill yet)', change: v => partEdit('fillColor', v) })) : null,
+        fills.length && !lines.length ? h('span.part-prop', { title: 'Give the selected fill an outline' }, h('span.lbl', null, 'Outline'), W.colorBtn('#24213F', { label: 'Outline color (no outline yet)', change: v => partEdit('addOutline', v) })) : null,
         fills.length ? h('span.part-prop', null, h('span.lbl', null, 'Fill'), W.colorBtn((fills[0].f ? fills[0].c : fills[0].fc) || '#24213F', { label: fills.length > 1 ? `Fill color of ${fills.length} parts` : 'Fill color', change: v => partEdit('fillColor', v) })) : null,
         lines.length ? W.popSlider(mixed(lines, s => s.s) ? 'Width (mixed)' : 'Width', lines[0].s || 0, { min: 0, max: 80, step: 0.5, title: lines.length > 1 ? `Line width of ${lines.length} parts` : 'Line width', input: v => { parts().forEach(s => { if (hasLine(s)) s.s = v; }); SB.bump(); }, change: () => { const o = tree.sel(); SB.raster.refreshFills(SB.frames.current(o), new Set(parts()), false); SB.commit(); SB.invalidate('ctxbar'); } }) : null,
         !lines.length && !fills.length ? W.colorBtn(col || '#24213F', { label: 'Color', change: v => partEdit('color', v) }) : null,

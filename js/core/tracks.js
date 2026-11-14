@@ -61,7 +61,7 @@
   const T = SB.tracks = {
     TRANSFORM, TRANSFORM_SET: new Set(TRANSFORM), EASES, easeOf, bezier, bezierPath, MULTIPLY,
     prefix(name, handler) { prefixes[name] = handler; },
-    type: id => COLOR.has(id) || id.endsWith(':color') ? 'color' : id === 'frame' ? 'int' : id.endsWith(':on') || id === 'paused' ? 'bool' : 'num',
+    type: id => COLOR.has(id) || id.endsWith(':color') ? 'color' : id === 'frame' ? 'int' : id.endsWith(':on') || id === 'paused' || id === 'emitOn' ? 'bool' : 'num',
     uiMul: id => PERCENT.has(id) || id.startsWith('bonesx:') || id.startsWith('bonesy:') ? 100 : 1,
 
     base(o, id) {

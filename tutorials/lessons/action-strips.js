@@ -1,4 +1,4 @@
-/* Tutorial: actions and action strips. A rig has two ready actions, Wave and Hop; strips put them one after another (format: js/tours/tours.js). */
+/* Tutorial: actions and action strips. The screen has two ready actions, Wave and Hop; strips put them one after another (format: js/tours/tours.js). */
 'use strict';
 (function (SB) {
   const S = SB.state, tree = SB.tree, TR = SB.tracks, U = SB.util, at = SB.tours.at, art = SB.tours.art;
@@ -6,15 +6,15 @@
   const rigOf = () => R().rigs().find(r => r.bones && r.bones.length) || null;
   const P = p => U.pt(p[0], p[1]);
   const strips = () => { const r = rigOf(); return r && r.aseq ? r.aseq : []; };
-  const nameOf = s => { const r = rigOf(), a = r && r.actions && r.actions.list.find(x => x.id === s.act); return a ? a.name : ''; };
+  const nameOf = s => { const L = A().of(S.project), a = L && L.list.find(x => x.id === s.act); return a ? a.name : ''; };
   /** Where things are (stage pixels): the ground and Buddy's body, shoulder and hand. */
   const G = T => { const gy = Math.round(T.H * 0.82), cx = T.W * 0.5; return { gy, cx, body: [cx, gy - 160], shoulder: [cx + 135, gy - 215], hand: [cx + 330, gy - 215], hop: 230 }; };
   const clipOf = () => { const r = rigOf(); return r && document.querySelector(`#tl .clip[data-id="${r.id}"]`); };
   const addBtn = () => [...document.querySelectorAll('#inspector button')].find(b => /Add at the playhead/.test(b.textContent));
   SB.tours.add({
     id: 'action-strips', group: '5 Rigs and controllers', title: 'Action strips: wave, then hop', minutes: 3, level: 'Medium', duration: 6,
-    blurb: 'Chain a rig’s actions one after another with strips.',
-    desc: 'You know that a rig can hold several actions (see “Actions: more than one animation”). Buddy has Wave and Hop. You put them one after another with action strips, with a smooth blend between them, and no new keyframes at all.',
+    blurb: 'Chain actions one after another on a rig with strips.',
+    desc: 'You know that a screen can hold several actions (see “Actions: more than one animation”). Buddy has Wave and Hop. You put them one after another with action strips, with a smooth blend between them, and no new keyframes at all.',
     learn: ['Action strips: actions one after another', 'Blending from one action to the next', 'Reusing the same action again'],
     preview(c, t, w, h) {
       c.fillStyle = '#EAF7F4'; c.fillRect(0, 0, w, h); const gy = h * 0.82, u = t % 4, hop = u > 2 ? Math.abs(Math.sin((u - 2) * Math.PI)) * h * 0.22 : 0, ease = k => Math.max(0, Math.min(1, k)), bl = ease((u - 2) / 0.4);
@@ -41,12 +41,12 @@
       R().bindTo(body, rig, b0.id, 'follow'); R().bindTo(arm, rig, b1.id, 'follow');
       /* Wave: the arm swings up and down (this is the action you see) */
       const toast = SB.toast; SB.toast = () => {}; /* no toast while the actions are made */
-      const wave = A().start(rig, 'Wave'); wave.dur = 2;
+      const wave = A().start(S.project, 'Wave'); wave.dur = 2;
       [[0, 60], [0.5, -50], [1, 60], [1.5, -50], [2, 60]].forEach(([t, v]) => TR.put(rig, 'bone:' + b1.id, t, v, 'smooth'));
       /* Hop: Buddy jumps twice, the arm stays down */
-      const hop = A().add(rig, 'empty', 'Hop'); hop.dur = 2; const y0 = rig.y || 0;
+      const hop = A().add(S.project, 'empty', 'Hop'); hop.dur = 2; const y0 = rig.y || 0;
       [[0, 0], [0.5, -g.hop], [1, 0], [1.5, -g.hop], [2, 0]].forEach(([t, v]) => TR.put(rig, 'y', t, y0 + v, 'smooth')); TR.put(rig, 'bone:' + b1.id, 0, 60, 'smooth'); TR.put(rig, 'bone:' + b1.id, 2, 60, 'smooth');
-      A().switchTo(rig, wave.id, true); SB.toast = toast;
+      A().switchTo(S.project, wave.id, true); SB.toast = toast;
       S.project.duration = 6; S.project.fixedLen = true; [rig, arm, body].forEach(m => { m.dur = 6; });
       SB.time.set(0); tree.select([]); SB.tool.set('select'); S.selBone = null;
     },

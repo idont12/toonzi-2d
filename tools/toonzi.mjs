@@ -89,6 +89,14 @@ function check(d) {
     if ((o.effects || []).some(e => e && !GAME_FX.includes(e.type))) tips.push(`${at}: uses ${(o.effects || []).filter(e => e && !GAME_FX.includes(e.type)).map(e => e.type).join(', ')}: fine for video and web; not recommended for Unity, Godot and Blender (a look that never changes goes onto the sprite, others frame by frame).`);
   }
   if (all.length > 400) tips.push(`${all.length} layers: the editor stays smooth up to a few hundred.`);
+  // a screen's actions: a list, and keyframes only for layers that exist
+  const acts = (Pp, list, where) => { const A = Pp && Pp.actions; if (!A) return; const L = A.list;
+    if (!Array.isArray(L) || !L.length) return errors.push(`${where}.actions.list must be a list of actions ({ id, name, dur, tracks }).`);
+    const known = new Set(); const add = l => (l || []).forEach(o => { if (o && o.id) known.add(o.id); if (o && o.children) add(o.children); }); add(list);
+    L.forEach((x, i) => { if (!x || typeof x !== 'object') return errors.push(`${where}.actions.list[${i}] is not an object.`); if (x.dur != null && !(x.dur > 0)) errors.push(`${where}.actions.list[${i}].dur must be a positive number of seconds.`);
+      for (const k in x.tracks || {}) if (!known.has(k)) errors.push(`${where}.actions.list[${i}] "${x.name || x.id}": tracks for "${k}", but no layer has that id.`); });
+    if (A.cur && !L.some(x => x && x.id === A.cur)) errors.push(`${where}.actions.cur "${A.cur}" is not the id of an action in the list.`); };
+  acts(d.project, d.objects, 'project'); (d.screens || []).forEach((s, i) => acts(s.proj, s.objects, `screens[${i}].proj`));
   return { errors, tips, layers: all.length };
 }
 

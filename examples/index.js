@@ -4,3 +4,4 @@
    SB.examples.add({ name: 'My example', kind: 'project', file: 'examples/my-example.js', about: 'What it shows' }); */
 SB.examples.add({ name: 'Bouncing ball', kind: 'project', file: 'examples/bouncing-ball.js', about: 'Keyframes with eases, a squash, and a shadow' });
 SB.examples.add({ name: 'Star', kind: 'object', file: 'examples/star.js', about: 'A shape you can place and edit' });
+SB.examples.add({ name: 'Stick figure', kind: 'project', file: 'examples/stick-figure.js', about: 'A character on the ready human rig, with Look, Arms, Crouch and Mood controllers to animate it' });

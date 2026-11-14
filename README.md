@@ -40,7 +40,8 @@
 
 ### 🤖 Or ask an AI to make it
 
-Tell Claude, ChatGPT or any AI assistant: *"Make an animation of … with Toonzi 2D (github.com/idont12/toonzi-2d)"*. The repo has a guide for AIs ([AGENTS.md](AGENTS.md)), so it writes the animation and sends you back **a link that opens the editor with your animation in it**. Change anything you like, then click the logo › **Copy a link to this animation** and give the link back to the AI to ask for more.
+Ask Claude, ChatGPT or any AI: *"Make an animation of … with Toonzi 2D (github.com/idont12/toonzi-2d)"*.
+It follows [AGENTS.md](AGENTS.md) and gives you the editor with your animation in it, to change and send back for more.
 
 <p align="center">
   <a href="https://idont12.github.io/toonzi-2d/">Open the app</a> ·

@@ -11,7 +11,7 @@
                rig     the rig;  joint  one bone (or one joint of a segmented bone), parent = joint or rig
                ctrl    a controller (an empty object in the engine)
                particles  a particles layer: ps = its settings (js/model/types/particles.js); the engine makes its own particle node
-     clips   [{ name, n, dur, tracks: Map key → { W: [DOMMatrix stage px], a: [alpha], fi: [frame], on: [bool] } }]
+     clips   [{ name, n, dur, tracks: Map key → { W: [DOMMatrix stage px], a: [alpha], fi: [frame], on: [bool], em: [bool] (particles: Emitting) } }]
      order   leaf keys front to back;  warnings  Set of things that can't be carried
      baked   names of layers drawn frame by frame (opt.bakeFx: effects the engine can't do; opt.pixelFrames: a
              pixel art screen as one picture a frame, nd.pixel = keep its pixels sharp). They work, but a picture
@@ -193,7 +193,7 @@
             // animated lines (opt.lineFrames): the drawing becomes a loop of that many pictures
             if (nd.kind === 'layer' && !info.morph) info.fi = lineFi(o, info.fi, info.lt);
             const t = track(key); t.W[i] = info.M; t.a[i] = info.alpha; t.fi[i] = info.fi; t.on[i] = info.visible;
-            if (nd.kind === 'particles') { prev = key; return; } // the engine makes them itself: a particle node with the same settings
+            if (nd.kind === 'particles') { (t.em || (t.em = []))[i] = SB.particles.emitting(o, info.lt); prev = key; return; } // the engine makes them itself: a particle node with the same settings; em: Emitting, frame by frame
             if (nd.kind === 'layer') {
               prev = key;
               if (info.visible) { if (!nd.first) nd.first = info; if (!nd.pics.some(p => p.f === info.fi)) { const pic = (nd.still ? rasterStill : raster)(info, info.fi); if (pic) nd.pics.push(pic); } }

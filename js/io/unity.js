@@ -251,6 +251,7 @@ using UnityEngine;
 [ExecuteAlways]
 public class ToonziParticles : MonoBehaviour
 {
+    [Tooltip("Sends out new particles. Key it in an animation to start and stop them: the ones already out finish their life.")] public bool emitting = true;
     public bool burst = false;
     public float rate = 40f;
     public int count = 60;
@@ -290,7 +291,12 @@ public class ToonziParticles : MonoBehaviour
 
     void OnEnable() { Apply(); }
     void OnValidate() { dirty = true; }
-    void Update() { if (dirty) { dirty = false; Apply(); } }
+    void Update()
+    {
+        if (dirty) { dirty = false; Apply(); }
+        var ps = GetComponent<ParticleSystem>(); if (ps == null) return;
+        var em = ps.emission; if (em.enabled != emitting) em.enabled = emitting; // the Animator keys "emitting"
+    }
 
     public void Apply()
     {
@@ -317,7 +323,7 @@ public class ToonziParticles : MonoBehaviour
         main.maxParticles = 3000;
 
         var em = ps.emission;
-        em.enabled = true;
+        em.enabled = emitting;
         if (burst)
         {
             em.rateOverTime = 0f;
@@ -710,9 +716,9 @@ public class StoryboardController : MonoBehaviour
     G.clips.forEach((c, ci) => {
       const m = new Map(); series.push(m);
       for (const o of objs) {
-        const tr = o.nd && c.tracks.get(o.nd.key), Ls = [], vis = [], a = [], fi = [];
-        for (let i = 0; i < c.n; i++) { Ls.push(o.nd && o.nd.skin ? null : localAt(o, c, i)); vis.push(!!(tr && tr.on[i])); a.push(tr ? U.clamp(tr.a[i] || 0, 0, 1) : 0); fi.push(tr ? tr.fi[i] || 0 : 0); }
-        m.set(o, { L: E.filled(Ls), vis, a, fi, here: !!tr });
+        const tr = o.nd && c.tracks.get(o.nd.key), Ls = [], vis = [], a = [], fi = [], em = [];
+        for (let i = 0; i < c.n; i++) { Ls.push(o.nd && o.nd.skin ? null : localAt(o, c, i)); vis.push(!!(tr && tr.on[i])); a.push(tr ? U.clamp(tr.a[i] || 0, 0, 1) : 0); fi.push(tr ? tr.fi[i] || 0 : 0); em.push(!(tr && tr.em && tr.em[i] === false)); }
+        m.set(o, { L: E.filled(Ls), vis, a, fi, em, here: !!tr });
       }
     });
     // what moves in the animations (controller pose grids don't count: they live in their StoryboardController, and the
@@ -725,6 +731,7 @@ public class StoryboardController : MonoBehaviour
         const v = s.get(o), Lf = v.L.map(l => l || l0);
         if (Lf.some(l => Math.abs(l.x - l0.x) > 1e-4 || Math.abs(l.y - l0.y) > 1e-4)) P.add('pos'); if (Lf.some(l => Math.abs(l.rot - l0.rot) > 0.01)) P.add('rot'); if (Lf.some(l => Math.abs(l.sx - l0.sx) > 1e-4 || Math.abs(l.sy - l0.sy) > 1e-4)) P.add('scale');
         if (o.ptc && v.vis.some(x => !x)) P.add('active'); // a particles object turns on and off
+        if (o.ptc && anim.some(s2 => s2.get(o).em.some(x => x !== v.em[0]))) P.add('emit'); // and starts and stops sending out particles (Emitting, keyed)
         if (o.layer) { if (v.vis.some(x => !x)) P.add('active'); if (v.a.some((x, i) => v.vis[i] && Math.abs(x - 1) > 0.004)) P.add('alpha'); if (!o.nd.skin && o.nd.pics.length > 1 && (new Set(v.fi.filter((f, i) => v.vis[i])).size > 1 || (G.clips[series.indexOf(s)].tracks.get(o.nd.key) || {}).fev)) P.add('sprite'); }
       }
     }
@@ -802,7 +809,7 @@ public class StoryboardController : MonoBehaviour
       const shapes = ['circle', 'soft', 'square', 'star', 'spark', 'ring', 'pictures'], st = v.ptShape === 'pictures' ? SB.particles.strip(v.ptSrc) : null;
       const picGuid = st ? await asset(`${root}/Sprites/${fileName(o.nd.name)} pictures.png`, G.png({ cv: st.cv }), gg => META.plain(gg, 'TextureImporter')) : null; // the pictures side by side
       D(114, id, `MonoBehaviour:\n  m_ObjectHideFlags: 0\n  m_CorrespondingSourceObject: {fileID: 0}\n  m_PrefabInstance: {fileID: 0}\n  m_PrefabAsset: {fileID: 0}\n  m_GameObject: ${ref(o.go)}\n  m_Enabled: 1\n  m_EditorHideFlags: 0\n  m_Script: ${ext(11500000, ptcScript, 3)}\n  m_Name: \n  m_EditorClassIdentifier: \n`
-        + `  burst: ${bit(v.emit === 'burst')}\n  rate: ${n(v.rate)}\n  count: ${Math.round(v.count)}\n  every: ${n(v.every)}\n  repeat: ${bit(v.repeat !== false)}\n  prewarm: ${bit(v.prewarm !== false)}\n  worldSpace: ${bit(v.ptSpace === 'world')}\n  life: ${n(v.life)}\n  lifeVariation: ${n(v.lifeVar)}\n`
+        + `  emitting: ${bit(series[0].get(o).em[0] !== false)}\n  burst: ${bit(v.emit === 'burst')}\n  rate: ${n(v.rate)}\n  count: ${Math.round(v.count)}\n  every: ${n(v.every)}\n  repeat: ${bit(v.repeat !== false)}\n  prewarm: ${bit(v.prewarm !== false)}\n  worldSpace: ${bit(v.ptSpace === 'world')}\n  life: ${n(v.life)}\n  lifeVariation: ${n(v.lifeVar)}\n`
         + `  speed: ${n(v.ptSpeed)}\n  speedVariation: ${n(v.speedVar)}\n  direction: ${n(v.ptDir)}\n  spread: ${n(v.ptSpread)}\n  gravity: ${n(v.ptGravity)}\n  drag: ${n(v.drag)}\n  sizeMin: ${n(v.sizeMin)}\n  sizeMax: ${n(v.sizeMax)}\n  sizeEnd: ${n(v.sizeEnd)}\n`
         + `  color: ${C(v.color)}\n  color2: ${C(v.color2)}\n  randomColor: ${bit(v.colorMode === 'random')}\n  fade: ${bit(v.fade !== false)}\n  glow: ${bit(v.ptGlow)}\n  shape: ${st ? 6 : Math.max(0, shapes.indexOf(v.ptShape === 'pictures' ? 'circle' : v.ptShape))}\n  spin: ${n(v.spin)}\n  area: ${n(v.area)}\n  seed: ${Math.round(v.seed || 1)}\n  sortingOrder: ${(sortOrder.get(o.nd.key) || 0) + 1}\n  pictures: ${st ? ext(2800000, picGuid, 3) : '{fileID: 0}'}\n  pictureCount: ${st ? st.n : 1}\n  picturesInOrder: ${bit(v.ptPick === 'life')}\n`);
     }
@@ -837,7 +844,7 @@ public class StoryboardController : MonoBehaviour
       const key1 = (k, step) => `      - serializedVersion: 3\n        time: ${n(k.t)}\n        value: ${n(k.v)}\n        inSlope: ${step ? 'Infinity' : n(k.inS)}\n        outSlope: ${step ? 'Infinity' : n(k.outS)}\n        tangentMode: ${step ? 103 : 69}\n        weightedMode: 0\n        inWeight: 0\n        outWeight: 0\n`;
       const curveV = (keys, path) => `  - curve:\n      serializedVersion: 2\n      m_Curve:\n${keys.map(key3).join('')}      m_PreInfinity: 2\n      m_PostInfinity: 2\n      m_RotationOrder: 4\n    path: ${ystr(path)}\n`;
       const curveF = (keys, attr, path, cls, step) => `  - curve:\n      serializedVersion: 2\n      m_Curve:\n${keys.map(k => key1(k, step)).join('')}      m_PreInfinity: 2\n      m_PostInfinity: 2\n      m_RotationOrder: 4\n    attribute: ${attr}\n    path: ${ystr(path)}\n    classID: ${cls}\n    script: {fileID: 0}\n`;
-      const gb = (path, attr, typeID, pptr, custom = 0) => bind.push(`    - serializedVersion: 2\n      path: ${crc32(path)}\n      attribute: ${attr}\n      script: {fileID: 0}\n      typeID: ${typeID}\n      customType: ${custom}\n      isPPtrCurve: ${pptr ? 1 : 0}\n`);
+      const gb = (path, attr, typeID, pptr, custom = 0, script = '{fileID: 0}') => bind.push(`    - serializedVersion: 2\n      path: ${crc32(path)}\n      attribute: ${attr}\n      script: ${script}\n      typeID: ${typeID}\n      customType: ${custom}\n      isPPtrCurve: ${pptr ? 1 : 0}\n`);
       for (const o of objs) {
         if (c.pose && o.nd && o.nd.kind === 'ctrl') continue; // a pose never moves the controllers
         const P = props.get(o), s = m.get(o); if (!P || !P.size) continue; const l0 = L0.get(o), Ls = end(s.L.map(l => l || l0));
@@ -845,6 +852,8 @@ public class StoryboardController : MonoBehaviour
         if (P.has('rot')) { const r = B.unwrap(Ls.map(l => l.rot)), k = linKeys(r.map(z => [0, 0, z]), 0.01); euler.push(curveV(k, o.path)); ['x', 'y', 'z'].forEach((a, d) => { const ks = k.map(x => ({ t: x.t, v: x.v[d], inS: x.inS[d], outS: x.outS[d] })); edF.push(curveF(ks, `localEulerAnglesRaw.${a}`, o.path, 4)); edE.push(curveF(ks, `m_LocalEulerAngles.${a}`, o.path, 4)); }); gb(o.path, 4, 4); }
         if (P.has('scale')) { const k = linKeys(Ls.map(l => [l.sx, l.sy, 1]), 1e-4); scale.push(curveV(k, o.path)); ['x', 'y', 'z'].forEach((a, d) => edF.push(curveF(k.map(x => ({ t: x.t, v: x.v[d], inS: x.inS[d], outS: x.outS[d] })), `m_LocalScale.${a}`, o.path, 4))); gb(o.path, 3, 4); }
         if (P.has('active')) { const vis = end(s.vis), ks = vis.map((v, i) => i).filter(i => i === 0 || i === vis.length - 1 || vis[i] !== vis[i - 1]).map(i => ({ t: tAt(i), v: vis[i] ? 1 : 0 })); const cv = curveF(ks, 'm_IsActive', o.path, 1, true); floats.push(cv); edF.push(cv); gb(o.path, crc32('m_IsActive'), 1); }
+        if (P.has('emit')) { const em = end(s.em), ks = em.map((v, i) => i).filter(i => i === 0 || i === em.length - 1 || em[i] !== em[i - 1]).map(i => ({ t: tAt(i), v: em[i] ? 1 : 0 })), scr = ext(11500000, ptcScript, 3);
+          const cv = curveF(ks, 'emitting', o.path, 114, true).replace('    script: {fileID: 0}\n', `    script: ${scr}\n`); floats.push(cv); edF.push(cv); gb(o.path, crc32('emitting'), 114, false, 0, scr); } // ToonziParticles.emitting
         if (P.has('alpha') && o.sr) { const k = linKeys(end(s.a), 0.002); const cv = curveF(k, 'm_Color.a', o.path, 212); floats.push(cv); edF.push(cv); gb(o.path, crc32('m_Color.a'), 212); }
         if (P.has('sprite') && o.sr) {
           const ks = E.picKeys(c.tracks.get(o.nd.key), c.n, fps).concat([[c.n / fps, null]]); ks[ks.length - 1][1] = ks[ks.length - 2][1]; // morph in-betweens at their own moments; a last key holds to the end

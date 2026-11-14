@@ -47,10 +47,10 @@
     /** Apply all effects of o at local time lt to the transform tr. */
     state(o, lt, tr, opt = {}) {
       const r = { prog: 1, dash: null, x: tr.x, y: tr.y, sx: tr.scale * (tr.scx ?? 1), sy: tr.scale * (tr.scy ?? 1), rot: tr.rot, opacity: tr.opacity, ax: tr.ax, ay: tr.ay, filters: [], wave: null, boil: null, glow: 0, chars: Infinity, clip: null, trx: null, styles: [] };
-      if (opt.noFx || !o.effects || !o.effects.length) return r;
+      if ((opt.noFx && opt.noFx !== 'looks') || !o.effects || !o.effects.length) return r;
       const seed = U.seedOf(o.id), L = lt + (o.phase || 0), left = o.dur - lt;
       for (const e of o.effects) {
-        const d = SB.effects.get(e.type); if (e.on === false || !d) continue;
+        const d = SB.effects.get(e.type); if (e.on === false || !d || (opt.noFx === 'looks' && d.cat !== 'static')) continue;
         const at = d.cat === 'out' ? 0 : (e.at || 0);
         if (d.cat === 'loop' && (L < at || (e.len != null && L >= at + e.len))) continue;
         const D = d.duration ? d.duration(o, e) : Math.max(0.05, e.dur ?? 0.6), speed = e.speed ?? 1;
@@ -74,9 +74,13 @@
     preview(o, e) {
       if (!o || !e || S.playing || S.exporting) return; const [a, d] = E.span(o, e), T = SB.tree, lt0 = Math.max(0, a - 0.15), lt1 = Math.min(o.dur, a + d + 0.25), back = S.time;
       const t0 = T.mainAt(o, lt0), t1 = T.mainAt(o, Math.max(lt0, lt1 - 1e-3)), len = Math.max(0.1, t1 - t0), start = performance.now(); E._prev = start;
-      const step = () => { if (E._prev !== start || S.playing) return; const u = (performance.now() - start) / 1000 / len; if (u >= 1) { E._prev = 0; SB.time.set(back); return; } SB.time.set(t0 + u * len); requestAnimationFrame(step); };
+      E._back = back; SB.emit('fxprev');
+      const step = () => { if (E._prev !== start || S.playing) { if (E._prev === start) { E._prev = 0; SB.emit('fxprev'); } return; } const u = (performance.now() - start) / 1000 / len; if (u >= 1) { E._prev = 0; SB.time.set(back); SB.emit('fxprev'); return; } SB.time.set(t0 + u * len); requestAnimationFrame(step); };
       step();
     },
+    /** Is a preview running? stopPreview ends it and puts the playhead back. */
+    previewing: () => !!E._prev,
+    stopPreview() { if (!E._prev) return; E._prev = 0; if (E._back != null) SB.time.set(E._back); SB.emit('fxprev'); },
     /** Turn an effect on or off (an animated on/off gets a key at the playhead instead). */
     setOn(o, e, on) { const k = `fx:${e.id}:on`; if (SB.tracks.animated(o, k)) SB.tracks.set(o, k, !!on); else if (on) delete e.on; else e.on = false; SB.commit(); SB.toast(`${(SB.effects.get(e.type) || { label: 'Effect' }).label} turned ${on ? 'on' : 'off'}.`); },
     /** Its settings in a popover next to anchor (an element, or { x, y } on the screen). */

@@ -67,10 +67,19 @@
       if (o.type === 'rig') out.bones = (o.bones || []).map((b, i) => Object.assign({ id: 'b' + i, name: 'Bone ' + (i + 1), parent: null, len: 80, ang: 0 }, b));
       return out;
     }).filter(Boolean);
+    // a screen's actions (js/rig/actions.js), as written by hand: ids, eases; the current one's keyframes go into the layers
+    const actsBefore = P => { const a = P.actions; if (!a || !Array.isArray(a.list) || !a.list.length) { delete P.actions; return; }
+      a.list = a.list.filter(x => x && typeof x === 'object').map((x, i) => Object.assign({ name: 'Action ' + (i + 1), dur: P.duration }, x, { id: x.id || 'ac' + U.uid() }));
+      if (!a.list.length) { delete P.actions; return; } if (!a.list.some(x => x.id === a.cur)) a.cur = a.list[0].id;
+      for (const x of a.list) { x.dur = Math.max(0.05, +x.dur || P.duration); for (const k in x.tracks || {}) for (const id in x.tracks[k] || {}) { const arr = Array.isArray(x.tracks[k][id]) ? x.tracks[k][id] : []; x.tracks[k][id] = arr.filter(q => q && q.v !== undefined).map(q => Object.assign({}, q, { t: U.r3(+q.t || 0), e: q.e || keyEase(id) })).sort((p, q) => p.t - q.t); } }
+      P.duration = a.list.find(x => x.id === a.cur).dur; };
+    const actsAfter = (P, objs) => { const a = P.actions; if (!a) return; const cur = a.list.find(x => x.id === a.cur);
+      if (cur.tracks) for (const o of tree.all(objs || [])) { const t = cur.tracks[o.link || o.id]; if (t) o.tracks = Object.assign(o.tracks || {}, U.deep(t)); }
+      delete cur.tracks; delete cur.clips; };
     try {
       S.project = Object.assign(SB.defaultProject(), d.name ? { name: d.name } : {}, d.project || {}); const P = S.project; d.project = P; d.name = P.name;
-      d.objects = fill(d.objects, P, P.duration);
-      if (d.screens) d.screens = d.screens.map((sc, i) => { const sp = Object.assign(SB.defaultProject(), sc.proj || (i === 0 ? P : {})); S.project = sp; const out = Object.assign({ id: 'scr' + U.uid(), name: 'Screen ' + (i + 1), x: i * (sp.w + 200), y: 0 }, sc); if (sc.objects) out.objects = fill(sc.objects, sp, sp.duration); if (sc.proj) out.proj = sp; return out; });
+      actsBefore(P); d.objects = fill(d.objects, P, P.duration); actsAfter(P, d.objects);
+      if (d.screens) d.screens = d.screens.map((sc, i) => { const sp = Object.assign(SB.defaultProject(), sc.proj || (i === 0 ? P : {})); S.project = sp; if (sc.proj) actsBefore(sp); const out = Object.assign({ id: 'scr' + U.uid(), name: 'Screen ' + (i + 1), x: i * (sp.w + 200), y: 0 }, sc); if (sc.objects) out.objects = fill(sc.objects, sp, sp.duration); if (sc.proj) { actsAfter(sp, out.objects); out.proj = sp; } return out; });
     } finally { S.project = keep; }
     d.v = d.v || 6; return d;
   }

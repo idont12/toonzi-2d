@@ -159,6 +159,8 @@
   }
 
   const skip = o => { const def = SB.types.get(o.type); return !def || !def.visual || def.render === false || (o.hidden && !(S.ixPlay && o._ix && o._ix.visible === 1)); }; // interactions can show a hidden layer
+  /** No effects for o (true), only its looks ('looks', while drawing on it), or all (false). */
+  const noFxOf = (opt, o) => !!opt.noFx && opt.noFx.has(o.id) && (opt.noFx.looks ? 'looks' : true);
   /** Draw a list back to front. time is on this list's clock (see tree.js). */
   function renderList(ctx, list, time, M, opt, sc, depth) {
     if (opt.T == null) opt.T = S.time;
@@ -186,7 +188,7 @@
     return Mo;
   }
   function drawGroup(ctx, g, lt, time, M, opt, sc, depth) {
-    const v = viewOf(g, lt), st = SB.fx.state(v, lt, TR.transform(g, lt), { noFx: opt.noFx && opt.noFx.has(g.id), sc }); if (g.blend) st.blend = g.blend;
+    const v = viewOf(g, lt), st = SB.fx.state(v, lt, TR.transform(g, lt), { noFx: noFxOf(opt, g), sc }); if (g.blend) st.blend = g.blend;
     if (opt.alphaMul != null) { st.opacity *= opt.alphaMul; opt = Object.assign({}, opt, { alphaMul: null }); }
     if (st.opacity <= 0.002 || st.sx === 0) return;
     const ct = g.seq ? lt + (g.inPoint || 0) : g.start + lt; // a shot runs on its own clock
@@ -207,7 +209,7 @@
     if (iso) composite(ctx, L.canvas, st, sc, glowColor(g), true);
   }
   function drawLeaf(ctx, o, lt, M, opt, sc) {
-    const def = SB.types.get(o.type), v = viewOf(o, lt), st = SB.fx.state(v, lt, TR.transform(o, lt), { noFx: opt.noFx && opt.noFx.has(o.id), sc }); if (o.blend) st.blend = o.blend;
+    const def = SB.types.get(o.type), v = viewOf(o, lt), st = SB.fx.state(v, lt, TR.transform(o, lt), { noFx: noFxOf(opt, o), sc }); if (o.blend) st.blend = o.blend;
     if (opt.alphaMul != null) st.opacity *= opt.alphaMul;
     if (st.opacity <= 0.002 || st.sx === 0) return;
     const fi = SB.frames.index(o, lt); let fr = o.frames[fi] || o.frames[0] || { strokes: [] };

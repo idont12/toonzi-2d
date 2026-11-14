@@ -81,12 +81,41 @@
   }
   /** Onion skin: neighbouring frames of the selected layer, tinted. */
   function onion(O) {
-    const o = tree.sel(), on = S.onionOpt; if (!S.onion || S.playing || !o || !SB.types.get(o.type).frames || o.frames.length < 2 || !tree.inRange(o) || tree.hidden(o)) return;
+    const o = tree.sel(), on = S.onionOpt; if (!S.onion || S.playing || !o || tree.hidden(o)) return;
+    motionOnion(O, o); // where it moves (keyframes, a rig, a controller)…
+    if (!SB.types.get(o.type).frames || o.frames.length < 2 || !tree.inRange(o)) return; // …and, frame by frame, its next and previous drawings
     const n = o.frames.length, i = SB.frames.index(o, tree.rawLocal(o)), wrap = o.play !== 'once' && o.play !== 'library', seen = new Set([i]), c = O.c;
     c.save(); c.setTransform(O.M(X.world(o)));
     const layer = (cnt, dir, col) => { for (let k = cnt; k >= 1; k--) { let j = i + dir * k; if (wrap) j = ((j % n) + n) % n; if (j < 0 || j >= n || seen.has(j)) continue; seen.add(j); c.globalAlpha = on.alpha * (1 - (k - 1) / (cnt + 0.5)); if (o.type === 'pixels') { const px = o.frames[j].px || {}, tint = {}; for (const key in px) tint[key] = col; SB.types.get('pixels').draw(c, o, { px: tint }); } /* pixel art: its squares in the onion color */ SB.strokes.draw(c, o.frames[j].strokes || [], { tint: col, skipErase: true }); } };
     layer(on.before, -1, on.cb); layer(on.after, 1, on.ca); c.restore();
   }
+  /** What a motion onion skin shows for the selection o: a rig shows the layers it moves, a controller the layers it drives,
+      anything else itself. Empty when none of it moves over time (a still layer would only get tinted). */
+  function onionTargets(o) {
+    const rigs = new Set(), add = (list, x) => { if (x && !list.includes(x) && x.type !== 'rig' && x.type !== 'null' && SB.types.get(x.type).visual) list.push(x); }, list = [];
+    if (o.type === 'rig') { rigs.add(o.id); tree.all().forEach(x => { if (x.bind && SB.rig.bindRigs(x.bind).includes(o.id)) add(list, x); }); }
+    else if (o.type === 'null') tree.all().forEach(x => { if ((x.drv || []).some(L => L.ctrl === o.id)) { if (x.type === 'rig') { rigs.add(x.id); tree.all().forEach(y => { if (y.bind && SB.rig.bindRigs(y.bind).includes(x.id)) add(list, y); }); } else add(list, x); } });
+    else add(list, o);
+    const has = x => x && Object.keys(x.tracks || {}).some(k => (x.tracks[k] || []).length > 1);
+    const moves = x => has(x) || tree.ancestors(x).some(has) || (x.bind && SB.rig.bindRigs(x.bind).some(id => has(tree.find(id)) || (tree.find(id).drv || []).some(L => has(tree.find(L.ctrl))))) || (x.drv || []).some(L => has(tree.find(L.ctrl))) || (x.effects || []).some(e => SB.fx.timed(e) && e.on !== false);
+    return list.filter(x => tree.inRange(x) && !tree.hidden(x)).some(moves) ? list.filter(x => !tree.hidden(x)) : [];
+  }
+  /** Onion skin for animation that isn't frame by frame (keyframes, rigs, controllers): the selection a few frames before (pink)
+      and after (green), every `gap` frames (Onion skin settings). */
+  function motionOnion(O, o) {
+    const on = S.onionOpt, list = onionTargets(o); if (!list.length) return; const fps = S.project.fps || 24, step = Math.max(1, on.gap || 3) / fps, c = O.c, W = c.canvas.width, H = c.canvas.height, D = S.project.duration;
+    const paint = (g, T) => { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, W, H);
+      for (const x of list) { const par = tree.parentOf(x); if (!tree.inRange(x, T)) continue; SB.scene.renderList(g, [x], tree.parentTime(x, T), O.M(par ? X.worldAt(par, T) : new DOMMatrix()), { T, root: O.M(), preview: true }, O.sc, 0); } };
+    const now = U.poolCtx(W, H, ':onionNow'); paint(now, S.time); // the pose at the playhead stays clear of ghosts
+    const ghost = (T, col, a) => {
+      const g = U.poolCtx(W, H, ':onion'); paint(g, T);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'destination-out'; g.drawImage(now.canvas, 0, 0); g.globalCompositeOperation = 'source-over';
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = a; c.drawImage(g.canvas, 0, 0); c.restore();
+    };
+    for (let k = on.before; k >= 1; k--) { const T = S.time - k * step; if (T >= -1e-6) ghost(Math.max(0, T), on.cb, on.alpha * (1 - (k - 1) / (on.before + 0.5))); }
+    for (let k = on.after; k >= 1; k--) { const T = S.time + k * step; if (T <= D + 1e-6) ghost(Math.min(D, T), on.ca, on.alpha * (1 - (k - 1) / (on.after + 0.5))); }
+  }
+  SB.onionTargets = onionTargets;
   /** Layers that hang past the canvas edge show faintly around it, so you can grab them. */
   function outside(O) {
     const p = S.project, outs = [];
