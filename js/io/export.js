@@ -85,6 +85,12 @@
       async draw(x, t, k, tr) { await onScreen(s, async () => { await SB.media.seekVideos(t); SB.scene.render(x, t, k, { noBg: tr }); }); },
       audio: () => onScreen(s, () => SB.media.mix(s.proj.duration)) };
   }
+  /** One job per action of screen s (a sprite sheet each: idle, walk, jump…), or null when it has none. */
+  function actionJobs(s) {
+    const vs = SB.actions ? Sc.with(s, () => SB.actions.variants(S.objects, S.project)) : []; if (!vs.length) return null;
+    return vs.map(v => ({ id: s.id + ':' + v.act.id, name: (Sc.many() ? s.name + ' ' : '') + v.act.name, act: true, screen: s, w: s.proj.w, h: s.proj.h, duration: v.dur,
+      async draw(x, t, k, tr) { await onScreen(s, () => SB.actions.during(v.rigId, v.act.id, async () => { await SB.media.seekVideos(t); SB.scene.render(x, t, k, { noBg: tr }); })); } }));
+  }
   /** Several screens in one picture, placed as on the board. Each plays its own timeline (and holds its last frame). */
   function combinedJob(list) {
     const b = U.emptyBox(); list.forEach(s => { U.growBox(b, s.x, s.y); U.growBox(b, s.x + s.proj.w, s.y + s.proj.h); });
@@ -284,6 +290,12 @@
     const items = fx.map(x => ({ label: x.replace(/ \((.*)\)$/, ': $1'), how: 'frames' })).concat(st.map(x => ({ label: x.replace(/ \((.*)\)$/, ': $1'), how: 'sprite' })));
     if (!items.length && !px.length) return null;
     return h('div', null, px.length ? h('p.hint.bake', null, h('b', null, 'Frame by frame: '), `${px.map(x => x.replace(/ \(pixel art screen\)$/, '')).join(', ')} (pixel art): one sharp picture a frame, so it keeps its pixel look.`) : null, fxWarnBox(items, who)); };
+  /** Older copies in the Unity project (a second Assets folder, an old place): Unity complains about the doubles. */
+  const strayBox = list => { const box = h('div.exp-stray', null, h('b', null, 'Extra copies from older exports'),
+    h('p.hint', null, 'These folders hold a second copy of the shared scripts or of this animation, so Unity reports doubles (like “Assembly with name StoryboardStudio.Editor already exists”). The ones just written are kept.'),
+    h('ul', null, list.map(x => h('li', null, h('code', null, x.path)))),
+    W.btn(`Remove ${list.length === 1 ? 'it' : 'them'}`, async () => { const n = await SB.gameLink.removeStrays(list); box.replaceChildren(h('p.hint', null, `${n} folder${n === 1 ? '' : 's'} removed. Unity reimports by itself.`)); }, { cls: 'sm', icon: 'trash' }));
+    return box; };
   const engineNote = (who, w) => w.length ? `Left out (${who} can’t show them): ${w.join(', ')}.` : '';
   async function unity(job, o, prog) {
     const groups = Sc.groupsOf(job.screens, S.project.name || 'Animation'); // screen groups: one prefab each
@@ -363,7 +375,7 @@
       const bakeLines = (list, who) => { const px = list.filter(x => / \(pixel art screen\)$/.test(x));
         return [px.length ? h('p.hint.bake', null, h('b', null, 'Frame by frame: '), `${px.map(x => x.replace(/ \(pixel art screen\)$/, '')).join(', ')} (pixel art). Each frame goes as one sharp picture, so it keeps its pixel look. Its layers can’t be moved one by one in ${who}.`) : null];
       };
-      const jobs = () => { const l = chosen(); if (ENGINE[o.kind]) return [Object.assign(screenJob(l[0]), { name: p.name, screens: l, engine: true })]; return l.length > 1 && o.combine && !BAKED[o.kind] ? [combinedJob(l)] : l.map(s => Object.assign(screenJob(s), { active: s === Sc.active(), screen: s })); };
+      const jobs = () => { const l = chosen(); if (ENGINE[o.kind]) return [Object.assign(screenJob(l[0]), { name: p.name, screens: l, engine: true })]; return l.length > 1 && o.combine && !BAKED[o.kind] ? [combinedJob(l)] : l.flatMap(s => (o.kind === 'sheet' && o.allActs !== false && actionJobs(s)) || [Object.assign(screenJob(s), { active: s === Sc.active(), screen: s })]); }; // a sprite sheet for each action
       const body = h('div.exp'), bar = h('div.bar', null, h('i')), status = h('p.hint'), prog = (f, msg) => { bar.firstChild.style.width = Math.round(U.clamp(f, 0, 1) * 100) + '%'; if (msg) status.textContent = msg; };
       const go = W.btn('Export', async () => {
         Object.assign(lastOpts, o); delete lastOpts.screens;
@@ -373,7 +385,7 @@
         bar.hidden = false; status.textContent = ''; body.replaceChildren(bar, status); go.hidden = true; cancel.textContent = 'Stop'; S.exporting = true; S.cancelExport = false; S.playing = false; SB.media.pauseAll();
         try {
           for (let j = 0; j < list.length; j++) {
-            const job = list[j], name = Sc.many() && !job.engine ? `${proj}-${U.slug(job.name)}` : proj, sub = (f, msg) => prog((j + f) / list.length, (sep ? `${job.name}: ` : '') + (msg || ''));
+            const job = list[j], name = (Sc.many() || job.act) && !job.engine ? `${proj}-${U.slug(job.name)}` : proj, sub = (f, msg) => prog((j + f) / list.length, (sep ? `${job.name}: ` : '') + (msg || ''));
             const back = BAKE_KINDS[o.kind] ? offApply(job.screens || (job.screen ? [job.screen] : [])) : null; let r; // effects hidden from this export stay out of it
             try { r = await RUN[o.kind](job, Object.assign({}, o, { base: name, transparent: o.kind === 'video' ? o.trV : o.trI }), sub); } finally { if (back) back(); }
             r.files.forEach(f => { f.name = f.name || `${name}.${f.ext}`; if (sep || r.zip) f.name = (sep && r.zip ? U.slug(job.name) + '/' : '') + f.name; files.push(f); });
@@ -383,7 +395,8 @@
           if (done) { // written into the project: nothing to download
             body.replaceChildren(h('div.exp-done', null, h('span.ok', { html: SB.icon('check') }), h('div', null, h('b', null, `Updated in ${o.kind === 'unity' ? 'Unity' : 'Godot'}: ${done.folder}`),
               h('p', null, `${done.wrote} file${done.wrote === 1 ? '' : 's'} written, ${done.kept} unchanged${done.removed ? `, ${done.removed} no longer needed removed` : ''}.`),
-              h('p.hint', null, o.kind === 'unity' ? 'Switch to Unity: it reimports them by itself. Your scenes keep their links to the prefab.' : 'Switch to Godot: it reimports them by itself. Scenes that use this one keep their links.'), note.trim() ? h('p.hint', null, note.trim()) : null, bakeNote(baked, o.kind, still))));
+              h('p.hint', null, o.kind === 'unity' ? 'Switch to Unity: it reimports them by itself. Your scenes keep their links to the prefab.' : 'Switch to Godot: it reimports them by itself. Scenes that use this one keep their links.'), note.trim() ? h('p.hint', null, note.trim()) : null, bakeNote(baked, o.kind, still),
+              done.strays && done.strays.length ? strayBox(done.strays) : null)));
             go.hidden = false; go.textContent = 'Update again'; return;
           }
           prog(1, 'Saving…');
@@ -448,7 +461,7 @@
           o.kind === 'rive' && SB.interact ? h('div.row', null, W.btn('Edit interactions', () => { const m = U.$('#modal'); if (m._close) m._close(); SB.interact.open(); }, { cls: 'sm', icon: 'target', title: 'Opens Interactive mode: cards, arrows, clicks and hovers' }), h('span.hint', null, SB.interact.summary())) : null,
           (() => { // rigs with actions: which animations come out
             if (!SB.actions) return null; Sc.sync(); const acts = chosen().flatMap(sc => SB.actions.variants(sc.objects, sc.proj).map(v => v.act.name)); if (!acts.length) return null;
-            return h('p.hint.exp-sub', null, engine || o.kind === 'rive' ? `Animations from the rig's actions: ${acts.join(', ')} (plus one per screen without actions).` : o.kind === 'blender' ? `One FBX per action: ${acts.join(', ')}.` : `This exports the action shown now; Unity, Godot, Blender and Rive export every action (${acts.join(', ')}).`);
+            return h('p.hint.exp-sub', null, engine || o.kind === 'rive' ? `Animations from the actions: ${acts.join(', ')} (plus one per screen without actions).` : o.kind === 'blender' ? `One FBX per action: ${acts.join(', ')}.` : o.kind === 'sheet' && o.allActs !== false && !(chosen().length > 1 && o.combine) ? `A sprite sheet for each action: ${acts.join(', ')}.` : `This exports the action shown now; sprite sheets, Unity, Godot, Blender and Rive export every action (${acts.join(', ')}).`);
           })(),
           (() => { // only when a chosen screen has something this format can't show
             const T = SB.targets, want = REQ[o.kind]; if (!T || !want) return null; Sc.sync();
@@ -466,7 +479,8 @@
           baked ? null : W.row('Size', W.select(o.scale, [[0.25, '25%'], [0.5, '50%'], [0.75, '75%'], [1, '100%'], [1.5, '150%'], [2, '200%']], v => { o.scale = +v; form(); })),
           baked || vec || isGif || o.ifmt === 'svg' ? null : video ? W.row('Quality', W.select(o.quality, [[0.07, 'Standard (smaller file)'], [0.14, 'High'], [0.25, 'Best']], v => o.quality = +v)) : F.lossy ? W.row('Quality', W.select(o.iq, [[0.6, 'Small file'], [0.85, 'High'], [0.95, 'Best']], v => o.iq = +v)) : null,
           o.kind === 'sheet' ? W.row('Columns', W.select(o.cols, [[0, 'Automatic'], [4, '4'], [8, '8'], [16, '16'], [1000, 'One row']], v => o.cols = +v)) : null,
-          o.kind === 'sheet' && o.ifmt !== 'svg' && SB.sheetEditor ? W.row('Layout', W.btn('Arrange frames…', () => SB.sheetEditor.open(j0, Object.assign({}, o, { transparent: o.trI })).then(() => form(true)), { cls: 'sm', icon: 'frames', title: 'Order, delete, name and group the frames; remove duplicates; keep every frame in the same cell when you export again' }), h('span.hint', null, SB.sheetEditor.has(j0) ? 'Your saved layout is used.' : 'Every frame, in order.')) : null,
+          o.kind === 'sheet' && !(chosen().length > 1 && o.combine) && chosen().some(s => SB.actions && Sc.with(s, () => SB.actions.variants(S.objects, S.project).length)) ? W.row('Actions', W.seg(o.allActs === false ? 'cur' : 'all', [['all', 'A sheet each', 'Every action of the screen gets its own sprite sheet file'], ['cur', 'Only the one shown', 'Only the action you are on']], v => { o.allActs = v === 'all'; form(true); })) : null,
+          o.kind === 'sheet' && o.ifmt !== 'svg' && SB.sheetEditor ? W.row('Layout', W.btn(list.length > 1 ? `Arrange frames (${list.length} animations)…` : 'Arrange frames…', () => SB.sheetEditor.open(list, Object.assign({}, o, { transparent: o.trI })).then(() => form(true)), { cls: 'sm', icon: 'frames', title: 'Order, delete, name and group the frames of each animation; remove duplicates; keep every frame in the same cell when you export again' }), h('span.hint', null, (() => { const k = list.filter(j => SB.sheetEditor.has(j)).length; return k ? (list.length > 1 ? `Saved layouts: ${k} of ${list.length}.` : 'Your saved layout is used.') : list.length > 1 ? `${list.length} files, every frame in order.` : 'Every frame, in order.'; })())) : null,
           o.kind === 'sheet' ? W.row('', W.check(o.json, 'Include the JSON data file (Phaser, PixiJS…)', v => o.json = v)) : null,
           h('p.hint', null, `${dims}. ${F.info}${video && !caps.webcodecs ? ' This browser has no video encoder: the animation is recorded while it plays (MP4 or WebM only).' : ''}`)].filter(Boolean));
         if (wasOpen) { const d = body.querySelector('details.msel'); if (d) d.open = true; }

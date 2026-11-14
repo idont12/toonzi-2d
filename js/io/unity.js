@@ -879,7 +879,7 @@ public class StoryboardController : MonoBehaviour
     // the rig helper, only when something bends
     const skinned = objs.some(o => o.nd && o.nd.skin);
     const ctrls = objs.some(o => o.ctrlComp);
-    if (skinned || ctrls) await shared(SHARED, null, META.folder);
+    if (skinned || ctrls || objs.some(o => o.ptc)) await shared(SHARED, null, META.folder); // one folder for the shared scripts, whatever the export
     if (skinned) {
       await shared(SHARED + '/Editor', null, META.folder);
       await shared(SHARED + '/Editor/StoryboardRigSetup.cs', RIG_CS, META.script);

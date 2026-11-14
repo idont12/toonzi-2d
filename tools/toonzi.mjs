@@ -107,11 +107,11 @@ function editorPage(txt) {
   let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const inl = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
   const dataUri = f => `data:${f.endsWith('.svg') ? 'image/svg+xml' : f.endsWith('.png') ? 'image/png' : 'application/octet-stream'};base64,${fs.readFileSync(path.join(ROOT, f)).toString('base64')}`;
-  html = html.replace(/<link rel="stylesheet" href="([^"]+)">/g, (m, f) => `<style>\n${inl(f)}\n</style>`);
+  html = html.replace(/<link rel="stylesheet" href="([^"?]+)(\?[^"]*)?">/g, (m, f) => /^https?:/.test(f) ? m : `<style>\n${inl(f)}\n</style>`); // (?v=N: the version, so browsers load each update fresh)
   html = html.replace(/(src|href)="(assets\/[^"]+)"/g, (m, a, f) => fs.existsSync(path.join(ROOT, f)) ? `${a}="${dataUri(f)}"` : m);
   const open = `<script>window.TOONZI_OPEN = ${JSON.stringify(JSON.parse(txt)).replace(/</g, '\\u003c')};</script>\n`;
   let first = true;
-  html = html.replace(/<script src="([^"]+)"><\/script>/g, (m, f) => { if (/^https?:/.test(f) || !fs.existsSync(path.join(ROOT, f))) return m; const s = `${first ? open : ''}<script>/* ${f} */\n${inl(f).replace(/<\/script/gi, '<\\/script')}\n</script>`; first = false; return s; });
+  html = html.replace(/<script src="([^"?]+)(?:\?[^"]*)?"><\/script>/g, (m, f) => { if (/^https?:/.test(f) || !fs.existsSync(path.join(ROOT, f))) return m; const s = `${first ? open : ''}<script>/* ${f} */\n${inl(f).replace(/<\/script/gi, '<\\/script')}\n</script>`; first = false; return s; });
   return html.replace('</head>', `<base href="${BASE}">\n</head>`); // pictures and tutorials the page asks for later come from the public copy
 }
 

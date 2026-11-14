@@ -4,4 +4,4 @@ Instructions for AI assistants (making animations with this app, running or copy
 
 @AGENTS.md
 
-Working on the app itself: plain HTML/CSS/JS with no build step (`index.html` lists every script in load order; each file in `js/` starts with a comment explaining it). Serve the folder (`node tools/toonzi.mjs serve`) and open `index.html?nostart`. Record each round of changes in `CHANGELOG.md`.
+Working on the app itself: plain HTML/CSS/JS with no build step (`index.html` lists every script in load order; each file in `js/` starts with a comment explaining it). Serve the folder (`node tools/toonzi.mjs serve`) and open `index.html?nostart`. Record each round of changes in `CHANGELOG.md`, and raise the `?v=` number on the script and stylesheet links in `index.html` (all the same number) so browsers load the new files instead of old cached ones.
