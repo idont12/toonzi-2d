@@ -181,6 +181,7 @@ Think like an animator, then pick the simplest tool that does the job. Things th
 | a retro, blocky look | a **pixel art** screen (`project.pixel`) with `pixels` layers; 12 fps; moves in whole pixels feel right |
 | a title that pops in, a label that types out | text with an in effect (`popIn`, `typewriter`) |
 | a scene cut, a second camera | a shot (group with `seq`) or another screen |
+| a mouth or anything that should move with a voice or music | draw the mouth shapes as frames (Hold); then the person uses **Lip sync** in the editor (or a controller's **Move with sound**) on the audio layer: both make keyframes from the sound |
 | the same character or scene doing different things (idle, walk, jump; happy, sad) | **actions** on the screen (`project.actions`): one set of layers, one set of keyframes per action |
 
 **When to split into separate frames (frame by frame)**

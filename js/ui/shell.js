@@ -82,6 +82,7 @@
   // ---------- tool rail
   const ADD = [
     { icon: 'draw', label: 'Drawing', tip: 'New drawing layer', run: () => SB.add.drawing() },
+    { icon: 'pixlayer', label: 'Pixel art', tip: 'New pixel art layer (paint it with the Pixel brush)', run: () => SB.add.pixels() },
     { icon: 'text', label: 'Text', tip: 'Add text (T)', run: () => SB.add.text() },
     { icon: 'shape', label: 'Shape', tip: 'Add a shape', run: b => SB.add.shapeMenu(b) },
     { icon: 'particles', label: 'Particles', tip: 'Add particles: fire, smoke, snow, confetti, sparkles…', run: b => SB.add.particlesMenu(b) },
@@ -93,11 +94,11 @@
       Tool groups work like Illustrator: one button shows one tool of its group; right-click or press and hold it to pick another
       tool of the group, which then shows in the bar (S.railActive). */
   const RAIL_PRESETS = {
-    studio: { label: 'Toonzi 2D (default)', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:pixel', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:text', 'add:shape', 'add:particles', 'add:import'], group: { 'tool:points': 'tool:pen', 'tool:fillbrush': 'tool:brush', 'tool:gradient': 'tool:fill', 'tool:width': 'tool:smooth', 'tool:pull': 'tool:smooth' } },
+    studio: { label: 'Toonzi 2D (default)', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:pixel', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:pixlayer', 'add:text', 'add:shape', 'add:particles', 'add:import'], group: { 'tool:points': 'tool:pen', 'tool:fillbrush': 'tool:brush', 'tool:gradient': 'tool:fill', 'tool:width': 'tool:smooth', 'tool:pull': 'tool:smooth' } },
     flash: { label: 'Adobe Animate (Flash)', order: ['tool:select', 'tool:points', 'tool:pen', 'tool:brush', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:eraser', 'tool:bone', 'tool:hand', 'sep', 'add:text', 'add:shape', 'add:import'], group: {} },
     photoshop: { label: 'Photoshop', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:smooth', 'tool:pull', 'tool:pen', 'tool:points', 'tool:hand', 'sep', 'add:text', 'add:shape', 'add:import'], group: { 'tool:points': 'tool:pen', 'tool:smooth': 'tool:brush', 'tool:pull': 'tool:brush' } },
-    opentoonz: { label: 'OpenToonz', order: ['tool:select', 'tool:brush', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:eraser', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:cut', 'tool:bone', 'tool:hand', 'sep', 'add:draw', 'add:text'], group: {} },
-    all: { label: 'Every tool', order: ['tool:select', 'tool:points', 'tool:brush', 'tool:pen', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:pixel', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:text', 'add:shape', 'add:particles', 'add:import'], group: {} },
+    opentoonz: { label: 'OpenToonz', order: ['tool:select', 'tool:brush', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:eraser', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:pen', 'tool:points', 'tool:cut', 'tool:bone', 'tool:hand', 'sep', 'add:draw', 'add:pixlayer', 'add:text'], group: {} },
+    all: { label: 'Every tool', order: ['tool:select', 'tool:points', 'tool:brush', 'tool:pen', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:pixel', 'tool:gradient', 'tool:smooth', 'tool:width', 'tool:pull', 'tool:hand', 'tool:cut', 'tool:screen', 'tool:bone', 'sep', 'add:draw', 'add:pixlayer', 'add:text', 'add:shape', 'add:particles', 'add:import'], group: {} },
     simple: { label: 'Simple', order: ['tool:select', 'tool:brush', 'tool:eraser', 'tool:fill', 'tool:fillbrush', 'tool:gradient', 'tool:hand', 'sep', 'add:text', 'add:shape'], group: {} },
   };
   const railCustom = id => (S.railCustom || []).find(c => 'c:' + c.id === id);
@@ -118,7 +119,7 @@
     return { order, hidden, group };
   }
   const DEFAULT_GROUPS = { 'tool:points': 'tool:pen' };
-  const NEW_TOOLS = { 'tool:fillbrush': 'tool:fill', 'tool:gradient': 'tool:fillbrush', 'tool:pixel': 'tool:fillbrush', 'add:particles': 'add:shape' }; // new tool → the tool it goes after
+  const NEW_TOOLS = { 'tool:fillbrush': 'tool:fill', 'tool:gradient': 'tool:fillbrush', 'tool:pixel': 'tool:fillbrush', 'add:particles': 'add:shape', 'add:pixlayer': 'add:draw' }; // new tool → the tool it goes after
   const groups = () => railCfg().group;
   function railItems() {
     const all = new Map(), cfg = railCfg();
@@ -321,6 +322,8 @@
   // ---------- adding things
   SB.add = {
     drawing() { const o = tree.make('draw'); o._fresh = true; tree.add(o); SB.tool.set('brush'); },
+    /** A new Pixel art layer on top (several are fine: each is its own layer), then the Pixel brush. */
+    pixels() { if (!SB.pixel || !SB.pixel.addLayer) return; SB.pixel.addLayer(); SB.commit(); SB.tool.set('pixel'); },
     text() { const o = tree.add(tree.make('text')); SB.tool.set('select'); setTimeout(() => SB.textEdit.start(o), 40); },
     shape(kind) {
       const p = S.project, base = Math.min(p.w, p.h), dims = { ellipse: [0.32, 0.32], star: [0.36, 0.36], arrow: [0.42, 0.2], bubble: [0.5, 0.36], line: [0.4, 0.02], triangle: [0.34, 0.3] }[kind] || [0.42, 0.28];
@@ -424,7 +427,7 @@
       You pick one (Settings › Appearance, or the bar's ⋯; S.tbarLayout) and it stays the same whatever the format. Your changes are kept
       per layout (S.tbarEdits); layouts of your own are saved in S.tbarCustom ('c:<id>'). */
   const TB_PRESETS = {
-    studio: { label: 'Toonzi 2D (default)', order: ['start', 'prevkey', 'prevframe', 'play', 'nextkey', 'nextframe', 'loop', 'time', 'action', 'sep:a', 'onion', 'frames', 'framelock', 'sep:b', 'mic', 'rec', 'interactive', 'space:a', 'key', 'blankkey', 'autokey', 'keysnap', 'zoom'], group: { prevframe: 'prevkey', nextframe: 'nextkey', framelock: 'frames', mic: 'rec', keysnap: 'autokey' } },
+    studio: { label: 'Toonzi 2D (default)', order: ['start', 'prevkey', 'prevframe', 'play', 'nextkey', 'nextframe', 'loop', 'time', 'action', 'sep:a', 'onion', 'frames', 'framelock', 'filter', 'sep:b', 'mic', 'rec', 'interactive', 'space:a', 'key', 'blankkey', 'autokey', 'keysnap', 'zoom'], group: { prevframe: 'prevkey', nextframe: 'nextkey', framelock: 'frames', mic: 'rec', keysnap: 'autokey' } },
     opentoonz: { label: 'OpenToonz', order: ['start', 'prevkey', 'prevframe', 'play', 'nextframe', 'nextkey', 'loop', 'time', 'action', 'sep:a', 'onion', 'frames', 'framelock', 'sep:b', 'mic', 'rec', 'interactive', 'space:a', 'key', 'blankkey', 'autokey', 'zoom'], group: {} },
     flash: { label: 'Adobe Animate (Flash)', order: ['start', 'prevframe', 'play', 'nextframe', 'loop', 'time', 'action', 'sep:a', 'onion', 'frames', 'framelock', 'sep:b', 'key', 'blankkey', 'prevkey', 'nextkey', 'autokey', 'interactive', 'space:a', 'zoom'], group: {} },
     premiere: { label: 'Adobe Premiere Pro', order: ['start', 'prevframe', 'play', 'nextframe', 'loop', 'time', 'sep:a', 'split', 'shot', 'sep:b', 'prevkey', 'key', 'nextkey', 'keysnap', 'interactive', 'space:a', 'rows', 'filter', 'zoom'], group: {} },

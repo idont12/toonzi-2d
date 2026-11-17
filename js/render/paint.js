@@ -54,5 +54,11 @@
     if (!sa || !sb) return u < 0.5 ? a : b;
     const A = split(a), B = split(b), rgb = U.hexRgb(A.hex).map((v, i) => U.lerp(v, U.hexRgb(B.hex)[i], u)); return withAlpha(U.rgbHex(...rgb), U.lerp(A.a, B.a, u));
   }
-  SB.paint = { kind, parse, grad, geom, tex, solid, alpha, split, withAlpha, style, mix };
+  /** The same paint mirrored left–right (axis 'h') or upside down ('v'): a gradient's direction and middle flip with the shape. */
+  function mirror(v, axis) {
+    const p = parse(v); if (p.kind !== 'grad') return v;
+    const angle = axis === 'h' ? 180 - p.angle : -p.angle, geo = { cx: axis === 'h' ? 1 - p.cx : p.cx, cy: axis === 'v' ? 1 - p.cy : p.cy, len: p.len };
+    return grad(p.type, ((angle % 360) + 360) % 360, p.stops, geo);
+  }
+  SB.paint = { kind, parse, grad, geom, tex, solid, alpha, split, withAlpha, style, mix, mirror };
 })(window.SB);

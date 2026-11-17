@@ -351,7 +351,7 @@
       <ul>
         <li><strong>Auto key</strong> (a timeline button) makes keyframes for you whenever you change something. Turn it off again so nothing changes by accident.</li>
         <li><strong>Record motion</strong> (<kbd>R</kbd>) records while it plays: drag a layer, a bone or a controller and your movement becomes keys.</li>
-        <li><strong>Animation rows:</strong> right-click a layer › <em>Animate › Show animation rows</em> (or the <strong>Animation rows</strong> button) to see a row for each property with its own keys. <strong>Animated only</strong> hides the others.</li>
+        <li><strong>Animation rows:</strong> right-click a layer › <em>Animate › Show animation rows</em> (or the <strong>Animation rows</strong> button) to see a row for each property with its own keys. <strong>Animated only</strong> (the filter button in the timeline bar, next to the frame view buttons) hides the others.</li>
         <li><kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Alt</kbd>+<kbd>→</kbd> jump to the previous and next keyframe. <strong>Snap to keys</strong> (<kbd>Alt</kbd>+<kbd>K</kbd>) makes the playhead stick to keys.</li>
         <li>Right-click a layer › <em>Loop keyframes</em> repeats its motion. <em>Animate › Clean up keyframes</em> and <em>Remove all keyframes</em> tidy up.</li>
       </ul>
@@ -410,6 +410,7 @@
       <ul>
         <li>Each row has an <strong>eye</strong> (show or hide, or mute for audio) and a <strong>lock</strong>. Drag a row's name to reorder it or drop it into a group.</li>
         <li><strong>Right-click a layer</strong> for its menu: <em>Rename, Layer color…, Duplicate, Copy, Delete, Group layers, Make a shot, Arrange, Flip, Order, Animate, Effects, Mask, Rig, Physics…</em> and <em>Hide</em> / <em>Lock</em>. <em>Show only this in the timeline</em> hides every other row.</li>
+        <li><strong>Flip</strong> (left–right or upside down) flips a drawing's or pixel art's own lines and squares in place, in every frame, so its box stays a normal box and resizing works as usual; other layers flip by their size. A turned layer flips level on the screen (its turn goes the other way).</li>
         <li><strong>Group</strong> (<kbd>Ctrl</kbd>+<kbd>G</kbd>) puts layers together to move, scale and animate as one. <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd> ungroups.</li>
         <li><strong>Arrange</strong> (with two or more layers): Align left, centers, right, tops, middles, bottoms; Spread across or down evenly; Bring to front, Bring forward, Send backward, Send to back.</li>
         <li><strong>Combine into one drawing</strong> (<kbd>Ctrl</kbd>+<kbd>E</kbd>) merges drawings; <em>Split back into layers</em> undoes it.</li>
@@ -417,7 +418,7 @@
         <li><strong>Video and audio:</strong> import a file and it is a clip you trim and cut. Right-click a video › <em>Split sound into its own layer</em>, and <em>Hold this frame</em> to freeze it.</li>
       </ul>
       <h3>Shots</h3>
-      <p>A <strong>shot</strong> is a group with its own time. Select layers and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (<strong>Make shot</strong>). Move and trim it like a clip, <strong>double-click</strong> it to open and edit inside, and <kbd>Esc</kbd> goes back. Right-click a shot › <em>Shot</em> for <em>Fit to its layers</em> and <em>Line up all shots end to end</em>. Shots are good for building a film out of scenes.</p>
+      <p>A <strong>shot</strong> is a group with its own time. Select layers and press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (<strong>Make shot</strong>). Move and trim it like a clip, <strong>double-click</strong> it to open and edit inside, and <kbd>Esc</kbd> (or <strong>Main timeline</strong>) goes back, to the same zoom and scroll you had. Inside, the shot's bar stays at the top while you scroll; its <strong>Fit shot</strong> trims the shot to the time its layers cover. Right-click a shot › <em>Shot</em> for <em>Fit to its layers</em> and <em>Line up all shots end to end</em>. Shots are good for building a film out of scenes.</p>
       <h3>Saved objects</h3>
       <p>Right-click layers › <em>Saved objects › Save as a saved object</em> (a rig brings along every layer that bends with it). Place copies in any screen from logo menu › <strong>Saved objects…</strong>. Edit the saved original once (the pencil), choose <em>Save and update everywhere</em>, and every copy updates. Each copy keeps its own animation.</p>
     </section>
@@ -451,10 +452,11 @@
         <tbody>
           <tr><td>Transitions in</td><td>Fade in, Pop in, Slide in, Zoom in, Wipe in, Blur in, Spin in, Draw on, Typewriter</td></tr>
           <tr><td>Transitions out</td><td>Fade out, Pop out, Slide out, Zoom out, Wipe out, Blur out, Spin out, Draw off, Break apart</td></tr>
-          <tr><td>Animated effects</td><td>Shake, Hand-drawn boil, Wave, Wobble, Float, Pulse, Jelly, Spin, Swing, Blink, Rainbow, Marching dashes, Draw loop</td></tr>
+          <tr><td>Animated effects</td><td>Shake, Hand-drawn boil, Wave, Wobble, Float, Pulse, Jelly, Spin, Swing, Blink, Rainbow, Marching dashes (also on lines with thin ends), Draw loop</td></tr>
           <tr><td>Looks</td><td>Glow, Blur, Directional blur, Black &amp; white, Drop shadow, Outline, Inner shadow, Change color, Duplicate (grid)</td></tr>
         </tbody>
       </table></div>
+      <p><strong>Timing:</strong> open a layer's rows (the triangle by its name) to see <em>Effect timing</em>: drag a transition's bar anywhere on the layer's clip, also onto a piece of a cut clip further along, and drag its ends to change the length. Move the playhead through it to watch its progress (with any tool; while you draw a stroke, effects that move the layer pause so the stroke lands where you draw).</p>
       <h3>Make your own</h3>
       <ul>
         <li><strong>Design an effect</strong> / <strong>Design a transition</strong> (buttons in the panel, or <em>Settings › Effects</em> and <em>Settings › Transitions</em>) build one without code. An effect is a list of changes (move, scale, turn, fade, blur, colors, glow, shadow) and how each happens. A transition has its own small timeline where you animate the layer, and can mask it, cut holes in it or break it into pieces. Designed effects show with a ✦ and transitions with a ★, saved in the project.</li>
@@ -503,6 +505,8 @@
         <li><strong>Softness</strong> (on a layer that bends with a rig) makes the bend rounder. <strong>Smooth bend</strong> (on by default, off in Game Engine projects since Unity and Godot blend the simple way) keeps a bent part round and full instead of pinched or lumpy at the joint. <strong>Rebind at this pose</strong> re-attaches it where it is. <strong>Also bend with…</strong> adds a second rig.</li>
       </ul>
 
+      <h3>Locking a rig</h3>
+      <p>Lock the rig layer (the padlock on its row in the layer list) and nothing moves it: its bones can't be posed, dragged or changed, also through layers attached to it. To keep posing but protect the bones themselves, use <strong>Lock the setup</strong> in the rig's panel (or <em>Lock setup</em> in the bar above the stage): the bones can still be posed and keyframed, but not moved, added or changed.</p>
       <h3>Rig lock</h3>
       <p>A layer attached to a rig has a <strong>Rig lock</strong> button in the panel. When it is on, the rig moves the layer, so you can't move, turn or scale it by accident, and dragging it on the stage poses the bones instead. You can still select it, draw on it and add effects. Turn it off to place the layer again, then <em>Keep it here</em> or <em>Rebind</em>. The rig itself also has <strong>Lock the rig</strong> / <strong>Unlock the rig</strong>: a locked rig's bones can still be posed and keyframed but not moved, added or changed.</p>
 
@@ -530,6 +534,12 @@
       <p>In the timeline, a value a controller sets gets a yellow <strong>!</strong> and a striped row: keyframes there do nothing, because the controller decides it. That is every driven value on an <em>Exact</em> link, and colors, frames and switches on an <em>On top</em> link (On top adds to numbers, so their keys still count).</p>
       <p><strong>Eyes follow a controller…</strong> does the whole setup for pupils in two clicks. Dragging the knob moves the knob; dragging the box's dashed edge moves the whole controller. <em>Reset controller</em> puts it back at rest.</p>
 
+      <h3>Frame switch</h3>
+      <p>A drawing (or pixel art) layer with several frames, playing in <strong>Hold</strong>: right-click it › <em>Controller › Make a frame switch controller</em>, or press the controller button in its frames bar. You get a knob with one point per frame: drag it, key it or drive it from an interaction to pick the frame (mouths, hands, eyes, poses). Added more frames later? Its panel offers <strong>Update</strong>.</p>
+      <h3>Move with sound</h3>
+      <p>Select a controller and open <strong>Move with sound</strong> in its panel. Pick the <strong>Sound</strong> (an audio or video layer, or all sound), what it <strong>Follows</strong> (<em>Bass</em>: the beat; <em>Melody</em>: voices and instruments; <em>Highs</em>: cymbals and hiss; <em>Volume</em>: everything), where it rests when it is quiet (<strong>From</strong>) and where it goes when it is loud (<strong>To</strong>), then <strong>Strength</strong>, <strong>Smooth</strong> and <strong>Ignore below</strong> (quiet parts stay put). <strong>Make keyframes</strong> listens to the sound (here, nothing is uploaded) and keys the controller, so everything it moves dances with it, in videos, Unity and Godot too. Change a setting and make them again: it replaces its own keys where the sound plays.</p>
+      <h3>Lip sync</h3>
+      <p>A mouth drawn as frames (or a toggle or frame switch controller with a point per mouth): its panel has <strong>Lip sync</strong>. Give each frame or point the mouth shape it shows (Rest, M B P, A I, E, O, U W Q, F V, L Th, C D G K N S T…), pick the <strong>Voice</strong> and press <strong>Make lip sync keyframes</strong>: the mouth gets a held keyframe at each change. It listens to how loud the voice is and where its sound sits (no words are recognized), so it gets the rhythm and the open, round and closed moments right; fix single keys by hand where you want. <strong>Detail</strong>: low uses a few shapes and holds them longer, high uses all of them and switches more often. Shapes you didn't draw use the nearest one you have.</p>
       <h3>Constraints</h3>
       <p>A constraint makes a layer follow something else. Right-click the layer › <strong>Controller › Follow</strong>, then choose a type and <strong>Pick a target on the stage</strong> (a layer, a controller, or a bone of a rig):</p>
       <dl class="kv">
@@ -590,7 +600,7 @@
       <p>Any screen can be pixel art: it is drawn at a small size and shown big with no smoothing, so everything on it (shapes, text, drawings, particles) becomes pixels on one grid, on the stage and in every export.</p>
       <ol class="steps">
         <li>Click an empty part of the stage. In the panel, <strong>Pixel art</strong> › turn on <strong>This screen is pixel art</strong> and pick the <strong>Size</strong> (pixels across, from 32 to 640).</li>
-        <li>Pick the <strong>Pixel brush</strong> (<kbd>Shift</kbd>+<kbd>B</kbd>). It paints squares on the grid of a Pixel art layer (made for you when you start). Set its <strong>Size</strong> in pixels.</li>
+        <li>Pick the <strong>Pixel brush</strong> (<kbd>Shift</kbd>+<kbd>B</kbd>). It paints squares on the grid of a Pixel art layer (made for you when you start). Set its <strong>Size</strong> in pixels. For more pixel art layers (a background, a character, a foreground), press <strong>Pixel art</strong> under <em>Drawing</em> in the tool bar: each press adds a new one. Inside an open shot, new layers go into the shot.</li>
         <li>For a size of your own, type <strong>Pixels across</strong> (8 to 1024), or <strong>Each pixel</strong>: how many screen px one pixel is (the pixel ratio, for example 8 on a 1280 wide screen = 160 pixels across).</li>
         <li><strong>Draw</strong>, <strong>Erase</strong>, or <strong>Fill</strong> (the joined squares of one color, or an empty area). <kbd>Alt</kbd>-click picks a color. The Eraser tool erases squares too.</li>
         <li>Animate it frame by frame like a drawing: the frame library, onion skin and Auto key all work.</li>

@@ -64,7 +64,7 @@
     const sp = S.selPart && tree.find(S.selPart.id); if (sp && sp.id === S.sel && sp.parts && sp.parts[S.selPart.i]) return ops.removePart(sp, S.selPart.i);
     if (S.tool === 'points' && S.selPts.length && SB.pathEdit.deletePts()) return;
     if (S.tool === 'points' && S.selStrokes.size) return SB.tools.get('points').edit('delete');
-    const o = sel(); if (o && o.type === 'rig' && S.selBone && S.tool === 'bone' && !tree.locked(o)) { const sn = SB.rig.editSnap(o); SB.rig.deleteBoneOnly(o, S.selBone); SB.rig.keepAttached(sn); return SB.commit(); } // like Blender: its children stay
+    const o = sel(); if (o && o.type === 'rig' && S.selBone && S.tool === 'bone' && !tree.locked(o) && !o.setupLock) { const sn = SB.rig.editSnap(o); SB.rig.deleteBoneOnly(o, S.selBone); SB.rig.keepAttached(sn); return SB.commit(); } // like Blender: its children stay
     if (sel()) return ops.remove();
     if (SB.board && SB.board.screenSelected()) SB.board.remove(SB.screens.active()); // a selected screen (its name was clicked)
   }

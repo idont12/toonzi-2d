@@ -56,12 +56,16 @@
   function target(P, create) {
     let o = tree.sel(); if (ok(o)) return o;
     if (P) { const hit = scene.hit(P); if (ok(hit)) { tree.select([hit.id]); return hit; } }
-    const any = tree.all().find(x => ok(x) && tree.inRange(x)); if (any) { tree.select([any.id]); return any; } // keep painting on the screen's pixel art layer
+    const any = tree.all(tree.rootList()).find(x => ok(x) && tree.inRange(x)); if (any) { tree.select([any.id]); return any; } // keep painting on the screen's (or the open shot's) pixel art layer
     if (!create) return null;
-    const n = tree.all().filter(x => x.type === 'pixels').length + 1;
-    o = tree.make('pixels', { name: 'Pixel art ' + n, x: 0, y: 0, ax: 0, ay: 0, cs: PX.size().cs, frames: [{ strokes: [], px: {} }] });
-    S.objects.unshift(o); tree.reindex(); tree.select([o.id]); return o;
+    return PX.addLayer();
   }
+  /** A new Pixel art layer on top (in the shot that is open, or the main timeline), its squares on the screen's grid. */
+  PX.addLayer = () => {
+    const q = tree.ctx(), c = q ? X.world(q).inverse().transformPoint(U.pt(0, 0)) : { x: 0, y: 0 }, n = tree.all().filter(x => x.type === 'pixels').length + 1;
+    const o = tree.make('pixels', { name: 'Pixel art ' + n, x: U.r1(c.x), y: U.r1(c.y), ax: 0, ay: 0, cs: PX.size().cs, frames: [{ strokes: [], px: {} }] });
+    tree.rootList().unshift(o); tree.reindex(); tree.select([o.id]); return o;
+  };
   /** Square under stage point P in o's grid. */
   const cellAt = (o, P) => { const l = X.world(o).inverse().transformPoint(U.pt(P.x, P.y)), cs = o.cs || 1; return [Math.floor(l.x / cs), Math.floor(l.y / cs)]; };
   const brush = () => U.clamp(Math.round(S.pxSize || 1), 1, 32);

@@ -122,16 +122,23 @@
 
   /** Dashed and sketchy lines with changing width (pen pressure, thin ends, the Width tool): drawn in short pieces,
       each as wide as the line is there, so they keep their look (a filled outline would lose it). */
-  function varStroke(c, p, s, col, wp) {
+  /** The moving dashes on a line, if any: the Marching dashes effect (opt.dash) or a brush's Marching dashes animation.
+      { arr, off }: the dash pattern and how far it has run. */
+  function dashSpec(s, dash, an, Tl) {
+    if (dash && !s.er) { const a = Math.max(0.2, dash.amt); return { arr: [s.s * 2.2 * a, s.s * 1.6 * a], off: -dash.T * s.s * 6 }; }
+    if (an && an.k === 'march') { const a = 0.4 + (an.a ?? 0.5); return { arr: [s.s * 2 * a, s.s * 1.6 * a], off: -Tl * (an.sp ?? 1) * s.s * 8 }; }
+    return null;
+  }
+  function varStroke(c, p, s, col, wp, ds) {
     const n = p.length / 2; if (n < 2) return; const bs = s.bs || {}, ts = bs.ts || 0, te = bs.te || 0, arc = [0];
     for (let i = 1; i < n; i++) arc.push(arc[i - 1] + Math.hypot(p[i * 2] - p[i * 2 - 2], p[i * 2 + 1] - p[i * 2 - 1]));
     const L = arc[n - 1] || 1, K = arc.map(d => { const u = d / L; let k = 1; if (ts) k = Math.min(k, Math.pow(Math.min(1, u / ts), 0.6)); if (te) k = Math.min(k, Math.pow(Math.min(1, (1 - u) / te), 0.6)); if (wp) k *= G.prof(wp, u); return Math.max(0.04, k); });
     const rough = s.tx === 'rough', lines = rough ? [0, 1].map(k => G.jitter(p, { amp: Math.max(1, s.s * 0.35), step: k * 7 + 1, seed: 11 + k })) : [p], wk = rough ? 0.5 : 1;
-    c.strokeStyle = col; c.lineCap = 'round'; c.lineJoin = 'round'; if (s.tx === 'dashed') c.setLineDash(dashOf(s));
+    c.strokeStyle = col; c.lineCap = 'round'; c.lineJoin = 'round'; if (ds) c.setLineDash(ds.arr); else if (s.tx === 'dashed') c.setLineDash(dashOf(s));
     for (const q of lines) for (let i = 0; i < n - 1; ) {
       let j = i + 1; while (j < n - 1 && arc[j] - arc[i] < Math.max(2, s.s * 0.5) && Math.abs(K[j] - K[i]) < 0.08) j++;
       c.beginPath(); c.moveTo(q[i * 2], q[i * 2 + 1]); for (let m = i + 1; m <= j; m++) c.lineTo(q[m * 2], q[m * 2 + 1]);
-      c.lineWidth = s.s * wk * (K[i] + K[j]) / 2; if (s.tx === 'dashed') c.lineDashOffset = arc[i]; c.stroke(); i = j;
+      c.lineWidth = s.s * wk * (K[i] + K[j]) / 2; if (ds) c.lineDashOffset = arc[i] + ds.off; else if (s.tx === 'dashed') c.lineDashOffset = arc[i]; c.stroke(); i = j; // (each piece goes on with the pattern where the last one stopped)
     }
     c.setLineDash([]);
   }
@@ -168,7 +175,7 @@
       else { c.strokeStyle = col; if (bs.op != null && bs.op < 1) c.globalAlpha *= bs.op; }
       c.lineWidth = s.s;
       if (img && BT().drawLine(c, s, plain(col, s), p, wp, Tl, an)) { c.restore(); continue; }
-      if (taper && !s.er) { if (s.tx === 'dashed' || s.tx === 'rough') varStroke(c, p, s, col, wp); else taperFill(c, p, s, col, wp); c.restore(); continue; }
+      if (taper && !s.er) { const ds = dashSpec(s, dash, an, Tl); if (ds || s.tx === 'dashed' || s.tx === 'rough') varStroke(c, p, s, col, wp, ds); else taperFill(c, p, s, col, wp); c.restore(); continue; } // thin ends with moving dashes: in pieces (a filled outline can't be dashed)
       pathOf(c, p || s.pts);
       if (an && !dash) BT().march(c, s, Tl, an);
       if (dash && !s.er) { const a = Math.max(0.2, dash.amt); c.setLineDash([s.s * 2.2 * a, s.s * 1.6 * a]); c.lineDashOffset = -dash.T * s.s * 6; }
@@ -202,7 +209,8 @@
         for (const [li, L] of lines.entries()) { let wp = wps ? (s.subs[li] || {}).wp : null; if (an && an.k === 'pulse') wp = BT().pulse(wp, an, Tl);
           let p = G.densify(L, Math.max(2, s.s * 0.6)); if (!trimmed) { if (bs.jit) p = G.jitter(p, { amp: Math.max(0.5, s.s * bs.jit), step: 0, seed: 7 }); if (boil) p = G.jitter(p, boil); if (map) p = G.mapList(p, map); } if (an) p = BT().animate(p, s, Tl, an);
           if (img && BT().drawLine(c, s, plain(col, s), p, wp, Tl, an)) continue;
-          if (bs.ts || bs.te || wp) { if (s.tx === 'dashed' || s.tx === 'rough') varStroke(c, p, s, col, wp); else taperFill(c, p, s, col, wp); } else { c.beginPath(); polyPath(c, p, false); if (an) BT().march(c, s, Tl, an); (TEXTURES[s.tx] || TEXTURES.solid).draw(c, s, col, () => c.stroke()); }
+          const ds = dashSpec(s, dash, an, Tl);
+          if (bs.ts || bs.te || wp) { if (ds || s.tx === 'dashed' || s.tx === 'rough') varStroke(c, p, s, col, wp, ds); else taperFill(c, p, s, col, wp); } else { c.beginPath(); polyPath(c, p, false); if (ds) { c.setLineDash(ds.arr); c.lineDashOffset = ds.off; } (TEXTURES[s.tx] || TEXTURES.solid).draw(c, s, col, () => c.stroke()); }
         }
         c.restore(); return budget;
       }

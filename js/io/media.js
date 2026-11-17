@@ -114,12 +114,14 @@
         if (Math.abs(el.currentTime - target) > 0.0005 || el.readyState < 2) await seekEl(el, target);
       }
     },
-    /** Mix all audible audio and video sound into one buffer (for export). */
-    async mix(duration) {
-      const items = tree.all().filter(o => (o.type === 'audio' || o.type === 'video') && !tree.hidden(o) && (o.volume ?? 1) > 0 && files[o.mediaId]);
+    /** Mix all audible audio and video sound into one buffer (for export). opt.only: just these layers, at full volume
+        (even hidden or muted: the sound a controller or lip sync listens to); opt.sr, opt.ch: sample rate and channels. */
+    async mix(duration, opt = {}) {
+      const only = opt.only && opt.only.filter(Boolean);
+      const items = only ? only.filter(o => (o.type === 'audio' || o.type === 'video') && files[o.mediaId]) : tree.all().filter(o => (o.type === 'audio' || o.type === 'video') && !tree.hidden(o) && (o.volume ?? 1) > 0 && files[o.mediaId]);
       const ready = []; for (const o of items) { try { await M.decode(files[o.mediaId]); ready.push(o); } catch (e) {} }
       if (!ready.length) return null;
-      const sr = 48000, oac = new OfflineAudioContext(2, Math.max(1, Math.ceil(duration * sr)), sr);
+      const sr = opt.sr || 48000, oac = new OfflineAudioContext(opt.ch || 2, Math.max(1, Math.ceil(duration * sr)), sr);
       for (const o of ready) {
         const buf = files[o.mediaId].buffer, ip = o.inPoint || 0; if (ip >= buf.duration) continue;
         for (const [w0, w1, l0] of tree.windows(o)) { // every part that plays (a cut clip has several)
@@ -129,7 +131,7 @@
             const la = l0 + (a - w0), r = M.rateAt(o, la); let b = a; while (b < b0 - 1e-4 && Math.abs(M.rateAt(o, l0 + (b - w0) + 0.005) - r) < 1e-3) b = Math.min(b0, b + 0.02);
             if (b <= a) b = Math.min(b0, a + 0.02);
             const off = M.timeAt(o, la), lenF = M.timeAt(o, l0 + (b - w0)) - off;
-            if (r > 0.01 && lenF > 0 && off < buf.duration) { const src = oac.createBufferSource(); src.buffer = buf; src.playbackRate.value = U.clamp(r, 0.0625, 16); const g = oac.createGain(); g.gain.value = o.volume ?? 1; src.connect(g); g.connect(oac.destination); src.start(a, off, Math.min(lenF, buf.duration - off)); }
+            if (r > 0.01 && lenF > 0 && off < buf.duration) { const src = oac.createBufferSource(); src.buffer = buf; src.playbackRate.value = U.clamp(r, 0.0625, 16); const g = oac.createGain(); g.gain.value = only ? 1 : o.volume ?? 1; src.connect(g); g.connect(oac.destination); src.start(a, off, Math.min(lenF, buf.duration - off)); }
             a = b;
           }
         }

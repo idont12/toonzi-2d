@@ -9,10 +9,12 @@
   S.selBone = null; S.boneDraft = null; S.boneMode = 'turn'; S.wpaint = { add: true, r: 60, k: 0.5 }; S.poseLink = null;
   const rigVisible = r => r.showBones || r.id === S.sel || S.tool === 'bone' || S.tool === 'weights' || !!(S.picking && S.picking.bones);
   const usable = o => o && tree.inRange(o) && !tree.locked(o) && !tree.hidden(o);
-  /** A locked rig can still be posed: locking keeps its bones' setup and its place, not its pose. */
-  const poseable = o => o && tree.inRange(o) && !tree.hidden(o);
-  const rigLocked = r => !!r && tree.locked(r);
-  const lockedMsg = () => SB.toast('The rig is locked: its bones can be posed but not changed. Unlock it to edit the bones.');
+  /** A locked rig layer (the padlock) can't change at all: no posing either. Lock the setup (r.setupLock) keeps the bones'
+      setup and the rig's place but still lets you pose it. */
+  const poseable = o => o && tree.inRange(o) && !tree.hidden(o) && !tree.locked(o);
+  const rigLocked = r => !!r && (tree.locked(r) || !!r.setupLock);
+  const lockedMsg = () => SB.toast('The rig’s setup is locked: its bones can be posed but not changed. Unlock the setup to edit the bones.');
+  const poseLockedMsg = () => SB.toast('The rig layer is locked: its bones can’t move. Unlock it (the padlock) to pose it.');
   const fxable = o => o && SB.types.get(o.type).fx;
   SB.on('select', () => { const o = tree.sel(); if (!o || o.type !== 'rig') S.selBone = null; if (S.poseLink && !S.poseLink.multi && (!o || o.id !== S.poseLink.oid)) C.cancelSlot(); }); /* editing a controller's layers: pick any layer meanwhile */
 
@@ -99,6 +101,7 @@
     if (ch) { if (e.shiftKey) { tree.toggle(ch.c.id); return true; } if (S.multi.has(ch.c.id)) { if (S.sel !== ch.c.id) { S.sel = ch.c.id; SB.invalidate(); } } else tree.select([ch.c.id]); /* one of several selected: keep them all, so they move together */ if (ch.part === 'knob') SB.select.startXform(ch.c, 'move', P); else if (!S.recording) SB.tool.drag = boxesDrag(ch.c, P); return true; }
     const o = tree.sel();
     if (o && o.type === 'rig' && poseable(o)) { const hit = R.hit(o, P, e.pointerType === 'touch' ? 16 : 10); if (hit) { poseDrag(o, hit, P, e); return true; } }
+    else if (o && o.type === 'rig' && tree.inRange(o) && !tree.hidden(o) && tree.locked(o) && R.hit(o, P, e.pointerType === 'touch' ? 16 : 10)) { poseLockedMsg(); return true; } // a locked rig: its bones stay put
     if (o && o.phys && PH.mode(o) !== 'static' && usable(o) && !S.recording) {
       const O = velOrigin(o), lt = tree.localTime(o), tx = O.x + TR.value(o, 'phys:vx', lt) * PH.VEL_K, ty = O.y + TR.value(o, 'phys:vy', lt) * PH.VEL_K;
       if (Math.hypot(P.x - tx, P.y - ty) * SB.view.k() < 14) { SB.tool.drag = { kind: 'vel', moved: false, move(P) { this.moved = true; TR.set(o, 'phys:vx', Math.round((P.x - O.x) / PH.VEL_K)); TR.set(o, 'phys:vy', Math.round((P.y - O.y) / PH.VEL_K)); SB.fields.refresh(); }, up() { if (this.moved) SB.commit(); }, cancel() { if (this.moved) SB.revert(); } }; return true; }
@@ -437,8 +440,9 @@
       FL.row(o, { k: 'ik', label: 'Drag a tip moves', type: 'select', options: { 1: '1 bone', 2: '2 bones (arm, leg)', 3: '3 bones', 99: 'Whole chain' }, get: x => String(x.ik || 2), set: (x, v) => x.ik = +v }),
       FL.row(o, { k: 'showBones', label: 'Bones', type: 'check', text: 'Always show on the stage' }),
       R.hasDyn(o) ? FL.row(o, { k: 'phys:on', label: 'Dynamics', type: 'check', anim: true, text: 'On at the playhead' }) : null,
-      row(rigLocked(o) ? null : btn('Add bones', () => SB.tool.set('bone'), '', 'bone'), btn('Keyframe the pose', () => SB.ops.addKey(), 'ghost', 'key'), btn(o.locked ? 'Unlock the rig' : 'Lock the rig', () => { o.locked = !o.locked; if (o.locked && S.tool === 'bone') SB.tool.set('select'); SB.commit(); }, 'ghost', o.locked ? 'unlock' : 'lock')),
-      rigLocked(o) ? note('Locked: the bones can still be posed and keyframed, but not moved, added or changed.') : null,
+      row(rigLocked(o) ? null : btn('Add bones', () => SB.tool.set('bone'), '', 'bone'), btn('Keyframe the pose', () => SB.ops.addKey(), 'ghost', 'key'), btn(o.setupLock ? 'Unlock the setup' : 'Lock the setup', () => { o.setupLock = !o.setupLock; if (!o.setupLock) delete o.setupLock; if (o.setupLock && S.tool === 'bone') SB.tool.set('select'); SB.commit(); }, 'ghost', o.setupLock ? 'unlock' : 'lock')),
+      tree.locked(o) ? h('p.hint.keep', null, 'Locked: the bones can’t move. Unlock the layer (its padlock) to pose.') // (stays in sight: not folded into the “?”)
+        : o.setupLock ? h('p.hint.keep', null, 'Setup locked: pose it, but the bones can’t be changed.') : null,
       o.bind ? [note(`Attached to ${(R.boneById(tree.find(o.bind.rig), o.bind.bone) || {}).name || '?'} of ${(tree.find(o.bind.rig) || {}).name || '?'}.`), row(btn('Reattach here', () => { R.rebind(o); SB.commit(); }), btn('Detach', () => { delete o.bind; SB.commit(); }, 'ghost'))]
         : others.length ? row(btn('Attach to another rig…', () => pickBone([o]), 'ghost', 'link')) : null,
       bound.some(y => R.bendsWith(y, o)) ? row(btn('Clean up weights…', () => SB.weightFix.open(o), 'ghost', 'check')) : null,
@@ -711,7 +715,7 @@
       FL.row(o, { k: 'ctype', label: 'Moves', type: 'select', options: ctypeOptions(o), single: true, get: x => x.ctype || 'xy' }),
       FL.row(o, { k: 'label', label: 'Name on stage', type: 'text', single: true, get: x => x.label || '', set: (x, v) => { if (v.trim()) x.label = v; else delete x.label; } }),
       W.row('Color', W.colorBtn(o.color || ORANGE, { label: 'Controller color', input: v => { o.color = v; SB.dirty(); }, change: () => SB.commit() }), o.color ? W.btn('Default', () => { delete o.color; SB.commit(); }, { cls: 'sm ghost' }) : null),
-      o.toggle ? toggleEditor(o) : o.ctype === 'custom' && o.points ? pointsEditor(o) : null,
+      o.toggle ? toggleEditor(o) : o.frameSwitch ? frameSwitchEditor(o) : o.ctype === 'custom' && o.points ? pointsEditor(o) : null,
       row(btn(o.ctype === 'custom' && o.points ? 'Edit the design…' : 'Design your own…', () => SB.ctrlDesigner.open(o), '', 'ctrl')),
       t !== 'y' ? FL.row(o, { label: 'Width px', type: 'range', min: 10, max: 600, single: true, get: x => C.RX(x), set: (x, v) => x.rw = v }) : null,
       t !== 'x' ? FL.row(o, { label: 'Height px', type: 'range', min: 10, max: 600, single: true, get: x => C.RY(x), set: (x, v) => x.rh = v }) : null,
@@ -745,7 +749,7 @@
   const startPoint = c => { const sl = C.slotsFor(c), [u, v] = C.value(c, S.time); return (sl.slice().sort((a, b) => Math.hypot(a.u - u, a.v - v) - Math.hypot(b.u - u, b.v - v))[0] || { k: 'center' }).k; };
   /** In the Controller section: the layers it moves, and "Add and edit layers". */
   function ctlLayers(c) {
-    if (c.toggle) return null; const pl = editing(c);
+    if (c.toggle || c.frameSwitch) return null; const pl = editing(c);
     return h('div.fxitem.ctl-layers', null, h('div.hd', null, h('b', null, 'Layers it moves')), layerChips(c, pl),
       pl ? [pointsMap(c, pl.slot, k => k !== pl.slot && C.saveMulti(k)), h('div.row.btns', null, btn('Save', () => C.saveSlot(), 'primary'), btn('Cancel', () => C.cancelSlot(), 'ghost'))]
         : row(btn('Add and edit layers', () => C.enterMulti(c, startPoint(c)), '', 'plus'), W.info(['Pick a point of the controller, then select any layers and move, scale or turn them (several at once).', 'Save keeps that pose for every layer; layers you changed are added. Click another point to save and go on there.'], 'Add and edit layers')));
@@ -813,6 +817,7 @@
     const toggles = tree.all().filter(c => c.type === 'null' && c.toggle);
     const ctrl = { label: 'Controller', sub: [
       many ? { label: `Make a toggle controller (${items.length} layers, one point each)`, run: () => makeToggle(items) } : null,
+      !many && hasFrames(o) ? { label: `Make a frame switch controller (${o.frames.length} frames, one point each)`, run: () => makeFrameSwitch(o) } : null,
       ...toggles.map(c => ({ label: `Add to the toggle “${c.name}”`, run: () => { items.forEach(x => { if (!c.toggle.includes(x.id)) c.toggle.push(x.id); }); rebuildToggle(c); SB.commit(); SB.toast(`${c.name} has ${c.toggle.length} points.`); } })),
       { label: many ? 'Make them controllers' : 'Make it a controller', run: () => ctrlFromLayer(items) },
       { label: 'Drive with a controller', sub: driveItems(items).filter(Boolean) },
@@ -844,6 +849,38 @@
     ids.forEach(id => { const o = tree.find(id); (o.drv = o.drv || []).push({ id: U.uid(), ctrl: c.id, amt: 1, space: 'global', blend: 'hold', toggle: true, states: c.points.map(p => ({ slot: p.k, u: p.u, v: p.v, p: { opacity: p.k === 'tg_' + id ? 1 : 0 } })) }); });
     SB.bump();
   }
+  /** Frame switch: a toggle for one drawing's frames (Hold): one point per frame, the knob picks the frame shown.
+      c.frameSwitch = the layer's id; its link to the layer sets 'frame' (hold blend, so it jumps). */
+  const hasFrames = o => !!o && SB.types.get(o.type).frames && (o.frames || []).length > 1 && o.type !== 'null';
+  function makeFrameSwitch(o) {
+    if (!hasFrames(o)) return SB.toast('Pick a drawing (or pixel art) layer with two or more frames.');
+    const n = o.frames.length, b = SB.scene.box(o), q = b && b.aabb, c = C.make(null);
+    const P = X.parentWorld(c).inverse().transformPoint(pt(q ? (q.x0 + q.x1) / 2 : S.project.w / 2, q ? Math.max(30, q.y0 - 50) : 40));
+    c.name = o.name + ' frames'; c.label = 'Frames'; c.ctype = 'custom'; c.lock = 'x'; c.rw = Math.max(60, 26 * n); c.rh = 30; c.x = c.rx = U.r1(P.x); c.y = c.ry = U.r1(P.y); c.frameSwitch = o.id;
+    if (o.play !== 'library') { o.play = 'library'; SB.toast(`${o.name} is set to Hold, so the controller picks its frame.`); }
+    const now = SB.frames.currentIndex ? SB.frames.currentIndex(o) : 0;
+    rebuildFrameSwitch(c); c.x = U.r1(c.rx + (c.points[now] ? c.points[now].u : -1) * C.RX(c)); tree.reindex(); tree.select([c.id]); SB.commit();
+    SB.toast(`Frame switch with ${n} points: drag the knob (or key it) to pick ${o.name}'s frame.`); return c;
+  }
+  function rebuildFrameSwitch(c) {
+    const o = tree.find(c.frameSwitch); tree.all().forEach(x => { if (x.drv) { x.drv = x.drv.filter(L => !(L.ctrl === c.id && L.fswitch)); if (!x.drv.length) delete x.drv; } });
+    if (!o || !hasFrames(o)) { c.points = []; return SB.bump(); }
+    const n = o.frames.length; c.rw = Math.max(c.rw || 60, 26 * n);
+    c.points = o.frames.map((f, i) => ({ k: 'fs_' + i, name: f.name || `Frame ${i + 1}`, u: n > 1 ? U.r2(-1 + 2 * i / (n - 1)) : 0, v: 0 }));
+    (o.drv = o.drv || []).push({ id: U.uid(), ctrl: c.id, amt: 1, space: 'global', blend: 'hold', fswitch: true, states: c.points.map((p, i) => ({ slot: p.k, u: p.u, v: p.v, p: { frame: i } })) });
+    SB.bump();
+  }
+  function frameSwitchEditor(c) {
+    const o = tree.find(c.frameSwitch), n = (c.points || []).length, [u] = C.value(c, S.time), cur = n > 1 ? Math.round((u + 1) / 2 * (n - 1)) : 0;
+    if (!o) return [h('div.subhead', null, 'Frame switch'), note('Its drawing layer is gone.')];
+    const stale = hasFrames(o) && o.frames.length !== n;
+    return [h('div.subhead', null, `Frame switch: ${o.name} (${n} frames)`),
+      h('div.pt-list', null, (c.points || []).map((p, i) => h('div.pt-row' + (i === cur ? '.on' : ''), null, h('span.pt-i', null, String(i + 1)), h('span.pt-name', null, p.name),
+        W.iconBtn('eye', 'Show this frame (moves the knob here; with Auto key it is keyed)', () => showToggle(c, i), 'sm' + (i === cur ? ' on' : ''))))),
+      stale ? row(btn(`Update: ${o.name} has ${o.frames.length} frames now`, () => { rebuildFrameSwitch(c); SB.commit(); }, 'primary', 'frames')) : null,
+      note('Each point shows one frame of the drawing. Drag the knob, key it, or let Lip sync key it from a voice.')];
+  }
+  SB.frameSwitch = { make: makeFrameSwitch, rebuild: rebuildFrameSwitch, has: hasFrames };
   /** Show point i of a toggle: the knob goes there (with Auto key on, that is a keyframe). */
   function showToggle(c, i) { const p = c.points[i]; if (!p) return; TR.setMany(c, { x: U.r1((c.rx ?? c.x) + p.u * C.RX(c)), y: c.ry ?? c.y }); delete c._live; SB.commit(); }
   function toggleEditor(c) {
@@ -1097,7 +1134,7 @@
   function rigSteps(r, cur) {
     if (!r || r.type !== 'rig') return null;
     const go = k => {
-      if (k === 'bones') { if (r.locked) return SB.toast('The rig is locked: unlock it to change its bones.'); return SB.tool.set('bone'); }
+      if (k === 'bones') { if (rigLocked(r)) return SB.toast('The rig is locked: unlock it to change its bones.'); return SB.tool.set('bone'); }
       if (k === 'pose') return SB.tool.set('select');
       if (k === 'weights') { if (!tree.all().some(o => R.bendsWith(o, r))) return SB.toast('No layer bends with this rig yet: select a layer, then Rig › Bend with a rig.'); if (!S.selBone) S.selBone = (r.bones[0] || {}).id; S.wpaint.mode = S.wpaint.mode || 'brush'; return SB.tool.set('weights'); }
     };
@@ -1110,14 +1147,15 @@
     h('span.vsep'),
     o.bones.some(b => b.plant) ? ib('target', S.rigPlant === false ? 'Planted feet are free: they move with the body. Click to keep them in place' : 'Feet stay planted: when you move the body, planted bones keep their place and the legs bend. Click to let them move', () => { S.rigPlant = S.rigPlant === false; SB.invalidate('ctxbar'); }, S.rigPlant !== false, 'Feet stay') : null,
     o.bones.some(b => R.mirrorOf(o, b)) ? ib('flipH', S.rigMirror === false ? 'Mirror posing is off: each side poses on its own. Click to pose mirrored bones together' : 'Mirror posing: a bone and its mirror (_l and _r) pose together. Click to pose one side alone', () => { S.rigMirror = S.rigMirror === false; SB.invalidate('ctxbar'); }, S.rigMirror !== false, 'Mirror posing') : null,
-    o.locked ? null : ib('bone', 'Add bones (J)', () => SB.tool.set('bone'), false, 'Add bones'), ib('key', 'Keyframe the pose', () => SB.ops.addKey(), false, 'Keyframe'),
-    ib(o.locked ? 'lock' : 'unlock', o.locked ? 'Locked: the bones can be posed but not changed or moved. Click to unlock' : 'Lock the rig: keep posing, but its bones and place can’t change by accident', () => { o.locked = !o.locked; if (o.locked && S.tool === 'bone') SB.tool.set('select'); SB.commit(); }, o.locked, o.locked ? 'Locked' : 'Lock'),
+    rigLocked(o) ? null : ib('bone', 'Add bones (J)', () => SB.tool.set('bone'), false, 'Add bones'), ib('key', 'Keyframe the pose', () => SB.ops.addKey(), false, 'Keyframe'),
+    ib(o.setupLock ? 'lock' : 'unlock', o.setupLock ? 'Setup locked: the bones can be posed but not changed or moved. Click to unlock the setup' : 'Lock the setup: keep posing, but its bones and place can’t change by accident (the padlock in the layer list locks posing too)', () => { o.setupLock = !o.setupLock; if (!o.setupLock) delete o.setupLock; if (o.setupLock && S.tool === 'bone') SB.tool.set('select'); SB.commit(); }, !!o.setupLock, o.setupLock ? 'Setup locked' : 'Lock setup'),
     ib(o.showBones ? 'eye' : 'eyeOff', o.showBones ? 'Bones always show. Click to show them only when the rig is selected' : 'Bones show only when the rig is selected. Click to always show them', () => { o.showBones = !o.showBones; SB.commit(); }, o.showBones, 'Always show')];
-  SB.bars.null = o => [h('span.lbl', null, h('b', null, o.name)), o.toggle || editing(o) ? null : btn('Edit layers', () => C.enterMulti(o, startPoint(o)), 'ghost', 'plus'),  W.select(o.ctype || 'xy', ctypeOptions(o), v => { o.ctype = v; SB.commit(); }, 'Controller moves'), btn('Design…', () => SB.ctrlDesigner.open(o), 'ghost', 'ctrl'), W.popSlider('Size', Math.max(C.RX(o), C.RY(o)), { min: 10, max: 600, input: v => { const k = v / Math.max(C.RX(o), C.RY(o), 1); o.rw = Math.round(C.RX(o) * k); o.rh = Math.round(C.RY(o) * k); SB.bump(); }, change: () => SB.commit() }), btn('Keyframe', () => SB.ops.addKey(), 'ghost', 'key')];
+  SB.bars.null = o => [h('span.lbl', null, h('b', null, o.name)), o.toggle || o.frameSwitch || editing(o) ? null : btn('Edit layers', () => C.enterMulti(o, startPoint(o)), 'ghost', 'plus'),  W.select(o.ctype || 'xy', ctypeOptions(o), v => { o.ctype = v; SB.commit(); }, 'Controller moves'), btn('Design…', () => SB.ctrlDesigner.open(o), 'ghost', 'ctrl'), W.popSlider('Size', Math.max(C.RX(o), C.RY(o)), { min: 10, max: 600, input: v => { const k = v / Math.max(C.RX(o), C.RY(o), 1); o.rw = Math.round(C.RX(o) * k); o.rh = Math.round(C.RY(o) * k); SB.bump(); }, change: () => SB.commit() }), btn('Keyframe', () => SB.ops.addKey(), 'ghost', 'key')];
 
   /** Rig lock: a drag on the layer pulls its bone (the one it is on, or the nearest one for bending layers) like the tail of that bone. */
   function poseFromLayer(o, P, e = {}) {
     const rig = o.bind && tree.find(o.bind.rig); if (!rig || !rig.bones.length) return false;
+    if (tree.locked(rig)) { poseLockedMsg(); return true; } // its rig is locked: nothing poses it
     let b = o.bind.bone && R.boneById(rig, o.bind.bone);
     if (!b) { const l = R.toRig(rig, P), Q = R.poseAt(rig, S.time); let bd = Infinity; for (const x of rig.bones) { const q = Q[x.id], d = Math.hypot(q.tx - l.x, q.ty - l.y) + Math.hypot(q.hx - l.x, q.hy - l.y); if (d < bd) { bd = d; b = x; } } }
     if (!b) return false; poseDrag(rig, { bone: b, part: 'tail' }, P, e); return true;

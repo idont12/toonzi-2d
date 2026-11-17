@@ -149,6 +149,8 @@
         W.iconBtn('copy', 'Duplicate this frame', () => F.act('dup'), 'sm'), W.iconBtn('trash', 'Delete this frame', () => F.act('del'), 'sm'),
         h('span.vsep'),
         W.select(o.play, SB.PLAY_MODES, v => { o.play = v; if (v === 'library') o.frame = F.currentIndex(o); SB.commit(); }, 'How the frames play'),
+        lib && n > 1 && SB.frameSwitch ? (() => { const fs = SB.tree.all().find(c => c.type === 'null' && c.frameSwitch === o.id);
+          return W.iconBtn('ctrl', fs ? `Select its frame switch controller (${fs.name})` : 'Make a frame switch controller: a knob with one point per frame (key it, or let Lip sync key it)', () => fs ? SB.tree.select([fs.id]) : SB.frameSwitch.make(o), 'sm'); })() : null,
         lib ? null : h('label', { title: 'Frames per second for this layer' }, W.num(o.fps, { min: 1, max: 60, label: 'Speed', change: v => { o.fps = U.clamp(v, 1, 60); SB.commit(); } }), 'fps'),
         W.iconBtn('onion', 'Onion skin: see the frames before and after', () => { S.onion = !S.onion; SB.prefs.save(); SB.invalidate('frames', 'timeline'); SB.dirty(); }, S.onion ? 'sm on' : 'sm'),
         h('span.hint', null, n > 1 ? (lib ? (S.autoKey ? 'Click a frame to key it at the playhead' : 'Click a frame to show it. Auto key or the key button keeps it') : `${U.r2((F.units(o) || n) / o.fps)}s ${o.play === 'loop' ? 'per loop' : 'long'}`) : 'Add frames to animate')));

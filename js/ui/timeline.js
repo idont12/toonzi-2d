@@ -148,6 +148,7 @@
     html += `<div id="playhead"></div>`;
     tl.classList.toggle('razor', cutMode());
     inner.innerHTML = html; inner.style.width = (H + Wd) + 'px'; inner.style.setProperty('--head', H + 'px');
+    { const cr = inner.querySelector('.crumbs'), ru = inner.querySelector('.tl-row.ruler'); if (cr && ru) ru.style.top = cr.offsetHeight + 'px'; } // in a shot: its bar stays on top, the ruler under it
     playhead();
     if (S.sel && S.sel !== lastSel) { const r = inner.querySelector(`.tl-row[data-id="${S.sel}"]`); if (r) { const t = r.offsetTop, b = t + r.offsetHeight; if (t < tl.scrollTop + 40 || b > tl.scrollTop + tl.clientHeight) tl.scrollTop = t - 30; } }
     lastSel = S.sel;
@@ -293,7 +294,7 @@
     if (e.target.closest('.endmark')) { drag = { kind: 'end', x0: e.clientX, d0: S.project.duration }; inner.setPointerCapture(e.pointerId); return; }
     if (e.target.closest('#ruler')) { SB.time.pause(); scrubTo(e); drag = { kind: 'scrub' }; inner.setPointerCapture(e.pointerId); return; }
     const sub = e.target.closest('.tl-row.sub,.tl-row.subh'), fb = e.target.closest('.fxblk');
-    if (fb) { const o = tree.find(fb.dataset.id), fx = o && o.effects.find(x => x.id === fb.dataset.fx); if (fx) { const [a0, d0] = SB.fx.span(o, fx); if (S.sel !== o.id) tree.select([o.id]); drag = { kind: 'fxblk', o, fx, el: fb, x0: e.clientX, a0, d0, mode: e.target.classList.contains('l') ? 'L' : e.target.classList.contains('r') ? 'R' : 'M', moved: false }; inner.setPointerCapture(e.pointerId); } return; }
+    if (fb) { const o = tree.find(fb.dataset.id), fx = o && o.effects.find(x => x.id === fb.dataset.fx); if (fx) { const [a0, d0] = SB.fx.span(o, fx); if (S.sel !== o.id) tree.select([o.id]); drag = { kind: 'fxblk', o, fx, el: fb, x0: e.clientX, a0, d0, X0: ltX(o, a0), X1: ltX(o, a0 + d0), mode: e.target.classList.contains('l') ? 'L' : e.target.classList.contains('r') ? 'R' : 'M', moved: false }; inner.setPointerCapture(e.pointerId); } return; }
     if (sub) {
       const o = tree.find(sub.dataset.id), sk = e.target.closest('.sk');
       if (sk && o) { const id = sub.dataset.p, k = o.tracks[id][+sk.dataset.ki]; drag = keyDrag(e, [[k, { o, id }]], o, k.t); inner.setPointerCapture(e.pointerId); return; }
@@ -360,11 +361,16 @@
     if (drag.kind === 'box') return boxMove(drag, e);
     if (drag.kind === 'fxblk') {
       const { o, fx, a0, d0 } = drag, dd = (e.clientX - drag.x0) / z, cat = SB.effects.get(fx.type).cat, D = o.dur; if (Math.abs(e.clientX - drag.x0) > 2) drag.moved = true; if (!drag.moved) return;
+      // follow the pointer on the timeline itself: a timeline time → the layer's own time, through the piece of a cut clip under it
+      // (its own time joins the pieces end to end, so moving by the pointer's seconds would stop short of pieces placed later)
+      const own = X => tree.inner(o, tree.parentTime(o, tree.dom.toMain(X)), true) - o.start;
       let na = a0, nd = d0;
-      if (drag.mode === 'M') na = U.clamp(a0 + dd, 0, Math.max(0, D - d0)); else if (drag.mode === 'L') { na = U.clamp(a0 + dd, 0, a0 + d0 - 0.05); nd = d0 - (na - a0); } else nd = U.clamp(d0 + dd, 0.05, Math.max(0.05, D - a0));
+      if (drag.mode === 'M') na = U.clamp(own(drag.X0 + dd), 0, Math.max(0, D - d0));
+      else if (drag.mode === 'L') { na = U.clamp(own(drag.X0 + dd), 0, a0 + d0 - 0.05); nd = d0 - (na - a0); }
+      else nd = U.clamp(own(drag.X1 + dd) - a0, 0.05, Math.max(0.05, D - a0));
       const setD = v => { if (fx.type === 'typewriter') fx.speed = U.r2(((o.text || '').length + 1) / (16 * v)); else fx.dur = U.r2(v); };
       if (cat === 'in') { fx.at = U.r2(na); setD(nd); } else if (cat === 'out') { fx.gap = U.r2(Math.max(0, D - na - nd)); setD(nd); } else { fx.at = U.r2(na); fx.len = U.r2(nd); }
-      drag.el.style.left = (o.start + na) * z + 'px'; drag.el.style.width = Math.max(6, nd * z) + 'px'; const lb = drag.el.querySelector('b'); if (lb) lb.textContent = U.r2(nd) + 's';
+      drag.el.style.left = ltX(o, na) * z + 'px'; drag.el.style.width = Math.max(6, nd * z) + 'px'; const lb = drag.el.querySelector('b'); if (lb) lb.textContent = U.r2(nd) + 's';
       return SB.bump();
     }
     if (drag.kind === 'kscale') {
@@ -502,7 +508,7 @@
         if (b.dataset.act === 'unsolo') { S.solo = null; SB.invalidate(); return render(); }
         if (b.dataset.act === 'unfocus') return SB.layout.focus(false);
         if (b.dataset.act === 'exit') return tree.exit();
-        if (b.dataset.act === 'fitshot') return SB.ops.fitShot(tree.ctx());
+        if (b.dataset.act === 'fitshot') { const q = tree.ctx(), was = q && [q.inPoint || 0, q.dur]; SB.ops.fitShot(q); if (q) SB.toast(q.inPoint === was[0] && q.dur === was[1] ? 'The shot already fits its layers.' : `The shot now fits its layers: it shows ${U.r2(q.inPoint || 0)}s to ${U.r2((q.inPoint || 0) + q.dur)}s of them (${U.r2(q.dur)}s).`); return; }
         const row = b.closest('.tl-row'), o = row && tree.find(row.dataset.id); if (!o) return;
         const items = S.multi.has(o.id) ? tree.selected() : [o];
         if (b.dataset.act === 'color') return colorPick(items, b);

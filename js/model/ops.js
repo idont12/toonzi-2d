@@ -133,7 +133,39 @@
       if (t == null) return toast(dir > 0 ? 'No keyframe after the playhead.' : 'No keyframe before the playhead.'); SB.time.pause(); SB.time.set(t + 0.0001);
     },
     /** Mirror the selected layers (h: left–right, v: up–down) by flipping their stretch. */
-    flip(axis) { const id = axis === 'h' ? 'scx' : 'scy'; tree.selected().forEach(x => { if (SB.types.get(x.type).visual) TR.set(x, id, -TR.now(x, id)); }); SB.commit(); },
+    /** Flip left–right ('h') or upside down ('v') on the screen. A drawing or pixel art layer flips its own lines and squares in
+        place (every frame), so its scale stays positive and its box stays a normal box; other layers flip by their scale. A turned
+        layer turns the other way too (its rotation keys as well), so the flip is level on the screen, not along its tilt. */
+    flip(axis) {
+      const h = axis === 'h', sid = h ? 'scx' : 'scy', neg = (o, id) => { if (typeof o[id] === 'number') o[id] = -o[id]; (o.tracks[id] || []).forEach(k => { if (typeof k.v === 'number') k.v = -k.v; }); };
+      tree.selected().forEach(x => {
+        if (!SB.types.get(x.type).visual) return;
+        if (!(x.bind && x.bind.mode === 'deform') && ops.mirrorArt(x, axis)) { /* flipped its own art */ }
+        else neg(x, sid); // (its keys too, so an animated stretch flips all along)
+        if ((x.rot || 0) !== 0 || (x.tracks.rot && x.tracks.rot.length)) neg(x, 'rot');
+      });
+      SB.commit();
+    },
+    /** Mirror a drawing's or pixel art's own content around its middle (all frames, with gradients), and its pivot with it. */
+    mirrorArt(o, axis) {
+      const h = axis === 'h', i = h ? 0 : 1, frames = o.frames || [];
+      if (o.type === 'pixels') {
+        let lo = Infinity, hi = -Infinity; frames.forEach(f => Object.keys(f.px || {}).forEach(k => { const v = +k.split(',')[i]; lo = Math.min(lo, v); hi = Math.max(hi, v); }));
+        if (lo > hi) return true; const cs = o.cs || 1, flipK = k => { const c = k.split(',').map(Number); c[i] = lo + hi - c[i]; return c.join(','); }, c = (lo + hi + 1) / 2 * cs;
+        frames.forEach(f => { if (f.px) { const n = {}; for (const k in f.px) n[flipK(k)] = f.px[k]; f.px = n; }
+          (f.pg || []).forEach(g => { g.cells = (g.cells || []).map(flipK); ['a', 'b'].forEach(e => { if (g[e]) g[e][i] = U.r2(2 * c - g[e][i]); }); }); });
+        return ops.mirrorPivot(o, axis, c), true;
+      }
+      if (o.type !== 'draw') return false;
+      let lo = Infinity, hi = -Infinity; const each = fn => frames.forEach(f => (f.strokes || []).forEach(st => { if (st.pts) fn(st.pts); (st.subs || []).forEach(sb => sb.p && fn(sb.p)); }));
+      each(a => { for (let k = i; k < a.length; k += 2) { lo = Math.min(lo, a[k]); hi = Math.max(hi, a[k]); } });
+      if (lo > hi) return true; const c = (lo + hi) / 2;
+      each(a => { for (let k = i; k < a.length; k += 2) a[k] = U.r2(2 * c - a[k]); });
+      frames.forEach(f => (f.strokes || []).forEach(st => { ['c', 'fc'].forEach(k => { if (typeof st[k] === 'string') st[k] = SB.paint.mirror(st[k], axis); }); if (SB.paths.touch) SB.paths.touch(st); }));
+      return ops.mirrorPivot(o, axis, c), true;
+    },
+    /** The pivot goes to the mirrored spot (the art doesn't move): a pivot at a shoulder stays at the shoulder. */
+    mirrorPivot(o, axis, c) { const ax = o.ax || 0, ay = o.ay || 0; if (axis === 'h' && Math.abs(2 * c - ax - ax) > 0.05) SB.xf.setOrigin(o, 2 * c - ax, ay); else if (axis === 'v' && Math.abs(2 * c - ay - ay) > 0.05) SB.xf.setOrigin(o, ax, 2 * c - ay); },
     splitSound(o) {
       if (o.type !== 'video' || (o.soundSplit && tree.find(o.soundSplit))) return; const keep = ['speed', 'paused', 'showAt', 'volume'], tr = {}; keep.forEach(k => { if (o.tracks[k]) tr[k] = U.deep(o.tracks[k]); });
       const a = tree.make('audio', { name: o.name + ' (sound)', mediaId: o.mediaId, start: o.start, dur: o.dur, inPoint: o.inPoint || 0, speed: o.speed, paused: o.paused, volume: TR.base(o, 'volume'), tracks: tr });

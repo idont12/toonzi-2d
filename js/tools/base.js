@@ -50,12 +50,12 @@
     },
     // while pick mode is on (SB.picker), clicks pick a target instead of going to the tool
     // while the interactive player plays, the stage is the thing you click and hover (js/ui/interact.js)
-    down(P, e) { if (S.ixPlay) return SB.ix.pointer('down', P, e); T.drag = null; if (S.picking) { T.picked = true; return SB.picker.down(P, e); } T.picked = false; cur().down && cur().down(P, e); },
+    down(P, e) { if (S.ixPlay) return SB.ix.pointer('down', P, e); T.drag = null; T.pressed = true; if (S.picking) { T.picked = true; return SB.picker.down(P, e); } T.picked = false; cur().down && cur().down(P, e); },
     move(P, e) { if (S.ixPlay) return SB.ix.pointer('move', P, e); if (T.picked) return; cur().move && cur().move(P, e); },
-    up(P, e) { if (S.ixPlay) return SB.ix.pointer('up', P, e); if (T.picked) { T.picked = false; return; } cur().up && cur().up(P, e); T.drag = null; SB.dirty(); },
+    up(P, e) { const was = T.pressed; T.pressed = false; if (was) SB.dirty(); if (S.ixPlay) return SB.ix.pointer('up', P, e); if (T.picked) { T.picked = false; return; } cur().up && cur().up(P, e); T.drag = null; SB.dirty(); },
     hover(P, e) { if (S.ixPlay) return SB.ix.pointer('move', P, e); if (S.picking) return SB.picker.hover(P, e); cur().hover && cur().hover(P, e); addCursor(P, e); },
     dbl(P, e) { if (S.ixPlay) return; cur().dbl && cur().dbl(P, e); },
-    cancel() { cur().cancel && cur().cancel(); T.drag = null; SB.dirty(); },
+    cancel() { cur().cancel && cur().cancel(); T.drag = null; T.pressed = false; SB.dirty(); },
     contextMenu(e) { if (S.ixPlay) return; if (S.picking) return SB.picker.cancel(); SB.menus.stage(e); },
 
     /** The drawing layer to draw on: the selection if it has frames, the layer under P, or a new one. */
@@ -64,8 +64,10 @@
       if (ok(o)) return o;
       if (P) { const hit = SB.scene.hit(P); if (ok(hit)) { tree.select([hit.id]); return hit; } }
       if (!create) return null;
-      const parent = o && o.type === 'group' && !tree.locked(o) ? o : null;
-      o = tree.make('draw', parent ? { x: 0, y: 0 } : {}); o._fresh = true;
+      // a new drawing layer: in the selected group, else in the shot that is open (or the main timeline), at the screen's middle
+      const sel = o && o.type === 'group' && !tree.locked(o) ? o : null, parent = sel || tree.ctx();
+      const mid = parent ? SB.xf.world(parent).inverse().transformPoint(U.pt(S.project.w / 2, S.project.h / 2)) : null;
+      o = tree.make('draw', mid ? { x: U.r1(mid.x), y: U.r1(mid.y) } : {}); o._fresh = true;
       (parent ? parent.children : S.objects).unshift(o); tree.reindex(); tree.select([o.id]);
       return o;
     },
@@ -74,11 +76,13 @@
     /** Fresh drawing layers get their pivot centered on what was drawn. */
     centerFresh(o) { if (!o._fresh) return; delete o._fresh; const b = SB.scene.bounds(o); if (b) X.setOrigin(o, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2); },
 
-    /** While drawing, the layer stays still so strokes land where you draw: effects that move it (shake, wave, transitions…)
-        wait until you play, looks (blur, shadow, glow, outline…) still show (the set's looks flag). Editing text: no effects. */
+    /** While you draw a stroke (the pointer is down, or a pen path is open), the layer stays still so the stroke lands where
+        you draw: effects that move it (shake, wave, transitions…) pause for that moment; looks (blur, shadow, glow, outline…)
+        still show (the set's looks flag). Between strokes, and while you move the playhead, everything shows, so you can
+        watch a transition's progress. Editing text: no effects. */
     noFxSet() {
       if (S.textEdit && !S.playing) { const t = tree.find(S.textEdit); if (t) return new Set([t.id, ...tree.ancestors(t).map(a => a.id)]); }
-      if (S.playing || !DRAW_TOOLS.has(S.tool) || !S.sel) return null;
+      if (S.playing || !DRAW_TOOLS.has(S.tool) || !S.sel || !(T.pressed || S.pen)) return null;
       const o = tree.sel(); if (!o) return null; const set = new Set([o.id, ...tree.ancestors(o).map(a => a.id)]); set.looks = true; return set;
     },
     /** While drawing, keep the selected layer visible even outside its clip. */

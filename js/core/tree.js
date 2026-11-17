@@ -103,11 +103,18 @@
       length() { const q = T.ctx(); return q ? Math.max(q.dur + (q.inPoint || 0), ...q.children.map(c => c.start + c.dur)) : S.project.duration; },
     },
     enter(q) {
-      if (!q || !q.seq) return; S.ctx = q.id; S.solo = null;
+      if (!q || !q.seq) return; T.keepView(); S.ctx = q.id; S.solo = null;
       if (!T.inRange(q)) SB.time.set(T.mainOf(q, T.span(q)[0]) + 0.0001);
       T.select([]); SB.toast(`Inside ${q.name}. Its layers have their own time. Press Esc or Back to return.`);
     },
-    exit() { const q = T.ctx(); if (!q) return; const up = T.ancestors(q).find(a => a.seq); S.ctx = up ? up.id : null; T.select([q.id]); },
+    exit() { const q = T.ctx(); if (!q) return; const up = T.ancestors(q).find(a => a.seq); S.ctx = up ? up.id : null; T.select([q.id]); T.backToView(); },
+    /** The timeline's zoom and scroll at this level (the main timeline or a shot), kept when you open a shot inside it and put back when you come out. */
+    keepView() { const tl = document.getElementById('tl'); (T.views || (T.views = {}))[S.ctx || 'main'] = { zoom: S.zoom, x: tl ? tl.scrollLeft : 0, y: tl ? tl.scrollTop : 0 }; },
+    backToView() {
+      const v = T.views && T.views[S.ctx || 'main']; if (!v) return; delete T.views[S.ctx || 'main']; S.zoom = v.zoom; SB.invalidate('timeline');
+      const put = (n = 0) => { const tl = document.getElementById('tl'); if (!tl) return; tl.scrollLeft = v.x; tl.scrollTop = v.y; if (n < 3 && (Math.abs(tl.scrollLeft - v.x) > 1 || Math.abs(tl.scrollTop - v.y) > 1)) requestAnimationFrame(() => put(n + 1)); };
+      requestAnimationFrame(() => requestAnimationFrame(() => put()));
+    },
 
     /** Groups follow their layers: start at the first one, end at the last (or earlier, when the group's end was trimmed). */
     normalize() {

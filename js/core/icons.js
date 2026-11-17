@@ -51,6 +51,7 @@
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
     pixel: '<path d="M4 4h5v5H4zM9.5 9.5h5v5h-5zM15 4h5v5h-5zM4 15h5v5H4zM15 15h5v5h-5z" fill="currentColor" stroke="none"/>',
+    pixlayer: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M9.2 3.5v17M14.8 3.5v17M3.5 9.2h17M3.5 14.8h17" stroke-width="1.3"/><path d="M9.2 9.2h5.6v5.6H9.2z" fill="currentColor" stroke="none"/>', // a pixel art layer: a grid with one square filled
     particles: '<circle cx="6" cy="18" r="2.2"/><circle cx="12" cy="10" r="1.6"/><circle cx="17.5" cy="5.5" r="2.6"/><circle cx="18" cy="14" r="1.2"/><circle cx="8" cy="6" r="1"/><path d="M3 21l3-3"/>',
     book: '<path d="M12 6.5C10 5 7 4.6 4 5.5v13c3-.9 6-.5 8 1M12 6.5c2-1.5 5-1.9 8-1v13c-3-.9-6-.5-8 1M12 6.5v13"/>',
     tour: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.7-.8 1.2v.9"/><path d="M12 16.8v.2"/>',
